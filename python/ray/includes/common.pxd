@@ -318,3 +318,9 @@ cdef extern from "ray/common/task/task_spec.h" nogil:
         c_string GetName() const
         uint32_t GetMaxConcurrency() const
         c_vector[CFunctionDescriptor] GetFunctionDescriptors() const
+
+cdef extern from "ray/common/task/task_priority.h" nogil:
+    cdef cppclass CPriority "ray::Priority":
+        CPriority()
+        CPriority(const c_vector[int] &score)
+        c_vector[int] score

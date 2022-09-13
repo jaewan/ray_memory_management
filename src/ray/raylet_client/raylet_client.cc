@@ -281,7 +281,8 @@ Status raylet::RayletClient::Wait(const std::vector<ObjectID> &object_ids,
 }
 
 Status raylet::RayletClient::WaitForDirectActorCallArgs(
-    const std::vector<rpc::ObjectReference> &references, int64_t tag) {
+    const std::vector<rpc::ObjectReference> &references,
+    const Priority &priority, int64_t tag) {
   flatbuffers::FlatBufferBuilder fbb;
   std::vector<ObjectID> object_ids;
   std::vector<rpc::Address> owner_addresses;
@@ -290,7 +291,9 @@ Status raylet::RayletClient::WaitForDirectActorCallArgs(
     owner_addresses.push_back(ref.owner_address());
   }
   auto message = protocol::CreateWaitForDirectActorCallArgsRequest(
-      fbb, to_flatbuf(fbb, object_ids), AddressesToFlatbuffer(fbb, owner_addresses), tag);
+      fbb, to_flatbuf(fbb, object_ids), AddressesToFlatbuffer(fbb, owner_addresses),
+      fbb.CreateVector(priority.score.data(), priority.score.size()),
+      tag);
   fbb.Finish(message);
   return conn_->WriteMessage(MessageType::WaitForDirectActorCallArgsRequest, &fbb);
 }
@@ -491,6 +494,12 @@ void raylet::RayletClient::ShutdownRaylet(
   rpc::ShutdownRayletRequest request;
   request.set_graceful(graceful);
   grpc_client_->ShutdownRaylet(request, callback);
+}
+
+void raylet::RayletClient::SetNewDependencyAdded(
+    const rpc::ClientCallback<rpc::SetNewDependencyAddedReply> &callback) {
+  rpc::SetNewDependencyAddedRequest request;
+  grpc_client_->SetNewDependencyAdded(request, callback);
 }
 
 void raylet::RayletClient::GlobalGC(

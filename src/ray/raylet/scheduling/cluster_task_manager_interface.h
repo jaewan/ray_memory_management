@@ -16,6 +16,7 @@
 
 #include "ray/rpc/server_call.h"
 #include "src/ray/protobuf/node_manager.pb.h"
+#include "ray/raylet/local_object_manager.h"
 
 namespace ray {
 namespace raylet {
@@ -53,6 +54,12 @@ class ClusterTaskManagerInterface {
       rpc::RequestWorkerLeaseReply::SchedulingFailureType failure_type =
           rpc::RequestWorkerLeaseReply::SCHEDULING_CANCELLED_INTENDED,
       const std::string &scheduling_failure_message = "") = 0;
+
+  virtual void BlockTasks(Priority, instrumented_io_context&) = 0;
+
+  virtual bool EvictTasks(Priority) = 0;
+
+  virtual void CheckDeadlock(size_t, int64_t,  LocalObjectManager&, instrumented_io_context&) = 0;
 
   /// Queue task and schedule. This hanppens when processing the worker lease request.
   ///

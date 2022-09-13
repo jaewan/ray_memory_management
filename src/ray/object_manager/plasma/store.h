@@ -60,10 +60,13 @@ class PlasmaStore {
               const std::string &socket_name,
               uint32_t delay_on_oom_ms,
               float object_spilling_threshold,
+			  float block_tasks_threshold,
+			  float evict_tasks_threshold,
               ray::SpillObjectsCallback spill_objects_callback,
               std::function<void()> object_store_full_callback,
               ray::AddObjectCallback add_object_callback,
-              ray::DeleteObjectCallback delete_object_callback);
+              ray::DeleteObjectCallback delete_object_callback,
+              ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback);
 
   ~PlasmaStore();
 
@@ -80,6 +83,7 @@ class PlasmaStore {
   /// absolutely know what's going on). This method won't work correctly if it is used
   /// before the object is pinned by raylet for the first time.
   bool IsObjectSpillable(const ObjectID &object_id) LOCKS_EXCLUDED(mutex_);
+  bool IsObjectEagerSpillable(const ObjectID &object_id) LOCKS_EXCLUDED(mutex_);
 
   /// Return the plasma object bytes that are consumed by core workers.
   int64_t GetConsumedBytes();
@@ -106,6 +110,16 @@ class PlasmaStore {
       available = allocator_.GetFootprintLimit() - num_bytes_in_use;
     }
     callback(available);
+  }
+
+  void SetNewDependencyAdded() {
+    absl::MutexLock lock(&mutex_);
+    return create_request_queue_.SetNewDependencyAdded();
+  }
+
+  void SetShouldSpill(bool should_spill) {
+    absl::MutexLock lock(&mutex_);
+    return create_request_queue_.SetShouldSpill(should_spill);
   }
 
  private:
@@ -202,7 +216,10 @@ class PlasmaStore {
                                         const std::vector<uint8_t> &message,
                                         bool fallback_allocator,
                                         PlasmaObject *object,
-                                        bool *spilling_required)
+                                        bool *spilling_required,
+										bool *block_tasks_required,
+										bool *evict_tasks_required,
+										ray::Priority *lowest_priority)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void ReplyToCreateClient(const std::shared_ptr<Client> &client,
@@ -264,6 +281,8 @@ class PlasmaStore {
   /// shared with the main raylet thread.
   const ray::DeleteObjectCallback delete_object_callback_;
 
+  const ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback_;
+
   ObjectLifecycleManager object_lifecycle_mgr_ GUARDED_BY(mutex_);
 
   /// The amount of time to wait before retrying a creation request after an
@@ -272,6 +291,12 @@ class PlasmaStore {
 
   /// The percentage of object store memory used above which spilling is triggered.
   const float object_spilling_threshold_;
+
+  /// The percentage of object store memory used above which
+  //blocking new tasks is triggerted
+  const float block_tasks_threshold_;
+  const float evict_tasks_threshold_;
+  std::atomic<bool> block_task_flag_ = {false};
 
   /// A timer that is set when the first request in the queue is not
   /// serviceable because there is not enough memory. The request will be

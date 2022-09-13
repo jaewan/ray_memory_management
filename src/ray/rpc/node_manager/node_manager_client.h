@@ -174,6 +174,10 @@ class NodeManagerWorkerClient
                          RequestObjectSpillage,
                          grpc_client_,
                          /*method_timeout_ms*/ -1, )
+  VOID_RPC_CLIENT_METHOD(NodeManagerService,
+                         SetNewDependencyAdded,
+						 grpc_client_,
+                         /*method_timeout_ms*/ -1, )
 
   /// Release unused bundles.
   VOID_RPC_CLIENT_METHOD(NodeManagerService,

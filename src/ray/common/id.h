@@ -254,6 +254,10 @@ class TaskID : public BaseID<TaskID> {
 
   MSGPACK_DEFINE(id_);
 
+  bool operator<(const TaskID &rhs) const {
+    return std::memcmp(id_, rhs.id_, kLength) < 0;
+  }
+
  private:
   uint8_t id_[kLength];
 };
@@ -320,6 +324,10 @@ class ObjectID : public BaseID<ObjectID> {
   static ActorID ToActorID(const ObjectID &object_id);
 
   MSGPACK_DEFINE(id_);
+
+  bool operator<(const ObjectID &rhs) const{
+    return std::memcmp(id_, rhs.id_, kLength) < 0;
+  }
 
  private:
   /// A helper method to generate an ObjectID.

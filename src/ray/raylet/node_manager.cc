@@ -253,6 +253,65 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
                 "NodeManager.SpillObjects");
             return GetLocalObjectManager().IsSpillingInProgress();
           },
+          /*on_object_creation_blocked_callback=*/
+          [this](const Priority &base_priority, const ObjectID &object_id,
+		    bool delete_eager_spilled_objects, bool block_tasks,
+            bool evict_tasks, bool block_spill, size_t num_spinning_workers, int64_t pending_size) {
+			static const ObjectID default_object_id = ObjectID();
+			static const Priority default_priority = Priority();
+			if(object_id != default_object_id && base_priority != default_priority){
+			  local_object_manager_.MapObjectIDPriority(object_id, base_priority);
+			  return true;
+			}
+            if(block_tasks){
+              cluster_task_manager_->BlockTasks(base_priority, io_service_);
+            }
+			if(RayConfig::instance().enable_BlockTasksSpill()){
+			  if(num_spinning_workers && num_spinning_workers == worker_pool_.GetAllRegisteredWorkersNum()){
+                RAY_LOG(DEBUG) << "[" << __func__ << "] all workers are spinning: " << num_spinning_workers;
+                if(evict_tasks){
+                  if(cluster_task_manager_->EvictTasks(base_priority)){
+					if(delete_eager_spilled_objects){
+			          io_service_.post([this](){
+		                local_object_manager_.DeleteEagerSpilledObjects(true);
+				      },"");
+                      return GetLocalObjectManager().IsSpillingInProgress();
+					}else{
+			          io_service_.post([this](){
+					    object_manager_.SetShouldSpill(true);
+				      },"");
+					}
+				    return true;
+			      }else{
+                    RAY_LOG(DEBUG) << "[" << __func__ <<
+						"] EvictTasks destroyed workers num_workers now: "<<
+						worker_pool_.GetAllRegisteredWorkersNum();
+				  }
+                }else{
+				  if(delete_eager_spilled_objects){
+			        io_service_.post([this](){
+		              local_object_manager_.DeleteEagerSpilledObjects(true);
+				    },"");
+                    return GetLocalObjectManager().IsSpillingInProgress();
+				  }else{
+			        io_service_.post([this](){
+				      object_manager_.SetShouldSpill(true);
+				    },"");
+				  }
+				  return true;
+				}
+			  }
+			}
+            if(block_spill){
+			  cluster_task_manager_->CheckDeadlock(num_spinning_workers, pending_size, local_object_manager_, io_service_);
+			}else if(delete_eager_spilled_objects){
+			  io_service_.post([this](){
+				local_object_manager_.DeleteEagerSpilledObjects(true);
+			  },"");
+              return GetLocalObjectManager().IsSpillingInProgress();
+			}
+			return true;
+		  },
           /*object_store_full_callback=*/
           [this]() {
             // Post on the node manager's event loop since this
@@ -317,6 +376,17 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
           [this](const std::vector<ObjectID> &object_ids) {
             object_manager_.FreeObjects(object_ids,
                                         /*local_only=*/false);
+          },
+          /*store_object_count_*/
+          [this](const ObjectID &object_id, bool increase, bool decrease) {
+		    if(increase)
+			  store_client_.EagerSpillIncreaseObjectCount(object_id);
+			if(decrease)
+			  store_client_.EagerSpillDecreaseObjectCount(object_id);
+          },
+          /*is_plasma_object_eager_spillable*/
+          [this](const ObjectID &object_id) {
+            return object_manager_.IsPlasmaObjectEagerSpillable(object_id);
           },
           /*is_plasma_object_spillable*/
           [this](const ObjectID &object_id) {
@@ -385,6 +455,10 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
            "return values are greater than the remaining capacity.";
     max_task_args_memory = 0;
   }
+  auto destroy_worker = [this](std::shared_ptr<WorkerInterface> worker,
+                                rpc::WorkerExitType disconnect_type) {
+	  DestroyWorker(worker, disconnect_type);
+  };
   auto is_owner_alive = [this](const WorkerID &owner_worker_id,
                                const NodeID &owner_node_id) {
     return !(failed_workers_cache_.count(owner_worker_id) > 0 ||
@@ -408,7 +482,12 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
       std::dynamic_pointer_cast<ClusterResourceScheduler>(cluster_resource_scheduler_),
       get_node_info_func,
       announce_infeasible_task,
-      local_task_manager_);
+      local_task_manager_,
+	  leased_workers_,
+	  object_manager_,
+      [this](bool should_spill) {
+        object_manager_.SetShouldSpill(should_spill);
+      });
   placement_group_resource_manager_ = std::make_shared<NewPlacementGroupResourceManager>(
       std::dynamic_pointer_cast<ClusterResourceScheduler>(cluster_resource_scheduler_));
 
@@ -671,6 +750,14 @@ void NodeManager::DoLocalGC(bool triggered_by_global_gc) {
         });
   }
   local_gc_run_time_ns_ = absl::GetCurrentTimeNanos();
+}
+
+void NodeManager::HandleSetNewDependencyAdded(const rpc::SetNewDependencyAddedRequest &request,
+                                           rpc::SetNewDependencyAddedReply *reply,
+                                           rpc::SendReplyCallback send_reply_callback){
+  io_service_.post([this](){
+    object_manager_.SetNewDependencyAdded();
+  },"");
 }
 
 void NodeManager::HandleRequestObjectSpillage(
@@ -1226,7 +1313,7 @@ void NodeManager::ProcessClientMessage(const std::shared_ptr<ClientConnection> &
     HandleWorkerAvailable(client);
   } break;
   case protocol::MessageType::DisconnectClient: {
-    ProcessDisconnectClientMessage(client, message_data);
+	ProcessDisconnectClientMessage(client, message_data);
     // We don't need to receive future messages from this client,
     // because it's already disconnected.
     return;

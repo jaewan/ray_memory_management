@@ -16,6 +16,9 @@
 
 #include "absl/base/optimization.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/btree_set.h"
+#include "absl/container/btree_map.h"
 #include "ray/common/asio/periodical_runner.h"
 #include "ray/common/buffer.h"
 #include "ray/common/placement_group.h"
@@ -314,6 +317,7 @@ class CoreWorker : public rpc::CoreWorkerServiceHandler {
                         const size_t data_size,
                         const ObjectID &object_id,
                         const rpc::Address &owner_address,
+                        const Priority &priority,
                         std::shared_ptr<Buffer> *data,
                         bool created_by_worker);
 
@@ -448,6 +452,7 @@ class CoreWorker : public rpc::CoreWorkerServiceHandler {
                    const std::string &error_message,
                    double timestamp);
 
+  void BuildObjectWorkingSet(TaskSpecification &spec);
   /// Submit a normal task.
   ///
   /// \param[in] function The remote function to execute.
@@ -704,6 +709,10 @@ class CoreWorker : public rpc::CoreWorkerServiceHandler {
   /// Implements gRPC server handler.
   void HandleGetObjectStatus(const rpc::GetObjectStatusRequest &request,
                              rpc::GetObjectStatusReply *reply,
+                             rpc::SendReplyCallback send_reply_callback) override;
+
+  void HandleGetObjectWorkingSet(const rpc::GetObjectWorkingSetRequest &request,
+							 rpc::GetObjectWorkingSetReply *reply,
                              rpc::SendReplyCallback send_reply_callback) override;
 
   /// Implements gRPC server handler.
@@ -1260,6 +1269,8 @@ class CoreWorker : public rpc::CoreWorkerServiceHandler {
   std::shared_ptr<json> job_runtime_env_;
 
   std::shared_ptr<rpc::RuntimeEnvInfo> job_runtime_env_info_;
+
+  absl::flat_hash_map<TaskID, absl::btree_set<ObjectID> > object_working_set_;
 
   /// Simple container for per function task counters. The counters will be
   /// keyed by the function name in task spec.

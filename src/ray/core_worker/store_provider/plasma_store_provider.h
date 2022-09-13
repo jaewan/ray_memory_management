@@ -125,6 +125,7 @@ class CoreWorkerPlasmaStoreProvider {
                 const size_t data_size,
                 const ObjectID &object_id,
                 const rpc::Address &owner_address,
+				const Priority &priority,
                 std::shared_ptr<Buffer> *data,
                 bool created_by_worker);
 

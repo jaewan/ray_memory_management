@@ -111,6 +111,7 @@ class TaskSpecBuilder {
       const std::unordered_map<std::string, double> &required_resources,
       const std::unordered_map<std::string, double> &required_placement_resources,
       const std::string &debugger_breakpoint,
+      const Priority &priority,
       int64_t depth,
       const std::shared_ptr<rpc::RuntimeEnvInfo> runtime_env_info = nullptr,
       const std::string &concurrency_group_name = "") {
@@ -133,6 +134,11 @@ class TaskSpecBuilder {
     message_->set_depth(depth);
     if (runtime_env_info) {
       message_->mutable_runtime_env_info()->CopyFrom(*runtime_env_info);
+
+      auto pri = message_->mutable_priority();
+      for (auto &s : priority.score) {
+        pri->Add(s);
+      }
     }
     message_->set_concurrency_group_name(concurrency_group_name);
     return *this;

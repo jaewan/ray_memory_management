@@ -28,6 +28,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <thread>
 
 #include "absl/container/flat_hash_map.h"
 #include "ray/common/asio/instrumented_io_context.h"
@@ -58,7 +59,7 @@ class PlasmaBuffer : public SharedMemoryBuffer {
                const std::shared_ptr<Buffer> &buffer)
       : SharedMemoryBuffer(buffer, 0, buffer->Size()),
         client_(client),
-        object_id_(object_id) {}
+        object_id_(object_id) {RAY_LOG(DEBUG) << "[JAE_DEBUG] PlasmaBuffer created";}
 
  private:
   std::shared_ptr<PlasmaClient::Impl> client_;
@@ -112,6 +113,7 @@ class PlasmaClient::Impl : public std::enable_shared_from_this<PlasmaClient::Imp
 
   Status CreateAndSpillIfNeeded(const ObjectID &object_id,
                                 const ray::rpc::Address &owner_address,
+                                const ray::Priority &priority,
                                 int64_t data_size,
                                 const uint8_t *metadata,
                                 int64_t metadata_size,
@@ -144,6 +146,9 @@ class PlasmaClient::Impl : public std::enable_shared_from_this<PlasmaClient::Imp
              int64_t timeout_ms,
              ObjectBuffer *object_buffers,
              bool is_from_worker);
+
+  void EagerSpillDecreaseObjectCount(const ObjectID &object_id);
+  void EagerSpillIncreaseObjectCount(const ObjectID &object_id);
 
   Status Release(const ObjectID &object_id);
 
@@ -226,7 +231,7 @@ class PlasmaClient::Impl : public std::enable_shared_from_this<PlasmaClient::Imp
   std::recursive_mutex client_mutex_;
 };
 
-PlasmaBuffer::~PlasmaBuffer() { RAY_UNUSED(client_->Release(object_id_)); }
+PlasmaBuffer::~PlasmaBuffer() { RAY_LOG(DEBUG) << "[JAE_DEBUG] ~PlasmaBuffer call Release()"; RAY_UNUSED(client_->Release(object_id_)); }
 
 PlasmaClient::Impl::Impl() : store_capacity_(0) {}
 
@@ -359,6 +364,7 @@ Status PlasmaClient::Impl::HandleCreateReply(const ObjectID &object_id,
 
 Status PlasmaClient::Impl::CreateAndSpillIfNeeded(const ObjectID &object_id,
                                                   const ray::rpc::Address &owner_address,
+												  const ray::Priority &priority,
                                                   int64_t data_size,
                                                   const uint8_t *metadata,
                                                   int64_t metadata_size,
@@ -373,6 +379,7 @@ Status PlasmaClient::Impl::CreateAndSpillIfNeeded(const ObjectID &object_id,
   RAY_RETURN_NOT_OK(SendCreateRequest(store_conn_,
                                       object_id,
                                       owner_address,
+									  priority,
                                       data_size,
                                       metadata_size,
                                       source,
@@ -420,6 +427,7 @@ Status PlasmaClient::Impl::TryCreateImmediately(const ObjectID &object_id,
   RAY_RETURN_NOT_OK(SendCreateRequest(store_conn_,
                                       object_id,
                                       owner_address,
+									  ray::Priority(),
                                       data_size,
                                       metadata_size,
                                       source,
@@ -574,22 +582,55 @@ Status PlasmaClient::Impl::MarkObjectUnused(const ObjectID &object_id) {
   return Status::OK();
 }
 
+void PlasmaClient::Impl::EagerSpillDecreaseObjectCount(const ObjectID &object_id) {
+  auto elem = objects_in_use_.find(object_id);
+  ObjectInUseEntry *object_entry;
+  if (elem == objects_in_use_.end()) {
+    object_entry = objects_in_use_[object_id].get();
+  } else {
+    object_entry = elem->second.get();
+    RAY_CHECK(object_entry->count > 0);
+  }
+  //object_entry->count -= 1;
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] EagerSpillDecreaseObjectCount calling Release: "
+	  << object_id << ", count:" << object_entry->count;
+  Release(object_id);
+}
+
+void PlasmaClient::Impl::EagerSpillIncreaseObjectCount(const ObjectID &object_id) {
+  auto elem = objects_in_use_.find(object_id);
+  ObjectInUseEntry *object_entry;
+  if (elem == objects_in_use_.end()) {
+    object_entry = objects_in_use_[object_id].get();
+  } else {
+    object_entry = elem->second.get();
+    RAY_CHECK(object_entry->count > 0);
+  }
+  object_entry->count += 1;
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] EagerSpillIncreaseObjectCount called: "
+	  << object_id << ", count:" << object_entry->count;
+}
+
 Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Release called: " << object_id;
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   // If the client is already disconnected, ignore release requests.
   if (!store_conn_) {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] [Release] no connection";
     return Status::OK();
   }
   auto object_entry = objects_in_use_.find(object_id);
   RAY_CHECK(object_entry != objects_in_use_.end());
 
   object_entry->second->count -= 1;
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Release count it:" << object_entry->second->count;
   RAY_CHECK(object_entry->second->count >= 0);
   // Check if the client is no longer using this object.
   if (object_entry->second->count == 0) {
     // Tell the store that the client no longer needs the object.
     RAY_RETURN_NOT_OK(MarkObjectUnused(object_id));
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] Release() call SendReleaseRequest";
     RAY_RETURN_NOT_OK(SendReleaseRequest(store_conn_, object_id));
     auto iter = deletion_cache_.find(object_id);
     if (iter != deletion_cache_.end()) {
@@ -623,6 +664,7 @@ Status PlasmaClient::Impl::Contains(const ObjectID &object_id, bool *has_object)
 }
 
 Status PlasmaClient::Impl::Seal(const ObjectID &object_id) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Seal called";
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   // Make sure this client has a reference to the object before sending the
@@ -680,6 +722,7 @@ Status PlasmaClient::Impl::Abort(const ObjectID &object_id) {
 }
 
 Status PlasmaClient::Impl::Delete(const std::vector<ObjectID> &object_ids) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Delete called";
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   std::vector<ObjectID> not_in_use_ids;
@@ -706,6 +749,7 @@ Status PlasmaClient::Impl::Delete(const std::vector<ObjectID> &object_ids) {
 }
 
 Status PlasmaClient::Impl::Evict(int64_t num_bytes, int64_t &num_bytes_evicted) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Evict called";
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   // Send a request to the store to evict objects.
@@ -780,6 +824,7 @@ Status PlasmaClient::Connect(const std::string &store_socket_name,
 
 Status PlasmaClient::CreateAndSpillIfNeeded(const ObjectID &object_id,
                                             const ray::rpc::Address &owner_address,
+                                            const ray::Priority &priority,
                                             int64_t data_size,
                                             const uint8_t *metadata,
                                             int64_t metadata_size,
@@ -788,6 +833,7 @@ Status PlasmaClient::CreateAndSpillIfNeeded(const ObjectID &object_id,
                                             int device_num) {
   return impl_->CreateAndSpillIfNeeded(object_id,
                                        owner_address,
+									   priority,
                                        data_size,
                                        metadata,
                                        metadata_size,
@@ -819,6 +865,14 @@ Status PlasmaClient::Get(const std::vector<ObjectID> &object_ids,
                          std::vector<ObjectBuffer> *object_buffers,
                          bool is_from_worker) {
   return impl_->Get(object_ids, timeout_ms, object_buffers, is_from_worker);
+}
+
+void PlasmaClient::EagerSpillDecreaseObjectCount(const ObjectID &object_id) {
+  return impl_->EagerSpillDecreaseObjectCount(object_id);
+}
+
+void PlasmaClient::EagerSpillIncreaseObjectCount(const ObjectID &object_id) {
+  return impl_->EagerSpillIncreaseObjectCount(object_id);
 }
 
 Status PlasmaClient::Release(const ObjectID &object_id) {

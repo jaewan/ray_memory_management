@@ -81,6 +81,7 @@ PlasmaStoreRunner::PlasmaStoreRunner(std::string socket_name,
 }
 
 void PlasmaStoreRunner::Start(ray::SpillObjectsCallback spill_objects_callback,
+                              ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback,
                               std::function<void()> object_store_full_callback,
                               ray::AddObjectCallback add_object_callback,
                               ray::DeleteObjectCallback delete_object_callback) {
@@ -111,10 +112,11 @@ void PlasmaStoreRunner::Start(ray::SpillObjectsCallback spill_objects_callback,
                                  socket_name_,
                                  RayConfig::instance().object_store_full_delay_ms(),
                                  RayConfig::instance().object_spilling_threshold(),
-                                 spill_objects_callback,
-                                 object_store_full_callback,
-                                 add_object_callback,
-                                 delete_object_callback));
+                                 RayConfig::instance().block_tasks_threshold(),
+                                 RayConfig::instance().evict_tasks_threshold(),
+                                 spill_objects_callback, object_store_full_callback,
+                                 add_object_callback, delete_object_callback,
+                                 on_object_creation_blocked_callback));
     store_->Start();
   }
   main_service_.run();
@@ -135,6 +137,10 @@ void PlasmaStoreRunner::Shutdown() {
     store_->Stop();
     store_ = nullptr;
   }
+}
+
+bool PlasmaStoreRunner::IsPlasmaObjectEagerSpillable(const ObjectID &object_id) {
+  return store_->IsObjectEagerSpillable(object_id);
 }
 
 bool PlasmaStoreRunner::IsPlasmaObjectSpillable(const ObjectID &object_id) {

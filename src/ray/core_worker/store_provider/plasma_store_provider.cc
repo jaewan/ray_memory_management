@@ -90,6 +90,7 @@ Status CoreWorkerPlasmaStoreProvider::Put(const RayObject &object,
                            object.HasData() ? object.GetData()->Size() : 0,
                            object_id,
                            owner_address,
+						   Priority(),
                            &data,
                            /*created_by_worker=*/true));
   // data could be a nullptr if the ObjectID already existed, but this does
@@ -112,6 +113,7 @@ Status CoreWorkerPlasmaStoreProvider::Create(const std::shared_ptr<Buffer> &meta
                                              const size_t data_size,
                                              const ObjectID &object_id,
                                              const rpc::Address &owner_address,
+                                             const Priority &priority,
                                              std::shared_ptr<Buffer> *data,
                                              bool created_by_worker) {
   auto source = plasma::flatbuf::ObjectSource::CreatedByWorker;
@@ -121,6 +123,7 @@ Status CoreWorkerPlasmaStoreProvider::Create(const std::shared_ptr<Buffer> &meta
   Status status =
       store_client_.CreateAndSpillIfNeeded(object_id,
                                            owner_address,
+										   priority,
                                            data_size,
                                            metadata ? metadata->Data() : nullptr,
                                            metadata ? metadata->Size() : 0,
@@ -473,6 +476,7 @@ Status CoreWorkerPlasmaStoreProvider::WarmupStore() {
                            8,
                            object_id,
                            rpc::Address(),
+						   Priority(),
                            &data,
                            /*created_by_worker=*/true));
   RAY_RETURN_NOT_OK(Seal(object_id));

@@ -28,6 +28,7 @@ void LRUCache::Add(const ObjectID &key, int64_t size) {
   auto it = item_map_.find(key);
   RAY_CHECK(it == item_map_.end());
   // Note that it is important to use a list so the iterators stay valid.
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] LRU Cache Added";
   item_list_.emplace_front(key, size);
   item_map_.emplace(key, item_list_.begin());
   used_capacity_ += size;
@@ -127,7 +128,11 @@ int64_t EvictionPolicy::RequireSpace(int64_t size,
   RAY_LOG(DEBUG) << "There is not enough space to create this object, so evicting "
                  << objects_to_evict.size() << " objects to free up " << num_bytes_evicted
                  << " bytes. The number of bytes in use (before "
-                 << "this eviction) is " << allocator_.Allocated() << ".";
+                 << "this eviction) is " << allocator_.Allocated()
+                 << " size is " << size 
+				 << " FootprintLimit() is " << allocator_.GetFootprintLimit() 
+				 << " required_space is " << required_space 
+				 << " space to free is " << space_to_free << ".";
   return required_space - num_bytes_evicted;
 }
 

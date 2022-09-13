@@ -386,6 +386,8 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
       GetWorkerType(),
       RayConfig::instance().worker_lease_timeout_milliseconds(),
       actor_creator_,
+      /*get_task_priority=*/
+      [](const TaskSpecification &spec) { return spec.GetPriority(); },
       worker_context_.GetCurrentJobID(),
       boost::asio::steady_timer(io_service_),
       RayConfig::instance().max_pending_lease_requests_per_scheduling_category());
@@ -1020,6 +1022,7 @@ Status CoreWorker::CreateOwnedAndIncrementLocalRef(
                                               data_size,
                                               *object_id,
                                               /* owner_address = */ real_owner_address,
+											  Priority(),
                                               data,
                                               created_by_worker);
     }
@@ -1040,6 +1043,7 @@ Status CoreWorker::CreateExisting(const std::shared_ptr<Buffer> &metadata,
                                   const size_t data_size,
                                   const ObjectID &object_id,
                                   const rpc::Address &owner_address,
+                                  const Priority &priority,
                                   std::shared_ptr<Buffer> *data,
                                   bool created_by_worker) {
   if (options_.is_local_mode) {
@@ -1047,8 +1051,13 @@ Status CoreWorker::CreateExisting(const std::shared_ptr<Buffer> &metadata,
         "Creating an object with a pre-existing ObjectID is not supported in local "
         "mode");
   } else {
-    return plasma_store_provider_->Create(
-        metadata, data_size, object_id, owner_address, data, created_by_worker);
+    Priority priority;
+    {
+      absl::MutexLock lock(&mutex_);
+      priority = current_task_.GetPriority();
+    }
+    return plasma_store_provider_->Create(metadata, data_size, object_id, owner_address,
+                                          priority, data, created_by_worker);
   }
 }
 
@@ -1564,6 +1573,33 @@ void CoreWorker::BuildCommonTaskSpec(
   }
 }
 
+void CoreWorker::BuildObjectWorkingSet(TaskSpecification &spec){
+  size_t size = spec.NumArgs();
+  absl::btree_set<ObjectID> deps;
+  bool new_dependency_added = false;
+
+  //TODO(Jae) make a task set for performance
+  for(size_t i=0; i < size; i++){
+    if (spec.ArgByRef(i)){
+      deps.insert(spec.ArgId(i));
+	  new_dependency_added = true;
+    }
+  }
+
+  if(new_dependency_added){
+    local_raylet_client_->SetNewDependencyAdded(
+      [](const Status &status, const rpc::SetNewDependencyAddedReply &reply) {
+        if (!status.ok()) {
+          RAY_LOG(ERROR) << "HandleSetNewDependencyAdded Replied";
+        }
+    });
+
+    for(auto &dep : deps){
+      object_working_set_[dep.TaskId()].insert(deps.begin(), deps.end());
+    }
+  }
+}
+
 std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
     const RayFunction &function,
     const std::vector<std::unique_ptr<TaskArg>> &args,
@@ -1604,6 +1640,7 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
                       constrained_resources,
                       required_resources,
                       debugger_breakpoint,
+					  Priority(),
                       depth,
                       task_options.serialized_runtime_env_info);
   builder.SetNormalTaskSpec(max_retries,
@@ -1618,6 +1655,8 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
   } else {
     returned_refs = task_manager_->AddPendingTask(
         task_spec.CallerAddress(), task_spec, CurrentCallSite(), max_retries);
+    if(RayConfig::instance().enable_BlockTasksSpill())
+	  BuildObjectWorkingSet(task_spec);
     io_service_.post(
         [this, task_spec]() {
           RAY_UNUSED(direct_task_submitter_->SubmitTask(task_spec));
@@ -1686,6 +1725,7 @@ Status CoreWorker::CreateActor(const RayFunction &function,
                       new_resource,
                       new_placement_resources,
                       "" /* debugger_breakpoint */,
+					  Priority(),
                       depth,
                       actor_creation_options.serialized_runtime_env_info);
 
@@ -1911,6 +1951,7 @@ std::optional<std::vector<rpc::ObjectReference>> CoreWorker::SubmitActorTask(
                       task_options.resources,
                       required_resources,
                       "",    /* debugger_breakpoint */
+					  Priority(),
                       depth, /*depth*/
                       "{}",  /* serialized_runtime_env_info */
                       task_options.concurrency_group_name);
@@ -2135,9 +2176,10 @@ Status CoreWorker::AllocateReturnObject(const ObjectID &object_id,
                                         const std::vector<ObjectID> &contained_object_ids,
                                         int64_t *task_output_inlined_bytes,
                                         std::shared_ptr<RayObject> *return_object) {
+  auto spec = worker_context_.GetCurrentTask();
   rpc::Address owner_address(options_.is_local_mode
                                  ? rpc::Address()
-                                 : worker_context_.GetCurrentTask()->CallerAddress());
+                                 : spec->CallerAddress());
 
   bool object_already_exists = false;
   std::shared_ptr<Buffer> data_buffer;
@@ -2163,6 +2205,7 @@ Status CoreWorker::AllocateReturnObject(const ObjectID &object_id,
                                        data_size,
                                        object_id,
                                        owner_address,
+									   spec->GetPriority(),
                                        &data_buffer,
                                        /*created_by_worker=*/true));
       object_already_exists = !data_buffer;
@@ -2173,6 +2216,8 @@ Status CoreWorker::AllocateReturnObject(const ObjectID &object_id,
     auto contained_refs = GetObjectRefs(contained_object_ids);
     *return_object =
         std::make_shared<RayObject>(data_buffer, metadata, std::move(contained_refs));
+  } else {
+    RAY_LOG(DEBUG) << "Return object already exists " << object_id;
   }
 
   return Status::OK();
@@ -2479,7 +2524,7 @@ Status CoreWorker::GetAndPinArgsForExecutor(const TaskSpecification &task,
       // Pin all args passed by reference for the duration of the task.  This
       // ensures that when the task completes, we can retrieve metadata about
       // any borrowed ObjectIDs that were serialized in the argument's value.
-      RAY_LOG(DEBUG) << "Incrementing ref for argument ID " << arg_id;
+      RAY_LOG(DEBUG) << " AddLocalReference Incrementing ref for argument ID " << arg_id;
       reference_counter_->AddLocalReference(arg_id, task.CallSiteString());
       // Attach the argument's owner's address. This is needed to retrieve the
       // value from plasma.
@@ -2511,7 +2556,7 @@ Status CoreWorker::GetAndPinArgsForExecutor(const TaskSpecification &task,
       // time it finishes.
       for (const auto &inlined_ref : task.ArgInlinedRefs(i)) {
         const auto inlined_id = ObjectID::FromBinary(inlined_ref.object_id());
-        RAY_LOG(DEBUG) << "Incrementing ref for borrowed ID " << inlined_id;
+        RAY_LOG(DEBUG) << " AddLocalReference Incrementing ref for borrowed ID " << inlined_id;
         // We do not need to add the ownership information here because it will
         // get added once the language frontend deserializes the value, before
         // the ObjectID can be used.
@@ -2613,6 +2658,34 @@ void CoreWorker::HandleRayletNotifyGCSRestart(
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
+void CoreWorker::HandleGetObjectWorkingSet(const rpc::GetObjectWorkingSetRequest &request,
+										   rpc::GetObjectWorkingSetReply *reply,
+                                       rpc::SendReplyCallback send_reply_callback) {
+	absl::btree_set<ObjectID> obj_ids;
+	for(int i=0; i<request.object_ids_size(); i++){
+	  obj_ids.insert(ObjectID::FromBinary(request.object_ids(i)));
+	}
+
+	//RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleGetObjectWorkingSet objects count from coreworker:" << reference_counter_->GetNumObjects();
+	//TODO(Jae) This is wrong with TaskID implementation. If one obj is deleted, taskID is deleted
+	auto deleted_obj_ids = reference_counter_->GetDeletedObjects();
+	for(auto &obj : deleted_obj_ids){
+	  RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleGetObjectWorkingSet deleted objects:" << obj << " size "<<deleted_obj_ids.size();
+	  object_working_set_.erase(obj.TaskId());
+	  for(auto &working_set : object_working_set_){
+		working_set.second.erase(obj);
+	  }
+	}
+
+	for(auto &obj : obj_ids){
+		if(std::includes(obj_ids.begin(), obj_ids.end(),
+				object_working_set_[obj.TaskId()].begin(), object_working_set_[obj.TaskId()].end())){
+		  reply->add_gcable_object_ids(obj.TaskId().Binary());
+		}
+	}
+    send_reply_callback(Status::OK(), nullptr,nullptr);
+}
+
 void CoreWorker::HandleGetObjectStatus(const rpc::GetObjectStatusRequest &request,
                                        rpc::GetObjectStatusReply *reply,
                                        rpc::SendReplyCallback send_reply_callback) {
@@ -2624,7 +2697,7 @@ void CoreWorker::HandleGetObjectStatus(const rpc::GetObjectStatusRequest &reques
   }
 
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
-  RAY_LOG(DEBUG) << "Received GetObjectStatus " << object_id;
+  RAY_LOG(DEBUG) << " AddLocalReference Received GetObjectStatus " << object_id;
   // Acquire a reference to the object. This prevents the object from being
   // evicted out from under us while we check the object status and start the
   // Get.
@@ -3110,10 +3183,20 @@ void CoreWorker::HandleLocalGC(const rpc::LocalGCRequest &request,
 void CoreWorker::HandleSpillObjects(const rpc::SpillObjectsRequest &request,
                                     rpc::SpillObjectsReply *reply,
                                     rpc::SendReplyCallback send_reply_callback) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleSpillObjects called";
+  static const bool enable_eagerSpill = RayConfig::instance().enable_EagerSpill();
   if (options_.spill_objects != nullptr) {
     auto object_refs =
         VectorFromProtobuf<rpc::ObjectReference>(request.object_refs_to_spill());
+	//Increase reference so the eager spilled objects will not be evicted
+	if(enable_eagerSpill){
+	  for(auto ref: object_refs){
+	    reference_counter_->EagerSpillIncreaseLocalReference(ObjectID::FromBinary(ref.object_id()));
+	  }
+	}
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling options_.spill_objects ";
     std::vector<std::string> object_urls = options_.spill_objects(object_refs);
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] options_.spill_objects called";
     for (size_t i = 0; i < object_urls.size(); i++) {
       reply->add_spilled_objects_url(std::move(object_urls[i]));
     }

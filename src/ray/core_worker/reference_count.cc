@@ -244,6 +244,27 @@ void ReferenceCounter::UpdateObjectSize(const ObjectID &object_id, int64_t objec
   }
 }
 
+bool ReferenceCounter::EagerSpillDecreaseLocalReference(const ObjectID &object_id){
+  absl::MutexLock lock(&mutex_);
+  /*
+  eager_spilled_objects_.insert(object_id);
+  absl::MutexLock lock(&mutex_);
+  auto it = object_id_refs_.find(object_id);
+  if (it != object_id_refs_.end()) {
+    it->second.local_ref_count--;
+	return true;
+  }
+  return false;
+  */
+  return eager_spilled_objects_.erase(object_id);
+}
+
+bool ReferenceCounter::EagerSpillIncreaseLocalReference(const ObjectID &object_id){
+  absl::MutexLock lock(&mutex_);
+  eager_spilled_objects_.insert(object_id);
+  return true;
+}
+
 void ReferenceCounter::AddLocalReference(const ObjectID &object_id,
                                          const std::string &call_site) {
   if (object_id.IsNil()) {
@@ -316,11 +337,34 @@ void ReferenceCounter::RemoveLocalReferenceInternal(const ObjectID &object_id,
   it->second.local_ref_count--;
   RAY_LOG(DEBUG) << "Remove local reference " << object_id;
   PRINT_REF_COUNT(it);
-  if (it->second.RefCount() == 0) {
+  auto spilled_obj_it = eager_spilled_objects_.find(object_id);
+  if (it->second.RefCount() == 0 && spilled_obj_it == eager_spilled_objects_.end()) {
     DeleteReferenceInternal(it, deleted);
   } else {
     PRINT_REF_COUNT(it);
   }
+}
+
+Priority& ReferenceCounter::GetObjectPriority(const ObjectID &object_id){
+  absl::MutexLock lock(&mutex_);
+  auto it = task_id_priority_.find(object_id.TaskId());
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] GetObjectPriority object: " << object_id <<
+	  " Priority: " << task_id_priority_[object_id.TaskId()];
+  /*
+  RAY_CHECK(it != object_id_priority_.end()) << "Object priority not found " << object_id
+	  <<" count:" << object_id_priority_.count(object_id);
+	  */
+  RAY_CHECK(task_id_priority_.count(object_id.TaskId()) > 0) << "Object priority not found " << object_id;
+  return it->second;
+}
+
+void ReferenceCounter::UpdateObjectPriority(
+		const ObjectID &object_id,
+		const Priority &priority){
+  absl::MutexLock lock(&mutex_);
+  task_id_priority_[object_id.TaskId()] =  priority;
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] UpdateObjectPriority object: " << object_id <<
+	  " Priority: " << priority;
 }
 
 void ReferenceCounter::UpdateSubmittedTaskReferences(
@@ -579,6 +623,7 @@ void ReferenceCounter::DeleteReferenceInternal(ReferenceTable::iterator it,
     }
     // Perform the deletion.
     ReleasePlasmaObject(it);
+	AddDeletedObjects(id);
     if (deleted) {
       deleted->push_back(id);
     }

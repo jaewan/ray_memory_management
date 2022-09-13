@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 import pytest
+import psutil
 
 import ray
 from ray._private.test_utils import (

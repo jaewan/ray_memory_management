@@ -34,6 +34,8 @@ namespace core {
 // Interface for mocking.
 class ReferenceCounterInterface {
  public:
+  virtual bool EagerSpillIncreaseLocalReference(const ObjectID &object_id) = 0;
+  virtual bool EagerSpillDecreaseLocalReference(const ObjectID &object_id) = 0;
   virtual void AddLocalReference(const ObjectID &object_id,
                                  const std::string &call_site) = 0;
   virtual bool AddBorrowedObject(const ObjectID &object_id,
@@ -94,6 +96,10 @@ class ReferenceCounter : public ReferenceCounterInterface,
   /// Return true if the object is owned by us.
   bool OwnedByUs(const ObjectID &object_id) const;
 
+  bool EagerSpillIncreaseLocalReference(const ObjectID &object_id)
+      LOCKS_EXCLUDED(mutex_);
+  bool EagerSpillDecreaseLocalReference(const ObjectID &object_id)
+      LOCKS_EXCLUDED(mutex_);
   /// Increase the reference count for the ObjectID by one. If there is no
   /// entry for the ObjectID, one will be created. The object ID will not have
   /// any owner information, since we don't know how it was created.
@@ -108,6 +114,11 @@ class ReferenceCounter : public ReferenceCounterInterface,
   /// \param[out] deleted List to store objects that hit zero ref count.
   void RemoveLocalReference(const ObjectID &object_id, std::vector<ObjectID> *deleted)
       LOCKS_EXCLUDED(mutex_);
+
+  Priority& GetObjectPriority(const ObjectID &object_id);
+  void UpdateObjectPriority(
+		const ObjectID &object_id,
+		const Priority &priority);
 
   /// Add references for the provided object IDs that correspond to them being
   /// dependencies to a submitted task. If lineage pinning is enabled, then
@@ -735,6 +746,8 @@ class ReferenceCounter : public ReferenceCounterInterface,
   using ReferenceTable = absl::flat_hash_map<ObjectID, Reference>;
   using ReferenceProtoTable = absl::flat_hash_map<ObjectID, rpc::ObjectReferenceCount>;
 
+  using PriorityTable = absl::flat_hash_map<TaskID, Priority>;
+
   void SetNestedRefInUseRecursive(ReferenceTable::iterator inner_ref_it)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
@@ -934,6 +947,11 @@ class ReferenceCounter : public ReferenceCounterInterface,
 
   /// Holds all reference counts and dependency information for tracked ObjectIDs.
   ReferenceTable object_id_refs_ GUARDED_BY(mutex_);
+
+  absl::flat_hash_set<ObjectID> eager_spilled_objects_ GUARDED_BY(mutex_);
+
+  /// Holds priority of tracked ObjectIDs.
+  PriorityTable task_id_priority_ GUARDED_BY(mutex_);
 
   /// Objects whose values have been freed by the language frontend.
   /// The values in plasma will not be pinned. An object ID is

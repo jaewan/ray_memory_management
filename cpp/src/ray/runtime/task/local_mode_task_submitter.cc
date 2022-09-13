@@ -62,6 +62,7 @@ ObjectID LocalModeTaskSubmitter::Submit(InvocationSpec &invocation,
                             required_resources,
                             required_placement_resources,
                             "",
+							Priority(),
                             /*depth=*/0);
   if (invocation.task_type == TaskType::NORMAL_TASK) {
   } else if (invocation.task_type == TaskType::ACTOR_CREATION_TASK) {

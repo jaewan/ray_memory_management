@@ -131,6 +131,9 @@ class CoreWorkerClientInterface : public pubsub::SubscriberClientInterface {
   virtual void GetObjectStatus(const GetObjectStatusRequest &request,
                                const ClientCallback<GetObjectStatusReply> &callback) {}
 
+  virtual void GetObjectWorkingSet(const GetObjectWorkingSetRequest &request,
+                                   const ClientCallback<GetObjectWorkingSetReply> &callback){}
+
   /// Ask the actor's owner to reply when the actor has gone out of scope.
   virtual void WaitForActorOutOfScope(
       const WaitForActorOutOfScopeRequest &request,
@@ -237,6 +240,12 @@ class CoreWorkerClient : public std::enable_shared_from_this<CoreWorkerClient>,
                          grpc_client_,
                          /*method_timeout_ms*/ -1,
                          override)
+  VOID_RPC_CLIENT_METHOD(CoreWorkerService,
+                         GetObjectWorkingSet,
+						 grpc_client_,
+                         /*method_timeout_ms*/ -1,
+						 override)
+
 
   VOID_RPC_CLIENT_METHOD(CoreWorkerService,
                          CancelTask,

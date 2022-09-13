@@ -1010,8 +1010,9 @@ cdef int64_t restore_spilled_objects_handler(
             with ray._private.worker._changeproctitle(
                     ray_constants.WORKER_PROCESS_TYPE_RESTORE_WORKER,
                     ray_constants.WORKER_PROCESS_TYPE_RESTORE_WORKER_IDLE):
+                # TODO(swang): Pass priority for restored object.
                 bytes_restored = external_storage.restore_spilled_objects(
-                    object_refs, urls)
+                    object_refs, [], urls)
         except Exception:
             exception_str = (
                 "An unexpected internal error occurred while the IO worker "
@@ -1307,6 +1308,7 @@ cdef class CoreWorker:
 
     cdef _create_put_buffer(self, shared_ptr[CBuffer] &metadata,
                             size_t data_size, ObjectRef object_ref,
+                            const CPriority &c_priority,
                             c_vector[CObjectID] contained_ids,
                             CObjectID *c_object_id, shared_ptr[CBuffer] *data,
                             c_bool created_by_worker,
@@ -1335,7 +1337,9 @@ cdef class CoreWorker:
             with nogil:
                 check_status(CCoreWorkerProcess.GetCoreWorker().CreateExisting(
                             metadata, data_size, c_object_id[0],
-                            dereference(c_owner_address), data,
+                            dereference(c_owner_address),
+                            c_priority,
+                            data,
                             created_by_worker))
 
         # If data is nullptr, that means the ObjectRef already existed,
@@ -1361,7 +1365,7 @@ cdef class CoreWorker:
 
     def put_file_like_object(
             self, metadata, data_size, file_like, ObjectRef object_ref,
-            owner_address):
+            owner_address, priority):
         """Directly create a new Plasma Store object from a file like
         object. This avoids extra memory copy.
 
@@ -1387,6 +1391,7 @@ cdef class CoreWorker:
 
         status = CCoreWorkerProcess.GetCoreWorker().CreateExisting(
                     metadata_buf, data_size, object_ref.native(),
+                    CPriority(priority),
                     dereference(c_owner_address), &data_buf,
                     False)
         if not status.ok():
@@ -1431,6 +1436,7 @@ cdef class CoreWorker:
                 serialized_object.contained_object_refs)
         object_already_exists = self._create_put_buffer(
             metadata, total_bytes, object_ref,
+            CPriority(),
             contained_object_ids,
             &c_object_id, &data, True, owner_address, inline_small_object)
 

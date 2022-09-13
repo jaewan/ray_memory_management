@@ -151,7 +151,8 @@ class DependencyWaiterInterface {
   /// \param tag Value that will be sent to the core worker via gRPC on completion.
   /// \return ray::Status.
   virtual ray::Status WaitForDirectActorCallArgs(
-      const std::vector<rpc::ObjectReference> &references, int64_t tag) = 0;
+      const std::vector<rpc::ObjectReference> &references,
+      const Priority &priority, int64_t tag) = 0;
 
   virtual ~DependencyWaiterInterface(){};
 };
@@ -362,7 +363,8 @@ class RayletClient : public RayletClientInterface {
   /// \param tag Value that will be sent to the core worker via gRPC on completion.
   /// \return ray::Status.
   ray::Status WaitForDirectActorCallArgs(
-      const std::vector<rpc::ObjectReference> &references, int64_t tag) override;
+      const std::vector<rpc::ObjectReference> &references,
+      const Priority &priority, int64_t tag) override;
 
   /// Push an error to the relevant driver.
   ///
@@ -457,6 +459,8 @@ class RayletClient : public RayletClientInterface {
 
   void GetSystemConfig(
       const rpc::ClientCallback<rpc::GetSystemConfigReply> &callback) override;
+
+  void SetNewDependencyAdded(const rpc::ClientCallback<rpc::SetNewDependencyAddedReply> &callback);
 
   void GlobalGC(const rpc::ClientCallback<rpc::GlobalGCReply> &callback);
 

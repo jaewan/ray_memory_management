@@ -202,6 +202,7 @@ void CoreWorkerDirectTaskReceiver::HandleTask(
     }
 
     it->second->Add(request.sequence_number(),
+			        task_spec.GetPriority(),
                     request.client_processed_up_to(),
                     std::move(accept_callback),
                     std::move(reject_callback),
@@ -215,6 +216,7 @@ void CoreWorkerDirectTaskReceiver::HandleTask(
     RAY_LOG(DEBUG) << "Adding task " << task_spec.TaskId()
                    << " to normal scheduling task queue.";
     normal_scheduling_queue_->Add(request.sequence_number(),
+			                      task_spec.GetPriority(),
                                   request.client_processed_up_to(),
                                   std::move(accept_callback),
                                   std::move(reject_callback),

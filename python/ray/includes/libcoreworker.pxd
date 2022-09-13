@@ -42,6 +42,7 @@ from ray.includes.common cimport (
     CJobConfig,
     CConcurrencyGroup,
     CSchedulingStrategy,
+    CPriority,
 )
 from ray.includes.function_descriptor cimport (
     CFunctionDescriptor,
@@ -212,6 +213,7 @@ cdef extern from "ray/core_worker/core_worker.h" nogil:
                                   const size_t data_size,
                                   const CObjectID &object_id,
                                   const CAddress &owner_address,
+                                  const CPriority &priortiy,
                                   shared_ptr[CBuffer] *data,
                                   c_bool created_by_worker)
         CRayStatus SealOwned(const CObjectID &object_id, c_bool pin_object,

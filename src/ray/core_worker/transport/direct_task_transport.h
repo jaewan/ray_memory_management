@@ -17,6 +17,7 @@
 #include <google/protobuf/repeated_field.h>
 
 #include "absl/base/thread_annotations.h"
+#include "absl/container/btree_set.h"
 #include "absl/synchronization/mutex.h"
 #include "ray/common/id.h"
 #include "ray/common/ray_object.h"
@@ -68,6 +69,7 @@ class CoreWorkerDirectTaskSubmitter {
       WorkerType worker_type,
       int64_t lease_timeout_ms,
       std::shared_ptr<ActorCreatorInterface> actor_creator,
+      std::function<Priority(const TaskSpecification &spec)> get_task_priority,
       const JobID &job_id,
       absl::optional<boost::asio::steady_timer> cancel_timer = absl::nullopt,
       uint64_t max_pending_lease_requests_per_scheduling_category =
@@ -86,7 +88,8 @@ class CoreWorkerDirectTaskSubmitter {
         job_id_(job_id),
         max_pending_lease_requests_per_scheduling_category_(
             max_pending_lease_requests_per_scheduling_category),
-        cancel_retry_timer_(std::move(cancel_timer)) {}
+        cancel_retry_timer_(std::move(cancel_timer)),
+        get_task_priority_(get_task_priority) {}
 
   /// Schedule a task for direct submission to a worker.
   ///
@@ -109,6 +112,8 @@ class CoreWorkerDirectTaskSubmitter {
     absl::MutexLock lock(&mu_);
     return scheduling_key_entries_.empty();
   }
+
+  void UpdateTaskPriorities(const absl::flat_hash_map<TaskID, Priority> &priorities);
 
   int64_t GetNumTasksSubmitted() const { return num_tasks_submitted_; }
 
@@ -195,6 +200,7 @@ class CoreWorkerDirectTaskSubmitter {
                       rpc::CoreWorkerClientInterface &client,
                       const SchedulingKey &task_queue_key,
                       const TaskSpecification &task_spec,
+                      const Priority &priority,
                       const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry>
                           &assigned_resources);
 
@@ -277,13 +283,22 @@ class CoreWorkerDirectTaskSubmitter {
   absl::flat_hash_map<rpc::WorkerAddress, LeaseEntry> worker_to_lease_entry_
       GUARDED_BY(mu_);
 
+  struct TaskEntry {
+    TaskEntry(const TaskSpecification &task_spec, const SchedulingKey &key,
+        Priority priority)
+      : task_spec(task_spec), key(key), task_key(std::make_pair(priority, task_spec.TaskId())) {}
+
+    TaskSpecification task_spec;
+    SchedulingKey key;
+    TaskKey task_key;
+  };
+
   struct SchedulingKeyEntry {
     // Keep track of pending worker lease requests to the raylet.
     absl::flat_hash_map<TaskID, rpc::Address> pending_lease_requests;
     TaskSpecification resource_spec = TaskSpecification();
-    // Tasks that are queued for execution. We keep an individual queue per
-    // scheduling class to ensure fairness.
-    std::deque<TaskSpecification> task_queue = std::deque<TaskSpecification>();
+    // Tasks ordered by priority.
+    absl::btree_set<TaskKey> task_priority_queue = absl::btree_set<TaskKey>();
     // Keep track of the active workers, so that we can quickly check if one of them has
     // room for more tasks in flight
     absl::flat_hash_set<rpc::WorkerAddress> active_workers =
@@ -295,7 +310,7 @@ class CoreWorkerDirectTaskSubmitter {
     // Check whether it's safe to delete this SchedulingKeyEntry from the
     // scheduling_key_entries_ hashmap.
     inline bool CanDelete() const {
-      if (pending_lease_requests.empty() && task_queue.empty() &&
+      if (pending_lease_requests.empty() && task_priority_queue.empty() &&
           active_workers.size() == 0 && num_busy_workers == 0) {
         return true;
       }
@@ -327,6 +342,10 @@ class CoreWorkerDirectTaskSubmitter {
   absl::flat_hash_map<SchedulingKey, SchedulingKeyEntry> scheduling_key_entries_
       GUARDED_BY(mu_);
 
+  // Used to cache TaskSpecs and to look up the task's position in
+  // scheduling_key_entries_.
+  absl::flat_hash_map<TaskID, TaskEntry> tasks_;
+
   // Tasks that were cancelled while being resolved.
   absl::flat_hash_set<TaskID> cancelled_tasks_ GUARDED_BY(mu_);
 
@@ -335,6 +354,8 @@ class CoreWorkerDirectTaskSubmitter {
 
   // Retries cancelation requests if they were not successful.
   absl::optional<boost::asio::steady_timer> cancel_retry_timer_;
+
+  std::function<Priority(const TaskSpecification &spec)> get_task_priority_;
 
   int64_t num_tasks_submitted_ = 0;
   int64_t num_leases_requested_ GUARDED_BY(mu_) = 0;

@@ -18,6 +18,7 @@
 #include <functional>
 
 #include "ray/common/id.h"
+#include "ray/common/task/task_priority.h"
 #include "ray/common/status.h"
 
 namespace ray {
@@ -25,6 +26,15 @@ namespace ray {
 /// A callback to asynchronously spill objects when space is needed.
 /// It spills enough objects to saturate all spill IO workers.
 using SpillObjectsCallback = std::function<bool()>;
+
+/// Callback when the creation of object(s) is blocked. The priority is the
+/// highest priority of a blocked object.
+using ObjectCreationBlockedCallback = std::function<bool(const ray::Priority &priority, const ObjectID &object_id,
+		bool DeleteEagerSpilledObjects, bool BlockTasks, bool EvictTasks, bool BlockSpill, size_t num_spinning_workers, int64_t pending_size)>;
+
+using SetShouldSpillCallback = std::function<void(bool should_spill)>;
+
+using SetNewDependencyAddedCallback = std::function<void()>;
 
 /// A callback to call when space has been released.
 using SpaceReleasedCallback = std::function<void()>;
@@ -49,6 +59,8 @@ struct ObjectInfo {
   int owner_port;
   /// Owner's worker ID.
   WorkerID owner_worker_id;
+  // Priority of the object. Used for blockTasks() memory backpressure
+  ray::Priority priority;
 
   int64_t GetObjectSize() const { return data_size + metadata_size; }
 
@@ -58,7 +70,8 @@ struct ObjectInfo {
             (owner_raylet_id == other.owner_raylet_id) &&
             (owner_ip_address == other.owner_ip_address) &&
             (owner_port == other.owner_port) &&
-            (owner_worker_id == other.owner_worker_id));
+            (owner_worker_id == other.owner_worker_id) &&
+            (priority == other.priority));
   }
 };
 

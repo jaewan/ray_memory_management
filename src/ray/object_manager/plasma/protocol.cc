@@ -200,6 +200,7 @@ Status SendCreateRetryRequest(const std::shared_ptr<StoreConn> &store_conn,
 Status SendCreateRequest(const std::shared_ptr<StoreConn> &store_conn,
                          ObjectID object_id,
                          const ray::rpc::Address &owner_address,
+                         const ray::Priority &priority,
                          int64_t data_size,
                          int64_t metadata_size,
                          flatbuf::ObjectSource source,
@@ -213,6 +214,8 @@ Status SendCreateRequest(const std::shared_ptr<StoreConn> &store_conn,
                                     fbb.CreateString(owner_address.ip_address()),
                                     owner_address.port(),
                                     fbb.CreateString(owner_address.worker_id()),
+									fbb.CreateVector(priority.score.data(),
+										priority.score.size()),
                                     data_size,
                                     metadata_size,
                                     source,
@@ -236,6 +239,11 @@ void ReadCreateRequest(uint8_t *data,
   object_info->owner_ip_address = message->owner_ip_address()->str();
   object_info->owner_port = message->owner_port();
   object_info->owner_worker_id = WorkerID::FromBinary(message->owner_worker_id()->str());
+  auto p = message->priority();
+  for(unsigned int i=0; i<p->size(); i++){
+	  object_info->priority.SetScore(i, (*p)[i]);
+  }
+  //object_info->priority = message->priority();
   *source = message->source();
   *device_num = message->device_num();
   return;

@@ -20,6 +20,10 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "ray/common/file_system_monitor.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/btree_map.h"
+
+#include "ray/common/task/task_priority.h"
 #include "ray/common/status.h"
 #include "ray/object_manager/common.h"
 #include "ray/object_manager/plasma/common.h"
@@ -32,17 +36,20 @@ namespace plasma {
 class CreateRequestQueue {
  public:
   using CreateObjectCallback = std::function<PlasmaError(
-      bool fallback_allocator, PlasmaObject *result, bool *spilling_required)>;
+      bool fallback_allocator, PlasmaObject *result, bool *spilling_required,
+	  bool *block_tasks_required, bool *evict_tasks_required, ray::Priority *lowest_pri)>;
 
   CreateRequestQueue(ray::FileSystemMonitor &fs_monitor,
                      int64_t oom_grace_period_s,
                      ray::SpillObjectsCallback spill_objects_callback,
+                     ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback,
                      std::function<void()> trigger_global_gc,
                      std::function<int64_t()> get_time,
                      std::function<std::string()> dump_debug_info_callback = nullptr)
       : fs_monitor_(fs_monitor),
         oom_grace_period_ns_(oom_grace_period_s * 1e9),
         spill_objects_callback_(spill_objects_callback),
+        on_object_creation_blocked_callback_(on_object_creation_blocked_callback),
         trigger_global_gc_(trigger_global_gc),
         get_time_(get_time),
         dump_debug_info_callback_(dump_debug_info_callback) {}
@@ -59,7 +66,8 @@ class CreateRequestQueue {
   /// \param create_callback A callback to attempt to create the object.
   /// \param object_size Object size in bytes.
   /// \return A request ID that can be used to get the result.
-  uint64_t AddRequest(const ObjectID &object_id,
+  uint64_t AddRequest(const ray::TaskKey &task_id,
+                      const ObjectID &object_id,
                       const std::shared_ptr<ClientInterface> &client,
                       const CreateObjectCallback &create_callback,
                       const size_t object_size);
@@ -106,6 +114,7 @@ class CreateRequestQueue {
   ///
   /// \return Bad status for the first request in the queue if it failed to be
   /// serviced, or OK if all requests were fulfilled.
+  Status ProcessFirstRequest();
   Status ProcessRequests();
 
   /// Remove all requests that were made by a client that is now disconnected.
@@ -116,6 +125,10 @@ class CreateRequestQueue {
   size_t NumPendingRequests() const { return queue_.size(); }
 
   size_t NumPendingBytes() const { return num_bytes_pending_; }
+
+  void SetShouldSpill(bool should_spill);
+
+  void SetNewDependencyAdded();
 
  private:
   struct CreateRequest {
@@ -152,15 +165,47 @@ class CreateRequestQueue {
     PlasmaObject result = {};
   };
 
+  class SpinningTasks{
+    public:
+      //Return false if it is deadlock (all workers spinning)
+	  //This is deadlock detection #1. There exists false-positive but the
+	  //implementation is simple
+	  size_t GetNumSpinningTasks(){
+		return spinning_tasks.size();
+	  }
+
+      void RegisterTasks(const ObjectID &object_id){
+		spinning_tasks[object_id.TaskId()].insert(object_id);
+		return;
+      }
+
+      void UnRegisterSpinningTasks(const ObjectID &object_id){
+		spinning_tasks[object_id.TaskId()].erase(object_id);
+		if(spinning_tasks[object_id.TaskId()].size() == 0){
+		  spinning_tasks.erase(object_id.TaskId());
+		}
+      }
+
+    private:
+	  absl::flat_hash_map<ray::TaskID, absl::flat_hash_set<ObjectID>> spinning_tasks;
+  };
+
   /// Process a single request. Sets the request's error result to the error
   /// returned by the request handler inside. Returns OK if the request can be
   /// finished.
   Status ProcessRequest(bool fallback_allocator,
                         std::unique_ptr<CreateRequest> &request,
-                        bool *spilling_required);
+                        bool *spilling_required,
+						bool *block_tasks_required,
+						bool *evict_tasks_required,
+						ray::Priority *lowest_pri);
 
   /// Finish a queued request and remove it from the queue.
-  void FinishRequest(std::list<std::unique_ptr<CreateRequest>>::iterator request_it);
+  void FinishRequest(absl::btree_map<ray::TaskKey, std::unique_ptr<CreateRequest>>::iterator queue_it);
+
+  /// Decides when to trigger spill, blocked by blockTasksSpill
+  double GetSpillTime();
+  bool SkiRental();
 
   /// Monitor the disk utilization.
   ray::FileSystemMonitor &fs_monitor_;
@@ -177,6 +222,8 @@ class CreateRequestQueue {
   /// throughput. It returns true if space is made by object spilling, and false if
   /// there's no more space to be made.
   const ray::SpillObjectsCallback spill_objects_callback_;
+
+  const ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback_;
 
   /// A callback to trigger global GC in the cluster if the object store is
   /// full.
@@ -199,7 +246,8 @@ class CreateRequestQueue {
   /// in the object store. Then, the client does not need to poll on an
   /// OutOfMemory error and we can just respond to them once there is enough
   /// space made, or after a timeout.
-  std::list<std::unique_ptr<CreateRequest>> queue_;
+  //std::list<std::unique_ptr<CreateRequest>> queue_;
+  absl::btree_map<ray::TaskKey, std::unique_ptr<CreateRequest>> queue_;
 
   /// A buffer of the results of fulfilled requests. The value will be null
   /// while the request is pending and will be set once the request has
@@ -212,7 +260,18 @@ class CreateRequestQueue {
   /// The time OOM timer first starts. It becomes -1 upon every creation success.
   int64_t oom_start_time_ns_ = -1;
 
+  int64_t oom_ = -1;
+
   size_t num_bytes_pending_ = 0;
+
+  // Shared between the object store thread and the scheduler thread.
+  bool should_spill_ = false;
+
+  bool new_dependency_added_ = false;
+
+  bool new_request_added_ = false;
+
+  SpinningTasks spinning_tasks_;
 
   friend class CreateRequestQueueTest;
 };

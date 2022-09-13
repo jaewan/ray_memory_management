@@ -172,6 +172,14 @@ message GetObjectStatusReply {
   uint64 object_size = 4;
 }
 
+message GetObjectWorkingSetRequest {
+  repeated bytes object_ids = 1;
+}
+
+message GetObjectWorkingSetReply {
+  repeated bytes gcable_object_ids = 1;
+}
+
 message WaitForActorOutOfScopeRequest {
   // The ID of the worker this message is intended for.
   bytes intended_worker_id = 1;
@@ -322,6 +330,8 @@ message RestoreSpilledObjectsRequest {
   // Object ids to restore. The order of object ids
   // must be the same as spilled_objects_url.
   repeated bytes object_ids_to_restore = 2;
+  // NOTE(memory): There is only ever one object in object_ids_to_restore.
+  repeated int32 priority = 3;
 }
 
 message RestoreSpilledObjectsReply {
@@ -372,6 +382,7 @@ service CoreWorkerService {
       returns (DirectActorCallArgWaitCompleteReply);
   // Ask the object's owner about the object's current status.
   rpc GetObjectStatus(GetObjectStatusRequest) returns (GetObjectStatusReply);
+  rpc GetObjectWorkingSet(GetObjectWorkingSetRequest) returns (GetObjectWorkingSetReply);
   // Wait for the actor's owner to decide that the actor has gone out of scope.
   // Replying to this message indicates that the client should force-kill the
   // actor process, if still alive.

@@ -92,6 +92,7 @@ class ObjectStoreRunner {
  public:
   ObjectStoreRunner(const ObjectManagerConfig &config,
                     SpillObjectsCallback spill_objects_callback,
+                    ObjectCreationBlockedCallback on_object_creation_blocked_callback,
                     std::function<void()> object_store_full_callback,
                     AddObjectCallback add_object_callback,
                     DeleteObjectCallback delete_object_callback);
@@ -169,6 +170,7 @@ class ObjectManager : public ObjectManagerInterface,
       RestoreSpilledObjectCallback restore_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
       SpillObjectsCallback spill_objects_callback,
+      ObjectCreationBlockedCallback on_object_creation_blocked_callback,
       std::function<void()> object_store_full_callback,
       AddObjectCallback add_object_callback,
       DeleteObjectCallback delete_object_callback,
@@ -187,6 +189,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// pinned by the raylet, so we can comfotable evict after spilling the object from
   /// local object manager. False otherwise.
   bool IsPlasmaObjectSpillable(const ObjectID &object_id);
+  bool IsPlasmaObjectEagerSpillable(const ObjectID &object_id);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
@@ -245,6 +248,18 @@ class ObjectManager : public ObjectManagerInterface,
   }
 
   bool PullManagerHasPullsQueued() const { return pull_manager_->HasPullsQueued(); }
+
+  void SetShouldSpill(bool should_spill){
+    plasma::plasma_store_runner->SetShouldSpill(should_spill);
+  }
+
+  void SetNewDependencyAdded(){
+    plasma::plasma_store_runner->SetNewDependencyAdded();
+  }
+
+  rpc::Address GetOwnerAddress(const ObjectID &object_id);
+  int64_t  GetObjectsInObjectStore(std::vector<const ObjectID*> *objs);
+  int64_t GetTaskObjectSize(const TaskID &task_id);
 
  private:
   friend class TestObjectManager;
@@ -415,6 +430,9 @@ class ObjectManager : public ObjectManagerInterface,
   /// Mapping from locally available objects to information about those objects
   /// including when the object was last pushed to other object managers.
   absl::flat_hash_map<ObjectID, LocalObjectInfo> local_objects_;
+
+  //TODO(Jae) Implement remove of this data structure
+  std::unordered_map<TaskID, int64_t> task_objects_size_;
 
   /// This is used as the callback identifier in Pull for
   /// SubscribeObjectLocations. We only need one identifier because we never need to

@@ -16,7 +16,9 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/btree_map.h"
 #include "ray/common/ray_object.h"
+#include "ray/object_manager/object_manager.h"
 #include "ray/common/task/task.h"
 #include "ray/common/task/task_common.h"
 #include "ray/raylet/scheduling/cluster_resource_scheduler.h"
@@ -54,9 +56,18 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
       internal::NodeInfoGetter get_node_info,
       std::function<void(const RayTask &)> announce_infeasible_task,
       std::shared_ptr<ILocalTaskManager> local_task_manager,
+      std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>> &leased_workers,
+	  ObjectManager &object_manager,
+	  SetShouldSpillCallback set_should_spill,
       std::function<int64_t(void)> get_time_ms = []() {
-        return (int64_t)(absl::GetCurrentTimeNanos() / 1e6);
-      });
+        return (int64_t)(absl::GetCurrentTimeNanos() / 1e6);}
+	  );
+  //Block new tasks from being scheduled with this priority
+  void BlockTasks(Priority, instrumented_io_context &io_service_) override;
+  //Preempt currently running tasks with a lower priority
+  bool EvictTasks(Priority) override;
+  void CheckDeadlock(size_t, int64_t first_pending_obj_size, LocalObjectManager &local_object_manager,
+		  instrumented_io_context &io_service_) override;
 
   /// Queue task and schedule. This hanppens when processing the worker lease request.
   ///
@@ -176,6 +187,17 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
 
   const SchedulerResourceReporter scheduler_resource_reporter_;
   mutable SchedulerStats internal_stats_;
+
+  std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>> &leased_workers_;
+
+  //Destroy all workers with lower priorities BlockTasks() set this value
+  ray::Priority block_requested_priority_;
+
+  bool task_blocked_ = false;
+
+  const SetShouldSpillCallback set_should_spill_;
+
+  ObjectManager &object_manager_;
 
   /// Returns the current time in milliseconds.
   std::function<int64_t()> get_time_ms_;

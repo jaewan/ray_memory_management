@@ -26,6 +26,7 @@ namespace ray {
 
 ObjectStoreRunner::ObjectStoreRunner(const ObjectManagerConfig &config,
                                      SpillObjectsCallback spill_objects_callback,
+                                     ObjectCreationBlockedCallback on_object_creation_blocked_callback,
                                      std::function<void()> object_store_full_callback,
                                      AddObjectCallback add_object_callback,
                                      DeleteObjectCallback delete_object_callback) {
@@ -39,6 +40,7 @@ ObjectStoreRunner::ObjectStoreRunner(const ObjectManagerConfig &config,
   store_thread_ = std::thread(&plasma::PlasmaStoreRunner::Start,
                               plasma::plasma_store_runner.get(),
                               spill_objects_callback,
+							  on_object_creation_blocked_callback,
                               object_store_full_callback,
                               add_object_callback,
                               delete_object_callback);
@@ -61,6 +63,7 @@ ObjectManager::ObjectManager(
     RestoreSpilledObjectCallback restore_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
     SpillObjectsCallback spill_objects_callback,
+    ObjectCreationBlockedCallback on_object_creation_blocked_callback,
     std::function<void()> object_store_full_callback,
     AddObjectCallback add_object_callback,
     DeleteObjectCallback delete_object_callback,
@@ -73,6 +76,7 @@ ObjectManager::ObjectManager(
       object_store_internal_(
           config,
           spill_objects_callback,
+          on_object_creation_blocked_callback,
           object_store_full_callback,
           /*add_object_callback=*/
           [this, add_object_callback = std::move(add_object_callback)](
@@ -160,6 +164,10 @@ ObjectManager::~ObjectManager() { StopRpcService(); }
 
 void ObjectManager::Stop() { plasma::plasma_store_runner->Stop(); }
 
+bool ObjectManager::IsPlasmaObjectEagerSpillable(const ObjectID &object_id) {
+  return plasma::plasma_store_runner->IsPlasmaObjectEagerSpillable(object_id);
+}
+
 bool ObjectManager::IsPlasmaObjectSpillable(const ObjectID &object_id) {
   return plasma::plasma_store_runner->IsPlasmaObjectSpillable(object_id);
 }
@@ -192,6 +200,7 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   RAY_LOG(DEBUG) << "Object added " << object_id;
   RAY_CHECK(local_objects_.count(object_id) == 0);
   local_objects_[object_id].object_info = object_info;
+  task_objects_size_[object_id.TaskId()] += object_info.data_size;
   used_memory_ += object_info.data_size + object_info.metadata_size;
   object_directory_->ReportObjectAdded(object_id, self_node_id_, object_info);
 
@@ -800,6 +809,28 @@ void ObjectManager::Tick(const boost::system::error_code &e) {
   auto interval = boost::posix_time::milliseconds(config_.timer_freq_ms);
   pull_retry_timer_.expires_from_now(interval);
   pull_retry_timer_.async_wait([this](const boost::system::error_code &e) { Tick(e); });
+}
+
+rpc::Address ObjectManager::GetOwnerAddress(const ObjectID &object_id){
+  const ObjectInfo &object_info = local_objects_[object_id].object_info;
+  rpc::Address owner_address;
+  owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
+  owner_address.set_ip_address(object_info.owner_ip_address);
+  owner_address.set_port(object_info.owner_port);
+  owner_address.set_worker_id(object_info.owner_worker_id.Binary());
+
+  return owner_address;
+}
+
+int64_t ObjectManager::GetTaskObjectSize(const TaskID &task_id){
+  return task_objects_size_[task_id];
+}
+
+int64_t ObjectManager::GetObjectsInObjectStore(std::vector<const ObjectID*> *objs){
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] GetObjectsInObjectStore local_objects_ size:" << local_objects_.size();
+  for(auto it = local_objects_.begin(); it != local_objects_.end(); it++)
+    objs->push_back(&(it->first));
+  return config_.object_store_memory - used_memory_;
 }
 
 }  // namespace ray

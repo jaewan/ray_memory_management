@@ -563,6 +563,7 @@ TEST_F(ZeroNodeTest, TestTaskSpecPerf) {
                               resources,
                               resources,
                               "",
+							  Priority(),
                               0);
     // Set task arguments.
     for (const auto &arg : args) {

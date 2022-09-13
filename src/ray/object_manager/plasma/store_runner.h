@@ -19,11 +19,13 @@ class PlasmaStoreRunner {
                     std::string plasma_directory,
                     std::string fallback_directory);
   void Start(ray::SpillObjectsCallback spill_objects_callback,
+             ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback,
              std::function<void()> object_store_full_callback,
              ray::AddObjectCallback add_object_callback,
              ray::DeleteObjectCallback delete_object_callback);
   void Stop();
 
+  bool IsPlasmaObjectEagerSpillable(const ObjectID &object_id);
   bool IsPlasmaObjectSpillable(const ObjectID &object_id);
 
   int64_t GetConsumedBytes();
@@ -32,6 +34,14 @@ class PlasmaStoreRunner {
   void GetAvailableMemoryAsync(std::function<void(size_t)> callback) const {
     main_service_.post([this, callback]() { store_->GetAvailableMemory(callback); },
                        "PlasmaStoreRunner.GetAvailableMemory");
+  }
+
+  void SetNewDependencyAdded() {
+    store_->SetNewDependencyAdded();
+  }
+
+  void SetShouldSpill(bool should_spill) {
+    store_->SetShouldSpill(should_spill);
   }
 
  private:
