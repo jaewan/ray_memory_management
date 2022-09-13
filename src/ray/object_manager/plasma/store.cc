@@ -507,8 +507,7 @@ Status PlasmaStore::ProcessMessage(const std::shared_ptr<Client> &client,
 		allocated_percentage = static_cast<float>(allocator_.Allocated()) / footprint_limit;
 	  }
 	  if(allocated_percentage < block_tasks_threshold_){
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] on_object_creation_blocked_callback unsetting
-			block task allocated allocated_percentage is " << allocated_percentage;
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] on_object_creation_blocked_callback unsetting block task allocated allocated_percentage is " << allocated_percentage;
 	    on_object_creation_blocked_callback_(ray::Priority(), ObjectID(), false, true, false, false, 0, 0);
 	    block_task_flag_.store(false, std::memory_order_release);
 	  }

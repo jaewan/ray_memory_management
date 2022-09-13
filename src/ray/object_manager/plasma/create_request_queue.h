@@ -114,7 +114,6 @@ class CreateRequestQueue {
   ///
   /// \return Bad status for the first request in the queue if it failed to be
   /// serviced, or OK if all requests were fulfilled.
-  Status ProcessFirstRequest();
   Status ProcessRequests();
 
   /// Remove all requests that were made by a client that is now disconnected.

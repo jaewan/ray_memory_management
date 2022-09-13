@@ -83,6 +83,16 @@ Status SendCreateRetryRequest(const std::shared_ptr<StoreConn> &store_conn,
                               ObjectID object_id,
                               uint64_t request_id);
 
+Status SendCreateRequest(const std::shared_ptr<StoreConn> &store_conn,
+                         ObjectID object_id,
+                         const ray::rpc::Address &owner_address,
+                         const ray::Priority &priority,
+                         int64_t data_size,
+                         int64_t metadata_size,
+						 flatbuf::ObjectSource source,
+                         int device_num,
+						 bool try_immediately);
+
 void ReadCreateRequest(uint8_t *data,
                        size_t size,
                        ray::ObjectInfo *object_info,

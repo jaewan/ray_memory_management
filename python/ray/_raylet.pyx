@@ -1391,8 +1391,7 @@ cdef class CoreWorker:
 
         status = CCoreWorkerProcess.GetCoreWorker().CreateExisting(
                     metadata_buf, data_size, object_ref.native(),
-                    CPriority(priority),
-                    dereference(c_owner_address), &data_buf,
+                    dereference(c_owner_address), CPriority(priority), &data_buf,
                     False)
         if not status.ok():
             logger.debug("Error putting restored object into plasma.")

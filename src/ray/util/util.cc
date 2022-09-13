@@ -20,6 +20,7 @@
 #include <sys/un.h>
 #endif
 
+#include <iomanip>
 #include <algorithm>
 #include <boost/asio/generic/stream_protocol.hpp>
 #include <sstream>

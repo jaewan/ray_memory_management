@@ -18,7 +18,6 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/btree_map.h"
 #include "ray/common/ray_object.h"
-#include "ray/object_manager/object_manager.h"
 #include "ray/common/task/task.h"
 #include "ray/common/task/task_common.h"
 #include "ray/raylet/scheduling/cluster_resource_scheduler.h"
@@ -27,6 +26,7 @@
 #include "ray/raylet/scheduling/local_task_manager_interface.h"
 #include "ray/raylet/scheduling/scheduler_resource_reporter.h"
 #include "ray/raylet/scheduling/scheduler_stats.h"
+#include "ray/object_manager/object_manager.h"
 
 namespace ray {
 namespace raylet {
