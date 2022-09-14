@@ -656,7 +656,9 @@ cc_library(
     ),
     hdrs = glob(
         [
-			"src/ray/object_manager/*.h",
+            "src/ray/protobuf/*.h",
+            "src/ray/rpc/runtime_env/*.h",
+            "src/ray/object_manager/*.h",
             "src/ray/raylet/scheduling/**/*.h",
             "src/ray/raylet/**/*.h",
             "src/ray/core_worker/common.h",
@@ -673,6 +675,9 @@ cc_library(
     strip_include_prefix = "src",
     visibility = ["//visibility:public"],
     deps = [
+        ":object_manager",
+        ":agent_manager_rpc",
+        "//src/ray/protobuf:gcs_cc_proto",
         ":gcs_client_lib",
         ":ray_common",
         ":ray_util",

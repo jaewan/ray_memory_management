@@ -59,6 +59,7 @@ class DependencyWaiter {
  public:
   /// Calls `callback` once the specified objects become available.
   virtual void Wait(const std::vector<rpc::ObjectReference> &dependencies,
+                    const Priority &priority,
                     std::function<void()> on_dependencies_available) = 0;
 
   virtual ~DependencyWaiter(){};
@@ -69,6 +70,7 @@ class DependencyWaiterImpl : public DependencyWaiter {
   DependencyWaiterImpl(DependencyWaiterInterface &dependency_client);
 
   void Wait(const std::vector<rpc::ObjectReference> &dependencies,
+            const Priority &priority,
             std::function<void()> on_dependencies_available) override;
 
   /// Fulfills the callback stored by Wait().

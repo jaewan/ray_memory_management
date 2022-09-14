@@ -52,10 +52,11 @@ DependencyWaiterImpl::DependencyWaiterImpl(DependencyWaiterInterface &dependency
     : dependency_client_(dependency_client) {}
 
 void DependencyWaiterImpl::Wait(const std::vector<rpc::ObjectReference> &dependencies,
+                                const Priority &priority,
                                 std::function<void()> on_dependencies_available) {
   auto tag = next_request_id_++;
   requests_[tag] = on_dependencies_available;
-  RAY_CHECK_OK(dependency_client_.WaitForDirectActorCallArgs(dependencies, tag));
+  RAY_CHECK_OK(dependency_client_.WaitForDirectActorCallArgs(dependencies, priority, tag));
 }
 
 /// Fulfills the callback stored by Wait().
