@@ -49,7 +49,7 @@ Priority TaskManager::GenerateTaskPriority(
 
 std::vector<rpc::ObjectReference> TaskManager::AddPendingTask(
     const rpc::Address &caller_address,
-    const TaskSpecification &spec,
+    TaskSpecification &spec,
     const std::string &call_site,
     int max_retries) {
   RAY_LOG(DEBUG) << "Adding pending task " << spec.TaskId() << " with " << max_retries

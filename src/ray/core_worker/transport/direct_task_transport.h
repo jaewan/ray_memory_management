@@ -326,13 +326,13 @@ class CoreWorkerDirectTaskSubmitter {
 
     // Get the current backlog size for this scheduling key
     [[nodiscard]] inline int64_t BacklogSize() const {
-      if (task_queue.size() < pending_lease_requests.size()) {
+      if (task_priority_queue.size() < pending_lease_requests.size()) {
         // This can happen if worker is reused.
         return 0;
       }
 
       // Subtract tasks with pending lease requests so we don't double count them.
-      return task_queue.size() - pending_lease_requests.size();
+      return task_priority_queue.size() - pending_lease_requests.size();
     }
   };
 
