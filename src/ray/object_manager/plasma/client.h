@@ -128,6 +128,7 @@ class PlasmaClientInterface {
   /// be either sealed or aborted.
   virtual Status CreateAndSpillIfNeeded(const ObjectID &object_id,
                                         const ray::rpc::Address &owner_address,
+                                        const ray::Priority &priority,
                                         int64_t data_size,
                                         const uint8_t *metadata,
                                         int64_t metadata_size,
