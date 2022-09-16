@@ -62,6 +62,7 @@ size_t OutOfOrderActorSchedulingQueue::Size() const {
 
 void OutOfOrderActorSchedulingQueue::Add(
     int64_t seq_no,
+	const Priority &priority,
     int64_t client_processed_up_to,
     std::function<void(rpc::SendReplyCallback)> accept_request,
     std::function<void(rpc::SendReplyCallback)> reject_request,
@@ -80,7 +81,7 @@ void OutOfOrderActorSchedulingQueue::Add(
                                 function_descriptor);
 
   if (dependencies.size() > 0) {
-    waiter_.Wait(dependencies, [this, request = std::move(request)]() mutable {
+    waiter_.Wait(dependencies, priority, [this, request = std::move(request)]() mutable {
       RAY_CHECK(boost::this_thread::get_id() == main_thread_id_);
       request.MarkDependenciesSatisfied();
       pending_actor_tasks_.push_back(std::move(request));

@@ -47,6 +47,23 @@ ClusterTaskManager::ClusterTaskManager(
 	  set_should_spill_(set_should_spill),
       get_time_ms_(get_time_ms){}
 
+ClusterTaskManager::ClusterTaskManager(
+    const NodeID &self_node_id,
+    std::shared_ptr<ClusterResourceScheduler> cluster_resource_scheduler,
+    internal::NodeInfoGetter get_node_info,
+    std::function<void(const RayTask &)> announce_infeasible_task,
+    std::shared_ptr<ILocalTaskManager> local_task_manager,
+    std::function<int64_t(void)> get_time_ms)
+    : self_node_id_(self_node_id),
+      cluster_resource_scheduler_(cluster_resource_scheduler),
+      get_node_info_(get_node_info),
+      announce_infeasible_task_(announce_infeasible_task),
+      local_task_manager_(std::move(local_task_manager)),
+      scheduler_resource_reporter_(
+          tasks_to_schedule_, infeasible_tasks_, *local_task_manager_),
+      internal_stats_(*this, *local_task_manager_),
+      get_time_ms_(get_time_ms){}
+
 void ClusterTaskManager::QueueAndScheduleTask(
     const RayTask &task,
     bool grant_or_reject,
@@ -96,9 +113,11 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
       // blocking where a task which cannot be scheduled because
       // there are not enough available resources blocks other
       // tasks from being scheduled.
-      Priority task_priority = work_it->first.first;
+      const std::shared_ptr<internal::Work> &work = *work_it;
+      RayTask task = work->task;
+      const Priority &task_priority = task.GetTaskSpecification().GetPriority();
       RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks task " <<
-		  work_it->second->task.GetTaskSpecification().TaskId() << " priority:" << task_priority
+		  task.GetTaskSpecification().TaskId() << " priority:" << task_priority
                      << " block requested is " << block_requested_priority_;
       if (task_priority >= block_requested_priority_) {
 		task_blocked_ = true;
@@ -109,8 +128,6 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
       }
 	  task_blocked_ = false;
 
-      const std::shared_ptr<internal::Work> &work = *work_it;
-      RayTask task = work->task;
       RAY_LOG(DEBUG) << "Scheduling pending task "
                      << task.GetTaskSpecification().TaskId();
       auto scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
@@ -155,7 +172,7 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
       RAY_CHECK(!work_queue.empty());
       // Only announce the first item as infeasible.
       auto &work_queue = shapes_it->second;
-      const auto &work = work_queue.begin()->second;
+      const auto &work = *(work_queue.begin());
       const RayTask task = work->task;
       if (announce_infeasible_task_) {
         announce_infeasible_task_(task);
@@ -218,9 +235,10 @@ bool ClusterTaskManager::CancelTask(
        shapes_it++) {
     auto &work_queue = shapes_it->second;
     for (auto work_it = work_queue.begin(); work_it != work_queue.end(); work_it++) {
-      const auto &task = work_it->second->task;
+      const auto &task = (*work_it)->task;
       if (task.GetTaskSpecification().TaskId() == task_id) {
-        RAY_LOG(DEBUG) << "Canceling task " << task_id << " from schedule queue.";
+        RAY_LOG(DEBUG) << "Canceling task " << task_id << " Priority " <<
+			task.GetTaskSpecification().GetPriority() <<" from schedule queue.";
         ReplyCancelled(*(*work_it), failure_type, scheduling_failure_message);
         work_queue.erase(work_it);
         if (work_queue.empty()) {
@@ -235,7 +253,7 @@ bool ClusterTaskManager::CancelTask(
        shapes_it++) {
     auto &work_queue = shapes_it->second;
     for (auto work_it = work_queue.begin(); work_it != work_queue.end(); work_it++) {
-      const auto &task = work_it->second->task;
+      const auto &task = (*work_it)->task;
       if (task.GetTaskSpecification().TaskId() == task_id) {
         RAY_LOG(DEBUG) << "Canceling task " << task_id << " from infeasible queue.";
         ReplyCancelled(*(*work_it), failure_type, scheduling_failure_message);
@@ -382,7 +400,8 @@ size_t ClusterTaskManager::GetPendingQueueSize() const {
 }
 
 void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t first_pending_obj_size,
-		LocalObjectManager &local_object_manager, instrumented_io_context &io_service_){
+		LocalObjectManager &local_object_manager, instrumented_io_context &io_service,
+        rpc::CoreWorkerClientPool &owner_client_pool){
   static const bool enable_eagerSpill = RayConfig::instance().enable_EagerSpill();
   static const bool enable_deadlock1 = RayConfig::instance().enable_Deadlock1();
   static const bool enable_deadlock2 = RayConfig::instance().enable_Deadlock2();
@@ -391,19 +410,19 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
   if(enable_deadlock1 && num_spinning_workers && num_spinning_workers == leased_workers_.size()){
 	RAY_LOG(DEBUG) << "[" << __func__ << "] All leased workers are spinning ";
 	if(enable_eagerSpill){
-	  io_service_.post([this](){
+	  io_service.post([this](){
 	    object_manager_.SetShouldSpill(true);
 	  },"");
 	}else{
-	  io_service_.post([&local_object_manager, this](){
+	  io_service.post([&local_object_manager, this](){
 	    local_object_manager.DeleteEagerSpilledObjects(true);
 	  },"");
 	}
-	BlockTasks(init_priority, io_service_);
+	BlockTasks(init_priority, io_service);
   }else{
 	if(!enable_deadlock2){
       if(enable_eagerSpill){
-	    io_service_.post([&local_object_manager, this](){
+	    io_service.post([&local_object_manager, this](){
 	      local_object_manager.DeleteEagerSpilledObjects(true);
 	    },"");
 	  }
@@ -415,18 +434,18 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	//No Objects in the object store == No GCable object
 	if(objects_in_obj_store.empty()){
 	  RAY_LOG(DEBUG) << "[" << __func__ << "] Object Store is empty ";
-	  BlockTasks(init_priority, io_service_);
+	  BlockTasks(init_priority, io_service);
 	  return;
 	}
 	rpc::Address address = object_manager_.GetOwnerAddress(*objects_in_obj_store[0]);
 
-	auto conn = worker_rpc_pool_.GetOrConnect(address);
+	auto conn = owner_client_pool.GetOrConnect(address);
 	rpc::GetObjectWorkingSetRequest request;
 	for(size_t i=0; i< objects_in_obj_store.size(); i++){
 	  request.add_object_ids(objects_in_obj_store[i]->Binary());
 	}
 	conn->GetObjectWorkingSet(request,
-			[&io_service_, &local_object_manager, this, first_pending_obj_size, free_memory]
+			[&io_service, &local_object_manager, this, first_pending_obj_size, free_memory]
 	  (const Status &status, const rpc::GetObjectWorkingSetReply &reply){
 	  int64_t gcable_size = free_memory;
 	  for(int i=0; i<reply.gcable_object_ids_size(); i++){
@@ -437,17 +456,17 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	  if(first_pending_obj_size > gcable_size){
 		is_deadlock = true;
 		//TODO(Jae) Change this to turn off backpressure
-		BlockTasks(init_priority, io_service_);
+		BlockTasks(init_priority, io_service);
 	  }
 	  RAY_LOG(DEBUG)<<"["<< __func__<<"] RPC reply Deadlock: "<<is_deadlock<<" gcable size:"
 	  <<gcable_size << " first pending object size:" << first_pending_obj_size;
 
 	  if(enable_eagerSpill){
-	    io_service_.post([&local_object_manager, this, is_deadlock](){
+	    io_service.post([&local_object_manager, this, is_deadlock](){
 	      local_object_manager.DeleteEagerSpilledObjects(is_deadlock);
 	    },"");
 	  }else{
-	    io_service_.post([this, is_deadlock](){
+	    io_service.post([this, is_deadlock](){
 		  object_manager_.SetShouldSpill(is_deadlock);
 	    },"");
 	  }
@@ -458,18 +477,21 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 bool ClusterTaskManager::EvictTasks(Priority base_priority) {
   RAY_LOG(DEBUG) << "[" << __func__ << "] Called " ;
   bool should_spill = true;
+  /*
   std::vector<std::shared_ptr<WorkerInterface>> workers_to_kill;
   for (auto &entry : leased_workers_) {
     std::shared_ptr<WorkerInterface> worker = entry.second;
     Priority priority = worker->GetAssignedTask().GetTaskSpecification().GetPriority();
     workers_to_kill.push_back(worker);
     should_spill = false;
+	*/
 	/*
     if (priority > base_priority) {
       workers_to_kill.push_back(worker);
       should_spill = false;
     }
 	*/
+  /*
   }
 
   for (auto &worker : workers_to_kill) {
@@ -477,18 +499,19 @@ bool ClusterTaskManager::EvictTasks(Priority base_priority) {
     destroy_worker_(worker, rpc::WorkerExitType::INTENDED_EXIT);
   }
 
+  */
   // Check Deadlock corner cases
   // Finer granularity preemption is not considered, kill all the lower priorities
   return should_spill;
 }
 
-void ClusterTaskManager::BlockTasks(Priority base_priority, instrumented_io_context &io_service_) {
+void ClusterTaskManager::BlockTasks(Priority base_priority, instrumented_io_context &io_service) {
   static Priority init_priority;
   static const bool enable_blockTasks = RayConfig::instance().enable_BlockTasks();
   if(enable_blockTasks){
     block_requested_priority_ = base_priority;
     if(base_priority == init_priority && task_blocked_){
-	  io_service_.post([this](){
+	  io_service.post([this](){
         ScheduleAndDispatchTasks();
 	  },"");
     }

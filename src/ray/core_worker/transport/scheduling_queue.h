@@ -28,6 +28,7 @@ class SchedulingQueue {
  public:
   virtual ~SchedulingQueue() = default;
   virtual void Add(int64_t seq_no,
+	               const Priority &priority,
                    int64_t client_processed_up_to,
                    std::function<void(rpc::SendReplyCallback)> accept_request,
                    std::function<void(rpc::SendReplyCallback)> reject_request,

@@ -121,11 +121,8 @@ void LocalObjectManager::EagerSpill() {
   }
   eager_spill_running_ = true;
 
-  // Spill as fast as we can using all our spill workers.
-  if (EagerSpillObjectsOfSize(min_spilling_size_)){
-    absl::MutexLock lock(&mutex_);
-    num_active_workers_ += 1;
-  }
+  EagerSpillObjectsOfSize(min_spilling_size_);
+
   eager_spill_running_ = false;
 }
 
@@ -149,7 +146,7 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
 			(objects_pending_eager_spill_.count(object_id)) > 0 ||
 			(eager_spilled_objects_.count(object_id)));
   if (pinned_objects_.count(object_id)) {
-	RemovePinnedObjects(object_id, pinned_objects_[object_id].first->GetSize());
+	RemovePinnedObjects(object_id, pinned_objects_[object_id]->GetSize());
     local_objects_.erase(it);
   } else {
     // If the object is being spilled or is already spilled, then we will clean
@@ -236,7 +233,7 @@ bool LocalObjectManager::EagerSpillObjectsOfSize(int64_t num_bytes_to_spill) {
          counts < max_fused_object_count_) {
     auto &obj_id = *it_expired;
     if (is_plasma_object_eager_spillable_(obj_id)) {
-      bytes_to_spill += pinned_objects_[obj_id].first->GetSize();
+      bytes_to_spill += pinned_objects_[obj_id]->GetSize();
       objects_to_spill.push_back(obj_id);
     }else{
 	  expired_objects_.erase(it_expired);
@@ -253,13 +250,23 @@ bool LocalObjectManager::EagerSpillObjectsOfSize(int64_t num_bytes_to_spill) {
       const ObjectID &obj_id = *it;
       RAY_LOG(DEBUG) << "obj: " << obj_id << " spillable:" << is_plasma_object_eager_spillable_(obj_id);
       if (is_plasma_object_eager_spillable_(obj_id)) {
-        bytes_to_spill += pinned_objects_[obj_id].first->GetSize();
+        bytes_to_spill += pinned_objects_[obj_id]->GetSize();
         objects_to_spill.push_back(obj_id);
       }
 	  it++;
 	  counts++;
 	}
     it_priority++;
+  }
+  if(it_priority == pinned_objects_prioity_.rend() && it_expired == expired_objects_.end() &&
+     bytes_to_spill < num_bytes_to_spill && !objects_pending_spill_.empty()) {
+    // We have gone through all spillable objects but we have not yet reached
+    // the minimum bytes to spill and we are already spilling other objects.
+    // Let those spill requests finish before we try to spill the current
+    // objects. This gives us some time to decide whether we really need to
+    // spill the current objects or if we can afford to wait for additional
+    // objects to fuse with.
+    return false;
   }
   if (!objects_to_spill.empty()) {
     RAY_LOG(DEBUG) << "Eager Spilling objects of total size " << bytes_to_spill
@@ -280,13 +287,28 @@ bool LocalObjectManager::EagerSpillObjectsOfSize(int64_t num_bytes_to_spill) {
         spill_time_total_s_ += (now - std::max(start_time, last_spill_finish_ns_)) / 1e9;
         if (now - last_spill_log_ns_ > 1e9) {
           last_spill_log_ns_ = now;
-          RAY_LOG(INFO) << "Eager Spilled "
-                        << static_cast<int>(spilled_bytes_total_ / (1024 * 1024))
-                        << " MiB, " << spilled_objects_total_
-                        << " objects, write throughput "
-                        << static_cast<int>(spilled_bytes_total_ / (1024 * 1024) /
-                                            spill_time_total_s_)
-                        << " MiB/s";
+          std::stringstream msg;
+          // Keep :info_message: in sync with LOG_PREFIX_INFO_MESSAGE in
+          // ray_constants.py.
+          msg << ":info_message:Eager Spilled "
+              << static_cast<int>(spilled_bytes_total_ / (1024 * 1024)) << " MiB, "
+              << spilled_objects_total_ << " objects, write throughput "
+              << static_cast<int>(spilled_bytes_total_ / (1024 * 1024) /
+                                  spill_time_total_s_)
+              << " MiB/s.";
+          if (next_spill_error_log_bytes_ > 0 &&
+              spilled_bytes_total_ >= next_spill_error_log_bytes_) {
+            // Add an advisory the first time this is logged.
+            if (next_spill_error_log_bytes_ ==
+                RayConfig::instance().verbose_spill_logs()) {
+              msg << " Set RAY_verbose_spill_logs=0 to disable this message.";
+            }
+            // Exponential backoff on the spill messages.
+            next_spill_error_log_bytes_ *= 2;
+            RAY_LOG(ERROR) << msg.str();
+          } else {
+            RAY_LOG(INFO) << msg.str();
+          }
         }
         last_spill_finish_ns_ = now;
       }
@@ -426,11 +448,10 @@ void LocalObjectManager::EagerSpillObjectsInternal(
       store_object_count_(id, true, false);
 
       // Move a pinned object to the pending spill object.
-      size_t object_size = it->second.first->GetSize();
+      size_t object_size = it->second->GetSize();
       num_bytes_pending_spill_ += object_size;
-
-	  //eager_spilled_objects_.insert(id);
       objects_pending_eager_spill_[id] = std::move(it->second);
+
 	  RemovePinnedObjects(id, object_size);
     }
   }
@@ -441,19 +462,44 @@ void LocalObjectManager::EagerSpillObjectsInternal(
     }
     return;
   }
+  {
+    absl::MutexLock lock(&mutex_);
+    num_active_workers_ += 1;
+  }
   io_worker_pool_.PopSpillWorker(
       [this, objects_to_spill, callback](std::shared_ptr<WorkerInterface> io_worker) {
         rpc::SpillObjectsRequest request;
+        std::vector<ObjectID> requested_objects_to_spill;
         for (const auto &object_id : objects_to_spill) {
           RAY_LOG(DEBUG) << "Sending eager spill request for object " << object_id;
-          auto ref = request.add_object_refs_to_spill();
-          ref->set_object_id(object_id.Binary());
           auto it = objects_pending_eager_spill_.find(object_id);
           RAY_CHECK(it != objects_pending_eager_spill_.end());
-          ref->mutable_owner_address()->CopyFrom(it->second.second);
+          auto freed_it = local_objects_.find(object_id);
+          // If the object hasn't already been freed, spill it.
+          if (freed_it == local_objects_.end() || freed_it->second.second) {
+            num_bytes_pending_spill_ -= it->second->GetSize();
+            objects_pending_spill_.erase(it);
+          } else {
+            auto ref = request.add_object_refs_to_spill();
+            ref->set_object_id(object_id.Binary());
+            ref->mutable_owner_address()->CopyFrom(freed_it->second.first);
+            RAY_LOG(DEBUG) << "Sending spill request for object " << object_id;
+            requested_objects_to_spill.push_back(object_id);
+          }
         }
+
+        if (request.object_refs_to_spill_size() == 0) {
+          {
+            absl::MutexLock lock(&mutex_);
+            num_active_workers_ -= 1;
+          }
+          io_worker_pool_.PushSpillWorker(io_worker);
+          callback(Status::OK());
+          return;
+        }
+
         io_worker->rpc_client()->SpillObjects(
-            request, [this, objects_to_spill, callback, io_worker](
+            request, [this, requested_objects_to_spill, callback, io_worker](
                          const ray::Status &status, const rpc::SpillObjectsReply &r) {
               {
                 absl::MutexLock lock(&mutex_);
@@ -464,28 +510,28 @@ void LocalObjectManager::EagerSpillObjectsInternal(
               // Object spilling is always done in the order of the request.
               // For example, if an object succeeded, it'll guarentee that all objects
               // before this will succeed.
-              RAY_CHECK(num_objects_spilled <= objects_to_spill.size());
-              for (size_t i = num_objects_spilled; i != objects_to_spill.size(); ++i) {
-                const auto &object_id = objects_to_spill[i];
+              RAY_CHECK(num_objects_spilled <= requested_objects_to_spill.size());
+              for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size();
+					  ++i) {
+                const auto &object_id = requested_objects_to_spill[i];
                 auto it = objects_pending_eager_spill_.find(object_id);
                 RAY_CHECK(it != objects_pending_eager_spill_.end());
 				RAY_LOG(DEBUG) << "[JAE_DEBUG] eager spilling error for obj: " << object_id;
-                pinned_objects_size_ += it->second.first->GetSize();
+                pinned_objects_size_ += it->second->GetSize();
                 pinned_objects_.emplace(object_id, std::move(it->second));
                 pinned_objects_prioity_[objectID_to_priority_[object_id]].insert(object_id);
-		        eager_spilled_objects_.erase(object_id);
                 objects_pending_eager_spill_.erase(it);
               }
 
               if (!status.ok()) {
-                for (size_t i = num_objects_spilled; i != objects_to_spill.size(); ++i) {
-                  const auto &object_id = objects_to_spill[i];
+                for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size(); ++i) {
+                  const auto &object_id = requested_objects_to_spill[i];
 				  store_object_count_(object_id, false, true);
 				}
                 RAY_LOG(ERROR) << "Failed to send object eager spilling request: "
                                << status.ToString();
               } else {
-                OnObjectEagerSpilled(objects_to_spill, r);
+                OnObjectEagerSpilled(requested_objects_to_spill, r);
               }
               if (callback) {
                 callback(status);
@@ -672,13 +718,23 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
     RAY_LOG(DEBUG) << "Removing pending eager spill object " << object_id;
     auto it = objects_pending_eager_spill_.find(object_id);
     RAY_CHECK(it != objects_pending_eager_spill_.end());
-    const auto object_size = it->second.first->GetSize();
-    const auto worker_addr = it->second.second;
-    const auto node_id_object_spilled =
-        is_external_storage_type_fs_ ? self_node_id_ : NodeID::Nil();
+    const auto object_size = it->second->GetSize();
     num_bytes_pending_spill_ -= object_size;
-	eager_spilled_objects_.emplace(object_id, std::make_pair(it->second.first->GetSize(), it->second.second));
     objects_pending_eager_spill_.erase(it);
+
+    // Asynchronously Update the spilled URL.
+    auto freed_it = local_objects_.find(object_id);
+    if (freed_it == local_objects_.end() || freed_it->second.second) {
+      RAY_LOG(DEBUG) << "Eager Spilled object already freed, skipping send of spilled URL to "
+                        "object directory for object "
+                     << object_id;
+      continue;
+    }
+    const auto &worker_addr = freed_it->second.first;
+    object_directory_->ReportObjectSpilled(
+        object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
+
+	eager_spilled_objects_.emplace(object_id, std::make_pair(it->second->GetSize(), worker_addr));
 	RemovePinnedObjects(object_id, object_size);
 	objectID_to_priority_.erase(object_id);
 	if(freed_during_eager_spill_.contains(object_id)){

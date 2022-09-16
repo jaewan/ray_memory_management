@@ -303,7 +303,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 			  }
 			}
             if(block_spill){
-			  cluster_task_manager_->CheckDeadlock(num_spinning_workers, pending_size, local_object_manager_, io_service_);
+			  cluster_task_manager_->CheckDeadlock(num_spinning_workers, pending_size,
+					  local_object_manager_, io_service_, worker_rpc_pool_);
 			}else if(delete_eager_spilled_objects){
 			  io_service_.post([this](){
 				local_object_manager_.DeleteEagerSpilledObjects(true);

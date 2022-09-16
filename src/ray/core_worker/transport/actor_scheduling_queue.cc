@@ -69,6 +69,7 @@ size_t ActorSchedulingQueue::Size() const {
 
 /// Add a new actor task's callbacks to the worker queue.
 void ActorSchedulingQueue::Add(int64_t seq_no,
+	                           const Priority &priority,
                                int64_t client_processed_up_to,
                                std::function<void(rpc::SendReplyCallback)> accept_request,
                                std::function<void(rpc::SendReplyCallback)> reject_request,
@@ -97,7 +98,7 @@ void ActorSchedulingQueue::Add(int64_t seq_no,
                                                 function_descriptor);
 
   if (dependencies.size() > 0) {
-    waiter_.Wait(dependencies, [seq_no, this]() {
+    waiter_.Wait(dependencies, priority, [seq_no, this]() {
       RAY_CHECK(boost::this_thread::get_id() == main_thread_id_);
       auto it = pending_actor_tasks_.find(seq_no);
       if (it != pending_actor_tasks_.end()) {

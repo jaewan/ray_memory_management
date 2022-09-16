@@ -203,7 +203,11 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
     while (!current_queue.empty() && !lease_entry.is_busy) {
-      auto task_spec = current_queue.front();
+	  const auto task_key_it = current_queue.begin();
+	  const auto &task_id = task_key_it->second;
+	  const auto task_it = tasks_.find(task_id);
+	  RAY_CHECK(task_it != tasks_.end()) << task_id;
+      const auto &task_spec = task_it->second.task_spec;
       lease_entry.is_busy = true;
 
       // Increment the total number of tasks in flight to any worker associated with the
@@ -225,6 +229,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 
 void CoreWorkerDirectTaskSubmitter::CancelWorkerLeaseIfNeeded(
     const SchedulingKey &scheduling_key) {
+  auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
   auto &task_priority_queue = scheduling_key_entry.task_priority_queue;
   if (!task_priority_queue.empty()) {
     // There are still pending tasks, or there are tasks that can be stolen by a new
@@ -352,7 +357,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
       scheduling_key_entries_.erase(scheduling_key);
     }
     return;
-  } else if (scheduling_key_entry.task_queue.size() <=
+  } else if ((size_t)scheduling_key_entry.task_priority_queue.size() <=
              scheduling_key_entry.pending_lease_requests.size()) {
     // All tasks have corresponding pending leases, no need to request more
     return;
@@ -403,15 +408,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 
           if (status.ok()) {
             if (reply.canceled()) {
-              auto &task_priority_queue = scheduling_key_entry.task_priority_queue;
-              while (!task_priority_queue.empty()) {
-                const auto task_key_it = task_priority_queue.begin();
-                const auto &task_id = task_key_it->second;
-                const auto task_it = tasks_.find(task_id);
-                RAY_CHECK(task_it != tasks_.end());
-                task_priority_queue.erase(task_key_it);
-                tasks_.erase(task_it);
-              }
               RAY_LOG(DEBUG) << "Lease canceled for task: " << task_id
                              << ", canceled type: "
                              << rpc::RequestWorkerLeaseReply::SchedulingFailureType_Name(
@@ -446,8 +442,18 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                 } else {
                   error_type = rpc::ErrorType::TASK_PLACEMENT_GROUP_REMOVED;
                 }
-                tasks_to_fail = std::move(scheduling_key_entry.task_queue);
-                scheduling_key_entry.task_queue.clear();
+              auto &task_priority_queue = scheduling_key_entry.task_priority_queue;
+              while (!task_priority_queue.empty()) {
+                const auto task_key_it = task_priority_queue.begin();
+                const auto &task_id = task_key_it->second;
+                const auto task_it = tasks_.find(task_id);
+                RAY_CHECK(task_it != tasks_.end());
+                task_priority_queue.erase(task_key_it);
+				tasks_to_fail.push_back(std::move(task_it->second.task_spec));
+                tasks_.erase(task_it);
+              }
+                //tasks_to_fail = std::move(scheduling_key_entry.task_queue);
+                //scheduling_key_entry.task_queue.clear();
                 if (scheduling_key_entry.CanDelete()) {
                   scheduling_key_entries_.erase(scheduling_key);
                 }
@@ -515,8 +521,18 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               RAY_CHECK(worker_type_ == WorkerType::DRIVER);
               error_type = rpc::ErrorType::LOCAL_RAYLET_DIED;
               error_status = status;
-              tasks_to_fail = std::move(scheduling_key_entry.task_queue);
-              scheduling_key_entry.task_queue.clear();
+              auto &task_priority_queue = scheduling_key_entry.task_priority_queue;
+              while (!task_priority_queue.empty()) {
+                const auto task_key_it = task_priority_queue.begin();
+                const auto &task_id = task_key_it->second;
+                const auto task_it = tasks_.find(task_id);
+                RAY_CHECK(task_it != tasks_.end());
+                task_priority_queue.erase(task_key_it);
+				tasks_to_fail.push_back(std::move(task_it->second.task_spec));
+                tasks_.erase(task_it);
+              }
+              //tasks_to_fail = std::move(scheduling_key_entry.task_queue);
+              //scheduling_key_entry.task_queue.clear();
               if (scheduling_key_entry.CanDelete()) {
                 scheduling_key_entries_.erase(scheduling_key);
               }
@@ -656,22 +672,23 @@ Status CoreWorkerDirectTaskSubmitter::CancelTask(TaskSpecification task_spec,
     }
 
     auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
-    auto &scheduling_tasks = scheduling_key_entry.task_queue;
+    auto &current_queue = scheduling_key_entry.task_priority_queue;
     // This cancels tasks that have completed dependencies and are awaiting
     // a worker lease.
-    if (!scheduling_tasks.empty()) {
-      for (auto spec = scheduling_tasks.begin(); spec != scheduling_tasks.end(); spec++) {
-        if (spec->TaskId() == task_spec.TaskId()) {
-          scheduling_tasks.erase(spec);
+    if (!current_queue.empty()) {
+      for (auto task_key_it = current_queue.begin(); task_key_it != current_queue.end(); task_key_it++) {
+	    const auto &task_id = task_key_it->second;
+        if (task_id == task_spec.TaskId()) {
+          current_queue.erase(task_key_it);
 
-          if (scheduling_tasks.empty()) {
+          if (current_queue.empty()) {
             CancelWorkerLeaseIfNeeded(scheduling_key);
           }
           RAY_UNUSED(task_finisher_->FailOrRetryPendingTask(
-              task_spec.TaskId(), rpc::ErrorType::TASK_CANCELLED, nullptr));
+              task_id, rpc::ErrorType::TASK_CANCELLED, nullptr));
           return Status::OK();
         }
-      }
+	  }
     }
 
     // This will get removed either when the RPC call to cancel is returned

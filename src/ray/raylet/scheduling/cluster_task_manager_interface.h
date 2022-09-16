@@ -59,7 +59,8 @@ class ClusterTaskManagerInterface {
 
   virtual bool EvictTasks(Priority) = 0;
 
-  virtual void CheckDeadlock(size_t, int64_t,  LocalObjectManager&, instrumented_io_context&) = 0;
+  virtual void CheckDeadlock(size_t, int64_t,  LocalObjectManager&, instrumented_io_context&,
+                             rpc::CoreWorkerClientPool &owner_client_pool) =0;
 
   /// Queue task and schedule. This hanppens when processing the worker lease request.
   ///

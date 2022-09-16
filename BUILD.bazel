@@ -677,6 +677,8 @@ cc_library(
     deps = [
         ":object_manager",
         ":agent_manager_rpc",
+        ":agent_manager_cc_grpc",
+        ":runtime_env_rpc",
         "//src/ray/protobuf:gcs_cc_proto",
         ":gcs_client_lib",
         ":ray_common",

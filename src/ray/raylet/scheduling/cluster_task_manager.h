@@ -62,12 +62,23 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
       std::function<int64_t(void)> get_time_ms = []() {
         return (int64_t)(absl::GetCurrentTimeNanos() / 1e6);}
 	  );
+  ClusterTaskManager(
+      const NodeID &self_node_id,
+      std::shared_ptr<ClusterResourceScheduler> cluster_resource_scheduler,
+      internal::NodeInfoGetter get_node_info,
+      std::function<void(const RayTask &)> announce_infeasible_task,
+      std::shared_ptr<ILocalTaskManager> local_task_manager,
+      std::function<int64_t(void)> get_time_ms = []() {
+        return (int64_t)(absl::GetCurrentTimeNanos() / 1e6);}
+	  );
   //Block new tasks from being scheduled with this priority
   void BlockTasks(Priority, instrumented_io_context &io_service_) override;
   //Preempt currently running tasks with a lower priority
   bool EvictTasks(Priority) override;
-  void CheckDeadlock(size_t, int64_t first_pending_obj_size, LocalObjectManager &local_object_manager,
-		  instrumented_io_context &io_service_) override;
+  void CheckDeadlock(size_t, int64_t first_pending_obj_size, 
+		             LocalObjectManager &local_object_manager,
+		             instrumented_io_context &io_service, 
+					 rpc::CoreWorkerClientPool &owner_client_pool) override;
 
   /// Queue task and schedule. This hanppens when processing the worker lease request.
   ///
@@ -195,9 +206,9 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
 
   bool task_blocked_ = false;
 
-  const SetShouldSpillCallback set_should_spill_;
-
   ObjectManager &object_manager_;
+
+  const SetShouldSpillCallback set_should_spill_;
 
   /// Returns the current time in milliseconds.
   std::function<int64_t()> get_time_ms_;

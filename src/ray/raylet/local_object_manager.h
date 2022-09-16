@@ -381,7 +381,7 @@ class LocalObjectManager {
   // Replicas of pinned_objects_ sorted by Priority
   absl::btree_map<ray::Priority, absl::flat_hash_set<ObjectID> > pinned_objects_prioity_;
   absl::flat_hash_map<ObjectID, ray::Priority> objectID_to_priority_;
-  absl::flat_hash_map<ObjectID, std::pair<std::unique_ptr<RayObject>, rpc::Address>>
+  absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject> >
       objects_pending_eager_spill_;
   absl::flat_hash_map<ObjectID, std::pair<size_t, rpc::Address>> eager_spilled_objects_;
   absl::flat_hash_set<ObjectID> expired_objects_;

@@ -314,6 +314,7 @@ void GcsServer::InitClusterResourceScheduler() {
 
 void GcsServer::InitClusterTaskManager() {
   RAY_CHECK(cluster_resource_scheduler_);
+  //this cluster_task_manager_ only calls ScheduleAndDispatchTasks()
   cluster_task_manager_ = std::make_shared<ClusterTaskManager>(
       local_node_id_,
       cluster_resource_scheduler_,
@@ -325,7 +326,8 @@ void GcsServer::InitClusterTaskManager() {
       /*announce_infeasible_task=*/
       nullptr,
       /*local_task_manager=*/
-      std::make_shared<NoopLocalTaskManager>());
+      std::make_shared<NoopLocalTaskManager>(),
+	  );
 }
 
 void GcsServer::InitGcsJobManager(const GcsInitData &gcs_init_data) {
