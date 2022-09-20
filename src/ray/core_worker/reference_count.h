@@ -506,6 +506,18 @@ class ReferenceCounter : public ReferenceCounterInterface,
   /// Release all local references which registered on this local.
   void ReleaseAllLocalReferences();
 
+  std::vector<ObjectID> GetDeletedObjects(){
+    absl::MutexLock lock(&mutex_);
+	std::vector<ObjectID>  ret = deleted_objects_;
+	deleted_objects_.clear();
+    return ret;
+  }
+
+  void ResetDeletedObjects(){
+    absl::MutexLock lock(&mutex_);
+    deleted_objects_.clear();
+  }
+
  private:
   /// Contains information related to nested object refs only.
   struct NestedReferenceCount {
@@ -915,6 +927,13 @@ class ReferenceCounter : public ReferenceCounterInterface,
   void CleanupBorrowersOnRefRemoved(const ReferenceTable &new_borrower_refs,
                                     const ObjectID &object_id,
                                     const rpc::WorkerAddress &borrower_addr);
+
+  void AddDeletedObjects(const ObjectID &id){
+    absl::MutexLock lock(&mutex_);
+    deleted_objects_.push_back(id);
+  }
+
+  std::vector<ObjectID> deleted_objects_;
 
   /// Decrease the local reference count for the ObjectID by one.
   /// This method is internal and not thread-safe. mutex_ lock must be held before

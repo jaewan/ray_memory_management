@@ -212,7 +212,7 @@ class NodeManager : public rpc::NodeManagerServiceHandler,
   std::optional<syncer::RaySyncMessage> CreateSyncMessage(
       int64_t after_version, syncer::MessageType message_type) const override;
 
-  int GetObjectManagerPort() const { return object_manager_.GetServerPort(); }
+  int GetObjectManagerPort() const { return object_manager_->GetServerPort(); }
 
   LocalObjectManager &GetLocalObjectManager() { return local_object_manager_; }
 
@@ -718,7 +718,7 @@ class NodeManager : public rpc::NodeManagerServiceHandler,
   /// manager.
   std::unique_ptr<IObjectDirectory> object_directory_;
   /// Manages client requests for object transfers and availability.
-  ObjectManager object_manager_;
+  std::shared_ptr<ObjectManager> object_manager_;
   /// A Plasma object store client. This is used for creating new objects in
   /// the object store (e.g., for actor tasks that can't be run because the
   /// actor died) and to pin objects that are in scope in the cluster.

@@ -862,6 +862,7 @@ class CoreWorker : public rpc::CoreWorkerServiceHandler {
       const std::unordered_map<std::string, double> &required_resources,
       const std::unordered_map<std::string, double> &required_placement_resources,
       const std::string &debugger_breakpoint,
+      const Priority &priority,
       int64_t depth,
       const std::string &serialized_runtime_env_info,
       const std::string &concurrency_group_name = "");

@@ -327,6 +327,8 @@ void GcsServer::InitClusterTaskManager() {
       nullptr,
       /*local_task_manager=*/
       std::make_shared<NoopLocalTaskManager>(),
+      /*object_manager=*/
+	  nullptr
 	  );
 }
 

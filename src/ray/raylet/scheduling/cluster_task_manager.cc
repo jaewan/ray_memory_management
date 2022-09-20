@@ -30,9 +30,9 @@ ClusterTaskManager::ClusterTaskManager(
     internal::NodeInfoGetter get_node_info,
     std::function<void(const RayTask &)> announce_infeasible_task,
     std::shared_ptr<ILocalTaskManager> local_task_manager,
-    std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>> &leased_workers,
-	ObjectManager &object_manager,
-	SetShouldSpillCallback set_should_spill,
+    //std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>> leased_workers,
+	shared_ptr<ObjectManager> object_manager,
+    std::function<size_t()> leased_workers_size,
     std::function<int64_t(void)> get_time_ms)
     : self_node_id_(self_node_id),
       cluster_resource_scheduler_(cluster_resource_scheduler),
@@ -40,28 +40,10 @@ ClusterTaskManager::ClusterTaskManager(
       announce_infeasible_task_(announce_infeasible_task),
       local_task_manager_(std::move(local_task_manager)),
       scheduler_resource_reporter_(
-          tasks_to_schedule_, infeasible_tasks_, *local_task_manager_),
+      tasks_to_schedule_, infeasible_tasks_, *local_task_manager_),
       internal_stats_(*this, *local_task_manager_),
-      leased_workers_(leased_workers),
 	  object_manager_(object_manager),
-	  set_should_spill_(set_should_spill),
-      get_time_ms_(get_time_ms){}
-
-ClusterTaskManager::ClusterTaskManager(
-    const NodeID &self_node_id,
-    std::shared_ptr<ClusterResourceScheduler> cluster_resource_scheduler,
-    internal::NodeInfoGetter get_node_info,
-    std::function<void(const RayTask &)> announce_infeasible_task,
-    std::shared_ptr<ILocalTaskManager> local_task_manager,
-    std::function<int64_t(void)> get_time_ms)
-    : self_node_id_(self_node_id),
-      cluster_resource_scheduler_(cluster_resource_scheduler),
-      get_node_info_(get_node_info),
-      announce_infeasible_task_(announce_infeasible_task),
-      local_task_manager_(std::move(local_task_manager)),
-      scheduler_resource_reporter_(
-          tasks_to_schedule_, infeasible_tasks_, *local_task_manager_),
-      internal_stats_(*this, *local_task_manager_),
+      leased_workers_size_(leased_workers_size),
       get_time_ms_(get_time_ms){}
 
 void ClusterTaskManager::QueueAndScheduleTask(
@@ -407,11 +389,11 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
   static const bool enable_deadlock2 = RayConfig::instance().enable_Deadlock2();
   static Priority init_priority;
   //Deadlock #1
-  if(enable_deadlock1 && num_spinning_workers && num_spinning_workers == leased_workers_.size()){
+  if(enable_deadlock1 && num_spinning_workers && num_spinning_workers == leased_workers_size_()){
 	RAY_LOG(DEBUG) << "[" << __func__ << "] All leased workers are spinning ";
 	if(enable_eagerSpill){
 	  io_service.post([this](){
-	    object_manager_.SetShouldSpill(true);
+	    object_manager_->SetShouldSpill(true);
 	  },"");
 	}else{
 	  io_service.post([&local_object_manager, this](){
@@ -430,14 +412,14 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	}
   //Deadlock Detection #2
 	std::vector<const ObjectID*> objects_in_obj_store;
-	int64_t free_memory = object_manager_.GetObjectsInObjectStore(&objects_in_obj_store);
+	int64_t free_memory = object_manager_->GetObjectsInObjectStore(&objects_in_obj_store);
 	//No Objects in the object store == No GCable object
 	if(objects_in_obj_store.empty()){
 	  RAY_LOG(DEBUG) << "[" << __func__ << "] Object Store is empty ";
 	  BlockTasks(init_priority, io_service);
 	  return;
 	}
-	rpc::Address address = object_manager_.GetOwnerAddress(*objects_in_obj_store[0]);
+	rpc::Address address = object_manager_->GetOwnerAddress(*objects_in_obj_store[0]);
 
 	auto conn = owner_client_pool.GetOrConnect(address);
 	rpc::GetObjectWorkingSetRequest request;
@@ -450,7 +432,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	  int64_t gcable_size = free_memory;
 	  for(int i=0; i<reply.gcable_object_ids_size(); i++){
 		TaskID task_id = TaskID::FromBinary(reply.gcable_object_ids(i));
-		gcable_size += object_manager_.GetTaskObjectSize(task_id);
+		gcable_size += object_manager_->GetTaskObjectSize(task_id);
 	  }
 	  bool is_deadlock = false;
 	  if(first_pending_obj_size > gcable_size){
@@ -467,7 +449,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	    },"");
 	  }else{
 	    io_service.post([this, is_deadlock](){
-		  object_manager_.SetShouldSpill(is_deadlock);
+		  object_manager_->SetShouldSpill(is_deadlock);
 	    },"");
 	  }
 	});

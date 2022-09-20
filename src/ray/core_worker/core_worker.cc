@@ -1051,11 +1051,13 @@ Status CoreWorker::CreateExisting(const std::shared_ptr<Buffer> &metadata,
         "Creating an object with a pre-existing ObjectID is not supported in local "
         "mode");
   } else {
+	/*
     Priority priority;
     {
       absl::MutexLock lock(&mutex_);
       priority = current_task_.GetPriority();
     }
+	*/
     return plasma_store_provider_->Create(metadata, data_size, object_id, owner_address,
                                           priority, data, created_by_worker);
   }
@@ -1545,6 +1547,7 @@ void CoreWorker::BuildCommonTaskSpec(
     const std::unordered_map<std::string, double> &required_resources,
     const std::unordered_map<std::string, double> &required_placement_resources,
     const std::string &debugger_breakpoint,
+    const Priority &priority,
     int64_t depth,
     const std::string &serialized_runtime_env_info,
     const std::string &concurrency_group_name) {
@@ -1564,6 +1567,7 @@ void CoreWorker::BuildCommonTaskSpec(
                             required_resources,
                             required_placement_resources,
                             debugger_breakpoint,
+							priority,
                             depth,
                             override_runtime_env_info,
                             concurrency_group_name);

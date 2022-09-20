@@ -228,7 +228,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
             ref.set_object_id(obj_id.Binary());
             MarkObjectsAsFailed(error_type, {ref}, JobID::Nil());
           })),
-      object_manager_(
+      object_manager_(std::make_shared<ObjectManager>(
           io_service,
           self_node_id,
           object_manager_config,
@@ -278,7 +278,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
                       return GetLocalObjectManager().IsSpillingInProgress();
 					}else{
 			          io_service_.post([this](){
-					    object_manager_.SetShouldSpill(true);
+					    object_manager_->SetShouldSpill(true);
 				      },"");
 					}
 				    return true;
@@ -295,7 +295,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
                     return GetLocalObjectManager().IsSpillingInProgress();
 				  }else{
 			        io_service_.post([this](){
-				      object_manager_.SetShouldSpill(true);
+				      object_manager_->SetShouldSpill(true);
 				    },"");
 				  }
 				  return true;
@@ -339,12 +339,12 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
             rpc::ObjectReference ref;
             ref.set_object_id(object_id.Binary());
             MarkObjectsAsFailed(error_type, {ref}, JobID::Nil());
-          }),
+          })),
       periodical_runner_(io_service),
       report_resources_period_ms_(config.report_resources_period_ms),
       temp_dir_(config.temp_dir),
       initial_config_(config),
-      dependency_manager_(object_manager_),
+      dependency_manager_(*object_manager_),
       wait_manager_(/*is_object_local*/
                     [this](const ObjectID &object_id) {
                       return dependency_manager_.CheckObjectLocal(object_id);
@@ -375,7 +375,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
           /*max_fused_object_count*/ RayConfig::instance().max_fused_object_count(),
           /*on_objects_freed*/
           [this](const std::vector<ObjectID> &object_ids) {
-            object_manager_.FreeObjects(object_ids,
+            object_manager_->FreeObjects(object_ids,
                                         /*local_only=*/false);
           },
           /*store_object_count_*/
@@ -387,11 +387,11 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
           },
           /*is_plasma_object_eager_spillable*/
           [this](const ObjectID &object_id) {
-            return object_manager_.IsPlasmaObjectEagerSpillable(object_id);
+            return object_manager_->IsPlasmaObjectEagerSpillable(object_id);
           },
           /*is_plasma_object_spillable*/
           [this](const ObjectID &object_id) {
-            return object_manager_.IsPlasmaObjectSpillable(object_id);
+            return object_manager_->IsPlasmaObjectSpillable(object_id);
           },
           /*core_worker_subscriber_=*/core_worker_subscriber_.get(),
           object_directory_.get()),
@@ -431,11 +431,11 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
           }
           return bytes_used;
         } else {
-          return object_manager_.GetUsedMemory();
+          return object_manager_->GetUsedMemory();
         }
       },
       /*get_pull_manager_at_capacity*/
-      [this]() { return object_manager_.PullManagerHasPullsQueued(); });
+      [this]() { return object_manager_->PullManagerHasPullsQueued(); });
 
   auto get_node_info_func = [this](const NodeID &node_id) {
     return gcs_client_->Nodes().Get(node_id);
@@ -446,7 +446,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
   RAY_CHECK(RayConfig::instance().max_task_args_memory_fraction() > 0 &&
             RayConfig::instance().max_task_args_memory_fraction() <= 1)
       << "max_task_args_memory_fraction must be a nonzero fraction.";
-  int64_t max_task_args_memory = object_manager_.GetMemoryCapacity() *
+  int64_t max_task_args_memory = object_manager_->GetMemoryCapacity() *
                                  RayConfig::instance().max_task_args_memory_fraction();
   if (max_task_args_memory <= 0) {
     RAY_LOG(WARNING)
@@ -456,10 +456,6 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
            "return values are greater than the remaining capacity.";
     max_task_args_memory = 0;
   }
-  auto destroy_worker = [this](std::shared_ptr<WorkerInterface> worker,
-                                rpc::WorkerExitType disconnect_type) {
-	  DestroyWorker(worker, disconnect_type);
-  };
   auto is_owner_alive = [this](const WorkerID &owner_worker_id,
                                const NodeID &owner_node_id) {
     return !(failed_workers_cache_.count(owner_worker_id) > 0 ||
@@ -484,11 +480,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
       get_node_info_func,
       announce_infeasible_task,
       local_task_manager_,
-	  leased_workers_,
 	  object_manager_,
-      [this](bool should_spill) {
-        object_manager_.SetShouldSpill(should_spill);
-      });
+	  [this](){return leased_workers_.size();});
   placement_group_resource_manager_ = std::make_shared<NewPlacementGroupResourceManager>(
       std::dynamic_pointer_cast<ClusterResourceScheduler>(cluster_resource_scheduler_));
 
@@ -757,7 +750,7 @@ void NodeManager::HandleSetNewDependencyAdded(const rpc::SetNewDependencyAddedRe
                                            rpc::SetNewDependencyAddedReply *reply,
                                            rpc::SendReplyCallback send_reply_callback){
   io_service_.post([this](){
-    object_manager_.SetNewDependencyAdded();
+    object_manager_->SetNewDependencyAdded();
   },"");
 }
 
@@ -1350,7 +1343,7 @@ void NodeManager::ProcessClientMessage(const std::shared_ptr<ClientConnection> &
     auto message = flatbuffers::GetRoot<protocol::FreeObjectsRequest>(message_data);
     std::vector<ObjectID> object_ids = from_flatbuf<ObjectID>(*message->object_ids());
     // Clean up objects from the object store.
-    object_manager_.FreeObjects(object_ids, message->local_only());
+    object_manager_->FreeObjects(object_ids, message->local_only());
   } break;
   case protocol::MessageType::SubscribePlasmaReady: {
     ProcessSubscribePlasmaReady(client, message_data);
@@ -2463,7 +2456,7 @@ std::string NodeManager::DebugString() const {
   }
   result << "\nClusterResources:";
   result << "\n" << local_object_manager_.DebugString();
-  result << "\n" << object_manager_.DebugString();
+  result << "\n" << object_manager_->DebugString();
   result << "\n" << gcs_client_->DebugString();
   result << "\n" << worker_pool_.DebugString();
   result << "\n" << dependency_manager_.DebugString();
@@ -2605,7 +2598,7 @@ void NodeManager::HandleGetNodeStats(const rpc::GetNodeStatsRequest &node_stats_
   // Report object spilling stats.
   local_object_manager_.FillObjectSpillingStats(reply);
   // Report object store stats.
-  object_manager_.FillObjectStoreStats(reply);
+  object_manager_->FillObjectStoreStats(reply);
   // Ensure we never report an empty set of metrics.
   if (!recorded_metrics_) {
     RecordMetrics();
@@ -2860,7 +2853,7 @@ void NodeManager::HandleGlobalGC(const rpc::GlobalGCRequest &request,
 bool NodeManager::TryLocalGC() {
   // If plasma store is under high pressure, we should try to schedule a global gc.
   bool plasma_high_pressure =
-      object_manager_.GetUsedMemoryPercentage() > high_plasma_storage_usage_;
+      object_manager_->GetUsedMemoryPercentage() > high_plasma_storage_usage_;
   if (plasma_high_pressure && global_gc_throttler_.AbleToRun()) {
     TriggerGlobalGC();
   }
@@ -2891,7 +2884,7 @@ void NodeManager::TriggerGlobalGC() {
 }
 
 void NodeManager::Stop() {
-  object_manager_.Stop();
+  object_manager_->Stop();
   if (heartbeat_sender_) {
     heartbeat_sender_.reset();
   }
@@ -2904,7 +2897,7 @@ void NodeManager::RecordMetrics() {
   }
 
   cluster_task_manager_->RecordMetrics();
-  object_manager_.RecordMetrics();
+  object_manager_->RecordMetrics();
   local_object_manager_.RecordMetrics();
 
   uint64_t current_time = current_time_ms();

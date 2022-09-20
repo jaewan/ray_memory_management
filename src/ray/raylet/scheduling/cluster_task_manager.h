@@ -56,18 +56,12 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
       internal::NodeInfoGetter get_node_info,
       std::function<void(const RayTask &)> announce_infeasible_task,
       std::shared_ptr<ILocalTaskManager> local_task_manager,
-      std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>> &leased_workers,
-	  ObjectManager &object_manager,
-	  SetShouldSpillCallback set_should_spill,
-      std::function<int64_t(void)> get_time_ms = []() {
-        return (int64_t)(absl::GetCurrentTimeNanos() / 1e6);}
-	  );
-  ClusterTaskManager(
-      const NodeID &self_node_id,
-      std::shared_ptr<ClusterResourceScheduler> cluster_resource_scheduler,
-      internal::NodeInfoGetter get_node_info,
-      std::function<void(const RayTask &)> announce_infeasible_task,
-      std::shared_ptr<ILocalTaskManager> local_task_manager,
+      //std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>>
+	  //leased_workers,
+	  shared_ptr<ObjectManager> object_manager,
+      std::function<size_t()> leased_workers_size = [](){
+	    return (size_t)0;
+	  },
       std::function<int64_t(void)> get_time_ms = []() {
         return (int64_t)(absl::GetCurrentTimeNanos() / 1e6);}
 	  );
@@ -199,16 +193,18 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
   const SchedulerResourceReporter scheduler_resource_reporter_;
   mutable SchedulerStats internal_stats_;
 
-  std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>> &leased_workers_;
+  shared_ptr<ObjectManager> object_manager_;
+  /*
+  std::unordered_map<WorkerID, std::shared_ptr<WorkerInterface>>
+	  leased_workers_;
+	  */
+  std::function<size_t()> leased_workers_size_;
 
   //Destroy all workers with lower priorities BlockTasks() set this value
   ray::Priority block_requested_priority_;
 
   bool task_blocked_ = false;
 
-  ObjectManager &object_manager_;
-
-  const SetShouldSpillCallback set_should_spill_;
 
   /// Returns the current time in milliseconds.
   std::function<int64_t()> get_time_ms_;
