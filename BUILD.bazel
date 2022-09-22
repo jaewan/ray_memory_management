@@ -649,6 +649,7 @@ cc_library(
     srcs = glob(
         [
             "src/ray/raylet/scheduling/**/*.cc",
+            "src/ray/raylet/local_object_manager.cc",
         ],
         exclude = [
             "src/ray/raylet/scheduling/**/*_test.cc",
