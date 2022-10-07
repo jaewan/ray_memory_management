@@ -90,7 +90,7 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
                                                ? task_spec.ActorCreationId()
                                                : ActorID::Nil(),
                                            task_spec.GetRuntimeEnvHash());
-        const auto priority = get_task_priority_(task_spec);
+        const auto priority = task_spec.GetPriority();
         auto inserted = tasks_.emplace(task_spec.TaskId(), TaskEntry(task_spec, scheduling_key, priority));
         RAY_CHECK(inserted.second);
         const auto task_key = inserted.first->second.task_key;
@@ -181,6 +181,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   auto &lease_entry = worker_to_lease_entry_[addr];
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle Called";
   if (!lease_entry.lease_client) {
     return;
   }
@@ -363,14 +364,30 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     return;
   }
 
-  num_leases_requested_++;
   // Create a TaskSpecification with an overwritten TaskID to make sure we don't reuse the
   // same TaskID to request a worker
-  const auto &head = task_priority_queue.begin();
   auto resource_spec_msg = scheduling_key_entry.resource_spec.GetMutableMessage();
   resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
   TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
-  resource_spec.SetPriority(head->first);
+  const TaskID task_id = resource_spec.TaskId();
+
+  uint64_t idx = 1;
+  Priority dummy_pri = Priority();
+  Priority &pri = dummy_pri;
+  for (const auto& priority_it : task_priority_queue){
+    if(priority_it.second == scheduling_key_entry.resource_spec.TaskId()){
+	  pri = priority_it.first;
+      break;
+	}
+	idx++;
+  }
+  if(idx > max_pending_lease_requests_per_scheduling_category_){ 
+    RAY_LOG(DEBUG) << "Request lease on non-priority task";
+	return;
+  }
+  resource_spec.SetPriority(pri);
+  num_leases_requested_++;
+
   rpc::Address best_node_address;
   const bool is_spillback = (raylet_address != nullptr);
   bool is_selected_based_on_locality = false;
@@ -382,14 +399,12 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   }
 
   auto lease_client = GetOrConnectLeaseClient(raylet_address);
-  const TaskID task_id = resource_spec.TaskId();
   RAY_LOG(DEBUG) << "Requesting lease from raylet "
                  << NodeID::FromBinary(raylet_address->raylet_id()) << " for task "
-                 << task_id;
+                 << task_id << " priority:" << pri;
   // Subtract 1 so we don't double count the task we are requesting for.
   int64_t queue_size = task_priority_queue.size() - 1;
 
-  RAY_LOG(DEBUG) << "Requesting worker lease " << task_id << " with priority " << head->first << ", requires object store memory:" << resource_spec.GetRequiredResources().GetResource("object_store_memory");
   lease_client->RequestWorkerLease(
       resource_spec.GetMessage(),
       /*grant_or_reject=*/is_spillback,

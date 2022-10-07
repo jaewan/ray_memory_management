@@ -472,6 +472,10 @@ void LocalObjectManager::EagerSpillObjectsInternal(
         std::vector<ObjectID> requested_objects_to_spill;
         for (const auto &object_id : objects_to_spill) {
           RAY_LOG(DEBUG) << "Sending eager spill request for object " << object_id;
+		  if(freed_during_eager_spill_.contains(object_id)){
+            RAY_LOG(DEBUG) << "[JAE_DEEBUG] freed before eager spill";
+		    continue;
+		  }
           auto it = objects_pending_eager_spill_.find(object_id);
           RAY_CHECK(it != objects_pending_eager_spill_.end());
           auto freed_it = local_objects_.find(object_id);
@@ -498,7 +502,8 @@ void LocalObjectManager::EagerSpillObjectsInternal(
           return;
         }
 
-        io_worker->rpc_client()->SpillObjects(
+		if(requested_objects_to_spill.size()){
+          io_worker->rpc_client()->SpillObjects(
             request, [this, requested_objects_to_spill, callback, io_worker](
                          const ray::Status &status, const rpc::SpillObjectsReply &r) {
               {
@@ -536,7 +541,8 @@ void LocalObjectManager::EagerSpillObjectsInternal(
               if (callback) {
                 callback(status);
               }
-            });
+          });
+		}
       });
 }
 
@@ -734,7 +740,7 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
     object_directory_->ReportObjectSpilled(
         object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
 
-	eager_spilled_objects_.emplace(object_id, std::make_pair(it->second->GetSize(), worker_addr));
+	eager_spilled_objects_.emplace(object_id, std::make_pair(object_size, worker_addr));
 	RemovePinnedObjects(object_id, object_size);
 	objectID_to_priority_.erase(object_id);
 	if(freed_during_eager_spill_.contains(object_id)){
@@ -884,6 +890,8 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       break;
     }
 
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] ProcessSpilledObjectsDeleteQueue 1";
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] ProcessSpilledObjectsDeleteQueue 2";
     // Object id is either spilled or not spilled at this point.
     const auto spilled_objects_url_it = spilled_objects_url_.find(object_id);
     if (spilled_objects_url_it != spilled_objects_url_.end()) {
@@ -900,6 +908,7 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
              "submit a Github issue if you see this error.";
       url_ref_count_it->second -= 1;
 
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] ProcessSpilledObjectsDeleteQueue 3";
       // If there's no more refs, delete the object.
       if (url_ref_count_it->second == 0) {
         url_ref_count_.erase(url_ref_count_it);
@@ -916,7 +925,9 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
     local_objects_.erase(object_id);
     spilled_object_pending_delete_.pop();
   }
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] ProcessSpilledObjectsDeleteQueue 4";
   if (object_urls_to_delete.size() > 0) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] ProcessSpilledObjectsDeleteQueue 5";
     DeleteSpilledObjects(object_urls_to_delete);
   }
 }
