@@ -359,6 +359,15 @@ Priority& ReferenceCounter::GetObjectPriority(const ObjectID &object_id){
 }
 
 void ReferenceCounter::UpdateObjectPriority(
+		const TaskID &task_id,
+		const Priority &priority){
+  absl::MutexLock lock(&mutex_);
+  task_id_priority_[task_id] =  priority;
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] UpdateObjectPriority task: " << task_id <<
+	  " Priority: " << priority;
+}
+
+void ReferenceCounter::UpdateObjectPriority(
 		const ObjectID &object_id,
 		const Priority &priority){
   absl::MutexLock lock(&mutex_);

@@ -117,6 +117,10 @@ class ReferenceCounter : public ReferenceCounterInterface,
 
   Priority& GetObjectPriority(const ObjectID &object_id);
   void UpdateObjectPriority(
+		const TaskID &task_id,
+		const Priority &priority);
+
+  void UpdateObjectPriority(
 		const ObjectID &object_id,
 		const Priority &priority);
 

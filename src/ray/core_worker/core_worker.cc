@@ -2233,6 +2233,7 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
                                ReferenceCounter::ReferenceTableProto *borrowed_refs,
                                bool *is_retryable_error) {
   RAY_LOG(DEBUG) << "Executing task, task info = " << task_spec.DebugString();
+  reference_counter_->UpdateObjectPriority(task_spec.TaskId(), task_spec.GetPriority());
   task_queue_length_ -= 1;
   num_executed_tasks_ += 1;
 
