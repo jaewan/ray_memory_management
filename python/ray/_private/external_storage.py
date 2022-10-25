@@ -97,11 +97,11 @@ class ExternalStorage(metaclass=abc.ABCMeta):
         return ray_object_pairs
 
     def _put_object_to_store(
-        self, metadata, data_size, file_like, object_ref, owner_address
+        self, metadata, data_size, file_like, object_ref, owner_address, priority
     ):
         worker = ray._private.worker.global_worker
         worker.core_worker.put_file_like_object(
-            metadata, data_size, file_like, object_ref, owner_address
+            metadata, data_size, file_like, object_ref, owner_address, priority
         )
 
     def _write_multiple_objects(
@@ -195,8 +195,9 @@ class ExternalStorage(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def restore_spilled_objects(
-        self, object_refs: List[ObjectRef], url_with_offset_list: List[str]
-    ) -> int:
+        self, object_refs: List[ObjectRef], 
+                                priority: List[int],
+                                url_with_offset_list: List[str]) -> int:
         """Restore objects from the external storage.
 
         Args:
@@ -230,7 +231,7 @@ class NullStorage(ExternalStorage):
     def spill_objects(self, object_refs, owner_addresses) -> List[str]:
         raise NotImplementedError("External storage is not initialized")
 
-    def restore_spilled_objects(self, object_refs, url_with_offset_list):
+    def restore_spilled_objects(self, object_refs, priority, url_with_offset_list):
         raise NotImplementedError("External storage is not initialized")
 
     def delete_spilled_objects(self, urls: List[str]):
@@ -301,9 +302,9 @@ class FileSystemStorage(ExternalStorage):
         with open(url, "wb", buffering=self._buffer_size) as f:
             return self._write_multiple_objects(f, object_refs, owner_addresses, url)
 
-    def restore_spilled_objects(
-        self, object_refs: List[ObjectRef], url_with_offset_list: List[str]
-    ):
+    def restore_spilled_objects(self, object_refs: List[ObjectRef],
+                                priority: List[int],
+                                url_with_offset_list: List[str]):
         total = 0
         for i in range(len(object_refs)):
             object_ref = object_refs[i]
@@ -324,7 +325,7 @@ class FileSystemStorage(ExternalStorage):
                 metadata = f.read(metadata_len)
                 # read remaining data to our buffer
                 self._put_object_to_store(
-                    metadata, buf_len, f, object_ref, owner_address
+                    metadata, buf_len, f, object_ref, owner_address, priority
                 )
         return total
 
@@ -388,9 +389,9 @@ class ExternalStorageRayStorageImpl(ExternalStorage):
         with self._fs.open_output_stream(url, buffer_size=self._buffer_size) as f:
             return self._write_multiple_objects(f, object_refs, owner_addresses, url)
 
-    def restore_spilled_objects(
-        self, object_refs: List[ObjectRef], url_with_offset_list: List[str]
-    ):
+    def restore_spilled_objects(self, object_refs: List[ObjectRef],
+                                priority: List[int],
+                                url_with_offset_list: List[str]):
         total = 0
         for i in range(len(object_refs)):
             object_ref = object_refs[i]
@@ -411,7 +412,7 @@ class ExternalStorageRayStorageImpl(ExternalStorage):
                 metadata = f.read(metadata_len)
                 # read remaining data to our buffer
                 self._put_object_to_store(
-                    metadata, buf_len, f, object_ref, owner_address
+                    metadata, buf_len, f, object_ref, owner_address, priority
                 )
         return total
 
@@ -532,7 +533,7 @@ class ExternalStorageSmartOpenImpl(ExternalStorage):
             )
 
     def restore_spilled_objects(
-        self, object_refs: List[ObjectRef], url_with_offset_list: List[str]
+        self, object_refs: List[ObjectRef], priority: List[int], url_with_offset_list: List[str]
     ):
         from smart_open import open
 
@@ -658,7 +659,7 @@ def spill_objects(object_refs, owner_addresses):
 
 
 def restore_spilled_objects(
-    object_refs: List[ObjectRef], url_with_offset_list: List[str]
+    object_refs: List[ObjectRef], priority: List[int], url_with_offset_list: List[str]
 ):
     """Restore objects from the external storage.
 
@@ -666,7 +667,8 @@ def restore_spilled_objects(
         object_refs: List of object IDs (note that it is not ref).
         url_with_offset_list: List of url_with_offset.
     """
-    return _external_storage.restore_spilled_objects(object_refs, url_with_offset_list)
+    return _external_storage.restore_spilled_objects(object_refs, priority,
+                                                     url_with_offset_list)
 
 
 def delete_spilled_objects(urls: List[str]):

@@ -187,6 +187,7 @@ void LocalObjectManager::FlushFreeObjects() {
     on_objects_freed_(objects_to_free_);
     objects_to_free_.clear();
   }
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] from FlushFreeObjects calling ProcessSpilledObjectsDeleteQueue for:" << spilled_object_pending_delete_.size();
   ProcessSpilledObjectsDeleteQueue(free_objects_batch_size_);
   last_free_objects_at_ms_ = current_time_ms();
 }
@@ -664,6 +665,7 @@ void LocalObjectManager::SpillObjectsInternal(
   // of concurrent spilling and object frees. Clear the queue here
   // if needed.
   if (spilled_object_pending_delete_.size() >= free_objects_batch_size_) {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] calling ProcessSpilledObjectsDeleteQueue for:" << spilled_object_pending_delete_.size();
     ProcessSpilledObjectsDeleteQueue(free_objects_batch_size_);
   }
 }
