@@ -351,10 +351,15 @@ Priority& ReferenceCounter::GetObjectPriority(const ObjectID &object_id){
   RAY_LOG(DEBUG) << "[JAE_DEBUG] GetObjectPriority object: " << object_id <<
 	  " Priority: " << task_id_priority_[object_id.TaskId()];
   /*
-  RAY_CHECK(it != object_id_priority_.end()) << "Object priority not found " << object_id
-	  <<" count:" << object_id_priority_.count(object_id);
+  RAY_CHECK(it != task_id_priority_.end()) << "Object priority not found " << object_id
+	  <<" count:" << task_id_priority_.count(object_id.TaskId());
 	  */
-  RAY_CHECK(task_id_priority_.count(object_id.TaskId()) > 0) << "Object priority not found " << object_id;
+  //TODO(JAE) this is a temporary patch for push-based shuffle
+  static Priority temp_pri = Priority();
+  if(it == task_id_priority_.end()){
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] GetObjectPriority object: " << object_id << " not found";
+	return temp_pri;
+  }
   return it->second;
 }
 
