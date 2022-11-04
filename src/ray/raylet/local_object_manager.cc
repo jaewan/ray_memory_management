@@ -187,7 +187,7 @@ void LocalObjectManager::FlushFreeObjects() {
     on_objects_freed_(objects_to_free_);
     objects_to_free_.clear();
   }
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] from FlushFreeObjects calling ProcessSpilledObjectsDeleteQueue for:" << spilled_object_pending_delete_.size();
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] from FlushFreeObjects calling ProcessSpilledObjectsDeleteQueue for:" << spilled_object_pending_delete_.size();
   ProcessSpilledObjectsDeleteQueue(free_objects_batch_size_);
   last_free_objects_at_ms_ = current_time_ms();
 }
@@ -415,10 +415,12 @@ void LocalObjectManager::RemovePinnedObjects(const ObjectID &object_id, size_t s
   }else{
 	RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] Error pinned_object not found:";
   }
-  ray::Priority &pri = objectID_to_priority_[object_id];
-  pinned_objects_prioity_[pri].erase(object_id);
-  if(pinned_objects_prioity_[pri].size() == 0){
-    pinned_objects_prioity_.erase(pri);
+  const auto obj2pri_it = objectID_to_priority_.find(object_id);
+  if(obj2pri_it != objectID_to_priority_.end()){
+    pinned_objects_prioity_[obj2pri_it->second].erase(object_id);
+    if(pinned_objects_prioity_[obj2pri_it->second].size() == 0){
+      pinned_objects_prioity_.erase(obj2pri_it->second);
+    }
   }
 }
 
@@ -478,7 +480,7 @@ void LocalObjectManager::EagerSpillObjectsInternal(
 		    continue;
 		  }
           auto it = objects_pending_eager_spill_.find(object_id);
-          RAY_CHECK(it != objects_pending_eager_spill_.end());
+          RAY_CHECK(it != objects_pending_eager_spill_.end()) << " object:" << object_id;
           auto freed_it = local_objects_.find(object_id);
           // If the object hasn't already been freed, spill it.
           if (freed_it == local_objects_.end() || freed_it->second.second) {

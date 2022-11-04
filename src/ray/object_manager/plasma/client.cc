@@ -592,6 +592,9 @@ void PlasmaClient::Impl::EagerSpillDecreaseObjectCount(const ObjectID &object_id
     RAY_CHECK(object_entry->count > 0);
   }
   //object_entry->count -= 1;
+  if(object_entry == nullptr){
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] EagerSpillDecreaseObjectCount Error No object entry";
+  }
   RAY_LOG(DEBUG) << "[JAE_DEBUG] EagerSpillDecreaseObjectCount calling Release: "
 	  << object_id << ", count:" << object_entry->count;
   Release(object_id);

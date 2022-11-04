@@ -181,13 +181,16 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   auto &lease_entry = worker_to_lease_entry_[addr];
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle Called";
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id <<
+	  "was_error:" << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
+	  << (current_time_ms() > lease_entry.lease_expiration_time);
   if (!lease_entry.lease_client) {
     return;
   }
 
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
   auto &current_queue = scheduling_key_entry.task_priority_queue;
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] current_queue size:" << current_queue.size(); 
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
@@ -371,7 +374,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
   const TaskID task_id = resource_spec.TaskId();
 
-  uint64_t idx = 1;
   Priority dummy_pri = Priority();
   Priority &pri = dummy_pri;
   for (const auto& priority_it : task_priority_queue){
@@ -379,11 +381,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 	  pri = priority_it.first;
       break;
 	}
-	idx++;
-  }
-  if(idx > max_pending_lease_requests_per_scheduling_category_){ 
-    RAY_LOG(DEBUG) << "Request lease on non-priority task";
-	return;
   }
   resource_spec.SetPriority(pri);
   num_leases_requested_++;

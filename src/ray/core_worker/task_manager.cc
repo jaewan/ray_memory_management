@@ -85,35 +85,38 @@ std::vector<rpc::ObjectReference> TaskManager::AddPendingTask(
   std::vector<rpc::ObjectReference> returned_refs;
   std::vector<ObjectID> return_ids;
   Priority task_priority = GenerateTaskPriority(spec, task_deps);
-  for (size_t i = 0; i < num_returns; i++) {
-    auto return_id = spec.ReturnId(i);
-    if (!spec.IsActorCreationTask()) {
-      bool is_reconstructable = max_retries != 0;
-      // We pass an empty vector for inner IDs because we do not know the return
-      // value of the task yet. If the task returns an ID(s), the worker will
-      // publish the WaitForRefRemoved message that we are now a borrower for
-      // the inner IDs. Note that this message can be received *before* the
-      // PushTaskReply.
-      // NOTE(swang): We increment the local ref count to ensure that the
-      // object is considered in scope before we return the ObjectRef to the
-      // language frontend. Note that the language bindings should set
-      // skip_adding_local_ref=True to avoid double referencing the object.
-      reference_counter_->AddOwnedObject(return_id,
-                                         /*inner_ids=*/{},
-                                         caller_address,
-                                         call_site,
-                                         -1,
-                                         /*is_reconstructable=*/is_reconstructable,
-                                         /*add_local_ref=*/true);
-    }
+  if(num_returns > 0){
+    for (size_t i = 0; i < num_returns; i++) {
+      auto return_id = spec.ReturnId(i);
+      if (!spec.IsActorCreationTask()) {
+        bool is_reconstructable = max_retries != 0;
+        // We pass an empty vector for inner IDs because we do not know the return
+        // value of the task yet. If the task returns an ID(s), the worker will
+        // publish the WaitForRefRemoved message that we are now a borrower for
+        // the inner IDs. Note that this message can be received *before* the
+        // PushTaskReply.
+        // NOTE(swang): We increment the local ref count to ensure that the
+        // object is considered in scope before we return the ObjectRef to the
+        // language frontend. Note that the language bindings should set
+        // skip_adding_local_ref=True to avoid double referencing the object.
+        reference_counter_->AddOwnedObject(return_id,
+                                           /*inner_ids=*/{},
+                                           caller_address,
+                                           call_site,
+                                           -1,
+                                           /*is_reconstructable=*/is_reconstructable,
+                                           /*add_local_ref=*/true);
+      }
 
-    return_ids.push_back(return_id);
-    rpc::ObjectReference ref;
-    ref.set_object_id(spec.ReturnId(i).Binary());
-    ref.mutable_owner_address()->CopyFrom(caller_address);
-    ref.set_call_site(call_site);
-	reference_counter_->UpdateObjectPriority(spec.ReturnId(i), task_priority);
-    returned_refs.push_back(std::move(ref));
+      return_ids.push_back(return_id);
+      rpc::ObjectReference ref;
+      ref.set_object_id(spec.ReturnId(i).Binary());
+      ref.mutable_owner_address()->CopyFrom(caller_address);
+      ref.set_call_site(call_site);
+  	  //TODO(Jae)This is deprecated as now we treat all objects from the same task as the same
+      returned_refs.push_back(std::move(ref));
+    }
+  	reference_counter_->UpdateObjectPriority(spec.ReturnId(0), task_priority);
   }
 
   reference_counter_->UpdateSubmittedTaskReferences(return_ids, task_deps);

@@ -199,6 +199,7 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
       *evict_tasks_required = true;
     }
   }
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] [HandleCreateObjectRequest] 1";
   if (lowest_priority != nullptr) {
     //LocalObject *lowest_pri_obj = object_lifecycle_mgr_.GetLowestPriObject();
     //lowest_priority = lowest_pri_obj->GetPriority();
@@ -213,6 +214,7 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
 		<< " P:" << p;
 		*/
   }
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] [HandleCreateObjectRequest] 2";
 
   // Trigger object spilling if current usage is above the specified threshold.
   if (spilling_required != nullptr) {
@@ -225,6 +227,7 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
       }
     }
   }
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] [HandleCreateObjectRequest] 3";
   return error;
 }
 
@@ -317,7 +320,7 @@ int PlasmaStore::RemoveFromClientObjectIds(const ObjectID &object_id,
 
 void PlasmaStore::ReleaseObject(const ObjectID &object_id,
                                 const std::shared_ptr<Client> &client) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] ReleaseObject called";
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] ReleaseObject called on object:" << object_id;
   auto entry = object_lifecycle_mgr_.GetObject(object_id);
   RAY_CHECK(entry != nullptr);
   // Remove the client from the object's array of clients.
