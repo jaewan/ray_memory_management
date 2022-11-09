@@ -198,7 +198,7 @@ void ReferenceCounter::AddOwnedObject(const ObjectID &object_id,
                                       bool is_reconstructable,
                                       bool add_local_ref,
                                       const absl::optional<NodeID> &pinned_at_raylet_id) {
-  RAY_LOG(DEBUG) << "Adding owned object " << object_id;
+  RAY_LOG(DEBUG) << "Adding owned object " << object_id<< " belongs task:"<<object_id.TaskId();
   absl::MutexLock lock(&mutex_);
   RAY_CHECK(object_id_refs_.count(object_id) == 0)
       << "Tried to create an owned object that already exists: " << object_id;

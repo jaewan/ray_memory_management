@@ -1652,13 +1652,15 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
                             serialized_retry_exception_allowlist,
                             scheduling_strategy);
   TaskSpecification task_spec = builder.Build();
-  RAY_LOG(DEBUG) << "Submitting normal task " << task_spec.DebugString();
+  //RAY_LOG(DEBUG) << "Submitting normal task " << task_spec.DebugString();
   std::vector<rpc::ObjectReference> returned_refs;
   if (options_.is_local_mode) {
     returned_refs = ExecuteTaskLocalMode(task_spec);
   } else {
     returned_refs = task_manager_->AddPendingTask(
         task_spec.CallerAddress(), task_spec, CurrentCallSite(), max_retries);
+	//TODO(Jae) this is to check if priority is correctly set. Remove it and restore log 7 lines up
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] Submitting normal task " << task_spec.DebugString();
     if(RayConfig::instance().enable_BlockTasksSpill())
 	  BuildObjectWorkingSet(task_spec);
     io_service_.post(

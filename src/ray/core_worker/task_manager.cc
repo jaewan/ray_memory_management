@@ -37,6 +37,7 @@ Priority TaskManager::GenerateTaskPriority(
   Priority &max_priority = dummy_pri;
   for (const ObjectID &argument_id : task_deps) {
     Priority &p = reference_counter_->GetObjectPriority(argument_id);
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] object: " <<argument_id << " has priority:" << p; 
     if(max_priority > p){
       max_priority = p;
 	}
