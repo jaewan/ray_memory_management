@@ -126,8 +126,10 @@ def client_mode_should_convert(*, auto_init: bool):
             if spill_dir:
                 ray.init(_system_config={"object_spilling_config": json.dumps({"type": "filesystem",
                                     "params": {"directory_path": spill_dir}},)})
+                print(f"Ray initialized to spill to {spill_dir}")
             else:
                 ray.init()
+                print(f"Ray initialized to spill to tmp")
 
     # `is_client_mode_enabled_by_default` is used for testing with
     # `RAY_CLIENT_MODE=1`. This flag means all tests run with client mode.

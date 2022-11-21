@@ -240,10 +240,12 @@ def read_datasource(
     Returns:
         Dataset holding the data read from the datasource.
     """
+
     ctx = DatasetContext.get_current()
     # TODO(ekl) remove this feature flag.
     force_local = "RAY_DATASET_FORCE_LOCAL_METADATA" in os.environ
     cur_pg = ray.util.get_current_placement_group()
+    # TODO(ekl) remove this feature flag.
     pa_ds = _lazy_import_pyarrow_dataset()
     if pa_ds:
         partitioning = read_args.get("dataset_kwargs", {}).get("partitioning", None)

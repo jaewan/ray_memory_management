@@ -33,17 +33,19 @@ Priority TaskManager::GenerateTaskPriority(
 		TaskSpecification &spec, std::vector<ObjectID> &task_deps) {
   RAY_LOG(DEBUG) << "Generating priority of task " << spec.TaskId()
 	  <<" num deps:" << task_deps.size();
-  Priority dummy_pri = Priority();
+  static Priority dummy_pri = Priority();
   Priority &max_priority = dummy_pri;
   for (const ObjectID &argument_id : task_deps) {
     Priority &p = reference_counter_->GetObjectPriority(argument_id);
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] object: " <<argument_id << " has priority:" << p; 
     if(max_priority > p){
       max_priority = p;
 	}
   }
 
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] GenerateTaskPriority task dependency pri: " <<max_priority; 
+	/*
+  static Priority dummy_pri = Priority();
+  Priority &max_priority = dummy_pri;
+  */
   Priority pri;
   pri.SetFromParentPriority(max_priority, new_priority_s++);
   spec.SetPriority(pri);

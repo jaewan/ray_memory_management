@@ -21,6 +21,10 @@
 #include "ray/stats/metric_defs.h"
 #include "ray/util/logging.h"
 
+#include <string>
+#include <fstream>
+#include <iostream>
+
 namespace ray {
 namespace raylet {
 
@@ -516,6 +520,17 @@ bool LocalTaskManager::PoppedWorkerHandler(
   } else {
     // A worker has successfully popped for a valid task. Dispatch the task to
     // the worker.
+	//********* log*********
+	//static int fd = open("/tmp/ray/scheduler_log", O_RDWR|O_CREAT, 0666);
+	std::ofstream log_stream("/tmp/ray/scheduler_log", std::ios_base::app);
+    std::ostringstream stream;
+	stream << task_id << " ";
+	std::string log_str = stream.str();
+	log_stream << log_str;
+	//write(fd, log_str, log_str.size());
+	//close(fd);
+	log_stream.close();
+	//********* log*********
     RAY_LOG(DEBUG) << "Dispatching task " << task_id << " to worker "
                    << worker->WorkerId();
 

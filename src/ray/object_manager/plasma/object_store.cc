@@ -53,13 +53,21 @@ const LocalObject *ObjectStore::CreateObject(const ray::ObjectInfo &object_info,
 
 ray::Priority ObjectStore::GetLowestPriObject() {
   // Return the lowest priority object in object_table
+  static ray::Priority base_priority;
   auto it = object_table_.begin();
-  if(it == object_table_.end())
-	return ray::Priority();
-  ray::Priority lowest_priority = it->second->GetPriority();
-  it++;
+  ray::Priority lowest_priority;
+  do{
+    if(it == object_table_.end()){
+	  return ray::Priority();
+    }
+    lowest_priority = it->second->GetPriority();
+    it++;
+  }while(lowest_priority == base_priority);
+
   for (; it != object_table_.end(); it++){
 	ray::Priority p = it->second->GetPriority();
+	if(p == base_priority)
+	  continue;
     if(lowest_priority < p){
       lowest_priority = p;
 	}
@@ -91,7 +99,6 @@ bool ObjectStore::DeleteObject(const ObjectID &object_id) {
   if (entry == nullptr) {
     return false;
   }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteObject called";
   allocator_.Free(std::move(entry->allocation));
   object_table_.erase(object_id);
   return true;

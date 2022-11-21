@@ -161,7 +161,8 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
   fb::ObjectSource source;
   int device_num;
   ReadCreateRequest(input, input_size, &object_info, &source, &device_num);
-  static bool enable_blocktasks = RayConfig::instance().enable_BlockTasks();
+  static const bool enable_blocktasks = RayConfig::instance().enable_BlockTasks();
+  static const bool enable_eagerSpill = RayConfig::instance().enable_EagerSpill();
 
 
   if (device_num != 0) {
@@ -170,28 +171,40 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
   }
 
   auto error = CreateObject(object_info, source, client, fallback_allocator, object);
+
+  const int64_t footprint_limit = allocator_.GetFootprintLimit();
+  float allocated_percentage;
+
   if (error == PlasmaError::OutOfMemory) {
     RAY_LOG(DEBUG) << "Not enough memory to create the object " << object_info.object_id
                    << ", data_size=" << object_info.data_size
                    << ", metadata_size=" << object_info.metadata_size
                    << ", remaining_size=" << allocator_.GetFootprintLimit() - allocator_.Allocated();
-  }else if(error == PlasmaError::OK){
+  }else if(error == PlasmaError::OK && enable_eagerSpill){
 	on_object_creation_blocked_callback_(object_info.priority, object_info.object_id, false, false,
 			false, false, 0, 0);
   }
-  const int64_t footprint_limit = allocator_.GetFootprintLimit();
-  float allocated_percentage;
 
   if (footprint_limit != 0) {
     allocated_percentage = static_cast<float>(allocator_.Allocated()) / footprint_limit;
   } else {
     allocated_percentage = 0;
   }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] [HandleCreateObjectRequest] allocated_percentage:" << allocated_percentage << " object_id:" << object_info.object_id;
+
   if (enable_blocktasks && block_tasks_required != nullptr) {
     if (error == PlasmaError::OutOfMemory || allocated_percentage >= block_tasks_threshold_) {
-      *block_tasks_required = true;
-	  block_task_flag_.store(true, std::memory_order_release);
+      if (lowest_priority != nullptr) {
+        ray::Priority p = object_lifecycle_mgr_.GetLowestPriObject();
+        int size = p.GetDepth();
+        int i;
+  	    for(i=0; i<size; i++){
+          lowest_priority->SetScore(i, p.GetScore(i));
+        }
+        RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] lowest_priority:" << *lowest_priority
+          << " P:" << p;
+        }
+        *block_tasks_required = true;
+        block_task_flag_ = true;
     }
   }
   if (evict_tasks_required != nullptr) {
@@ -199,22 +212,6 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
       *evict_tasks_required = true;
     }
   }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] [HandleCreateObjectRequest] 1";
-  if (lowest_priority != nullptr) {
-    //LocalObject *lowest_pri_obj = object_lifecycle_mgr_.GetLowestPriObject();
-    //lowest_priority = lowest_pri_obj->GetPriority();
-	ray::Priority p = object_lifecycle_mgr_.GetLowestPriObject();
-	int size = p.GetDepth();
-	int i;
-	for(i=0; i<size; i++){
-		lowest_priority->SetScore(i, p.GetScore(i));
-	}
-	/*
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] lowest_priority:" << lowest_priority
-		<< " P:" << p;
-		*/
-  }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] [HandleCreateObjectRequest] 2";
 
   // Trigger object spilling if current usage is above the specified threshold.
   if (spilling_required != nullptr) {
@@ -227,7 +224,6 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
       }
     }
   }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] [HandleCreateObjectRequest] 3";
   return error;
 }
 
@@ -331,10 +327,10 @@ void PlasmaStore::ReleaseObject(const ObjectID &object_id,
 	if (footprint_limit != 0) {
 	  allocated_percentage = static_cast<float>(allocator_.Allocated()) / footprint_limit;
 	 }
-	if(allocated_percentage < block_tasks_threshold_){
+	if(allocated_percentage < block_tasks_threshold_ && block_task_flag_){
 	  RAY_LOG(DEBUG) << "[JAE_DEBUG] ReleaseObject unsetting block task allocated allocated_percentage is " << allocated_percentage << " tid:"<< std::this_thread::get_id();
 	  on_object_creation_blocked_callback_(ray::Priority(), ObjectID(), false, true, false, false, 0, 0);
-	  block_task_flag_.store(false, std::memory_order_release);
+	  block_task_flag_ = false;
 	}
       //}
 }
@@ -512,7 +508,7 @@ Status PlasmaStore::ProcessMessage(const std::shared_ptr<Client> &client,
 	  if(allocated_percentage < block_tasks_threshold_){
 		RAY_LOG(DEBUG) << "[JAE_DEBUG] on_object_creation_blocked_callback unsetting block task allocated allocated_percentage is " << allocated_percentage;
 	    on_object_creation_blocked_callback_(ray::Priority(), ObjectID(), false, true, false, false, 0, 0);
-	    block_task_flag_.store(false, std::memory_order_release);
+	    block_task_flag_ = false;
 	  }
       //}
     }

@@ -259,6 +259,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
             bool evict_tasks, bool block_spill, size_t num_spinning_workers, int64_t pending_size) {
 			static const ObjectID default_object_id = ObjectID();
 			static const Priority default_priority = Priority();
+
+			//Update objectid priority in local_object_manager
 			if(object_id != default_object_id && base_priority != default_priority){
 			  local_object_manager_.MapObjectIDPriority(object_id, base_priority);
 			  return true;
@@ -267,6 +269,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
               cluster_task_manager_->BlockTasks(base_priority, io_service_);
             }
 			if(RayConfig::instance().enable_BlockTasksSpill()){
+			  // Deadlock#1 when all workers are spinning
 			  if(num_spinning_workers && num_spinning_workers == worker_pool_.GetAllRegisteredWorkersNum()){
                 RAY_LOG(DEBUG) << "[" << __func__ << "] all workers are spinning: " << num_spinning_workers;
                 if(evict_tasks){

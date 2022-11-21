@@ -199,6 +199,7 @@ Status CreateRequestQueue::ProcessRequests() {
 			<< enable_blocktasks <<" " << enable_evicttasks << " "
 			<< enable_blocktasks_spill << ") on priority "
 			<< lowest_pri;
+		//This is to block or evict tasks if obj store reaches the threshold
 	    on_object_creation_blocked_callback_(lowest_pri, ObjectID(), block_tasks_required,
 				false, evict_tasks_required, false, num_spinning_workers, 0);
 	  }
@@ -219,6 +220,7 @@ Status CreateRequestQueue::ProcessRequests() {
       }
 
 	  bool spill_pending;
+	  static const ObjectID base_object;
 
 	  if(!enable_eagerSpill){
 	    if (enable_blocktasks || enable_evicttasks || enable_blocktasks_spill) {
@@ -241,13 +243,13 @@ Status CreateRequestQueue::ProcessRequests() {
             RAY_LOG(DEBUG) << "[JAE_DEBUG] Num of spinning tasks: "  << num_spinning_workers;
 		    //*********************************************
 		  if(new_dependency_added_ && new_request_added_ && enable_blocktasks_spill && !should_spill_){
-	        on_object_creation_blocked_callback_(lowest_pri, ObjectID(), false, enable_blocktasks,
+	        on_object_creation_blocked_callback_(lowest_pri, base_object, false, enable_blocktasks,
 		      enable_evicttasks, true, num_spinning_workers, (request)->object_size);
 		    //Check Deadlock only when a new object creation is requested
 		    new_request_added_ = false;
 			new_dependency_added_ = false;
 		  }else{
-	        on_object_creation_blocked_callback_(lowest_pri, ObjectID(), false, enable_blocktasks,
+	        on_object_creation_blocked_callback_(lowest_pri, base_object, false, enable_blocktasks,
 		      enable_evicttasks, false, num_spinning_workers, (request)->object_size);
 		}
 
@@ -267,8 +269,8 @@ Status CreateRequestQueue::ProcessRequests() {
 
         spill_pending = spill_objects_callback_();
 	  }else{
-	    spill_pending = on_object_creation_blocked_callback_(lowest_pri, ObjectID(), true, false,
-		      false, false, enable_blocktasks_spill, 0);
+	    spill_pending = on_object_creation_blocked_callback_(lowest_pri, base_object, true, enable_blocktasks,
+		      enable_evicttasks, false, num_spinning_workers, (request)->object_size);
 	   RAY_LOG(DEBUG) << "[JAE_DEBUG] delete eager spilled objects called from ProcessRequests: ";
 	  }
       auto grace_period_ns = oom_grace_period_ns_;
@@ -301,7 +303,6 @@ Status CreateRequestQueue::ProcessRequests() {
         FinishRequest(queue_it);
       }
     }
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] Remaining requests: " << queue_.size();
   }
 
   return Status::OK();

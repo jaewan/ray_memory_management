@@ -384,6 +384,7 @@ class LocalObjectManager {
   absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject> >
       objects_pending_eager_spill_;
   absl::flat_hash_map<ObjectID, std::pair<size_t, rpc::Address>> eager_spilled_objects_;
+  // Ski-rental triggered Objects that stayed in the object store
   absl::flat_hash_set<ObjectID> expired_objects_;
   absl::flat_hash_set<ObjectID> freed_during_eager_spill_;
 };
