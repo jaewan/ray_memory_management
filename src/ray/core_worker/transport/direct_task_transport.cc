@@ -407,15 +407,12 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   int64_t queue_size = task_priority_queue.size() - 1;
 
   //********* log*********
-  //static int fd = open("/tmp/ray/core_worker_log", O_RDWR|O_CREAT, 0666);
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
   stream << task_id <<" " <<
 	resource_spec.GetName() << " " << pri << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
-  //write(fd, log_str, log_str.size());
-  //close(fd);
   log_stream.close();
   //********* log*********
 
