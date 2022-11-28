@@ -270,7 +270,7 @@ Status CreateRequestQueue::ProcessRequests() {
         spill_pending = spill_objects_callback_();
 	  }else{
 	    spill_pending = on_object_creation_blocked_callback_(lowest_pri, base_object, true, enable_blocktasks,
-		      enable_evicttasks, false, num_spinning_workers, (request)->object_size);
+		      enable_evicttasks, enable_blocktasks_spill, num_spinning_workers, (request)->object_size);
 	   RAY_LOG(DEBUG) << "[JAE_DEBUG] delete eager spilled objects called from ProcessRequests: ";
 	  }
       auto grace_period_ns = oom_grace_period_ns_;

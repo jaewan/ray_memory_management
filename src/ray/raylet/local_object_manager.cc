@@ -136,7 +136,7 @@ static inline double distribution(double i, double b){
   return pow(((b-1)/b),(b-i))*(1/(b*(1-pow(1-(1/b),b))));
 }
 
-bool LocalObjectManager::SkiRental(){
+bool LocalObjectManager::SkiRental(const std::pair<size_t, uint64_t> &object_info){
   static uint64_t ski_rental_timestamp;
   static bool ski_rental_started = false;
   uint64_t current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -180,15 +180,7 @@ bool LocalObjectManager::SkiRental(){
 }
 
 void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
-  static const bool enable_eagerSpill = RayConfig::instance().enable_EagerSpill();
-  static const bool enable_blocktasks_spill = RayConfig::instance().enable_BlockTasksSpill();
   // Only free the object if it is not already freed.
-  if(enable_eagerSpill && enable_blocktasks_spill){
-    if (!SkiRental()){
-      RAY_LOG(DEBUG) << "[JAE_DEBUG] Wait for Ski-Rental ";
-	  return;
-	}
-  }
   auto it = local_objects_.find(object_id);
   if (it == local_objects_.end() || it->second.second) {
     return;
@@ -729,31 +721,48 @@ void LocalObjectManager::SpillObjectsInternal(
 }
 
 bool LocalObjectManager::DeleteEagerSpilledObjects(bool delete_all){
-	bool ret = false;
-	if(delete_all){
-	  for(auto &eager_spilled_it : eager_spilled_objects_){
-        const ObjectID &object_id = eager_spilled_it.first;
-	    if(!is_plasma_object_spillable_(object_id)){
-          RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects object " << object_id
-			 <<" not spillable";
-	      continue;
-	    }
-	    ret = true;
-        RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleting " << object_id;
-		RemovePinnedObjects(object_id, eager_spilled_it.second.first);
-        store_object_count_(object_id, false, true);
-        RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleted " << object_id;
+  const static bool enable_blocktasks_spill = RayConfig::instance().enable_BlockTasksSpill();
+  bool ret = false;
+  if(!delete_all && enable_blocktasks_spill){
+	// Wait SkiRental before deleting
+    for (auto eager_spilled_it = eager_spilled_objects_.cbegin(); eager_spilled_it != eager_spilled_objects_.cend();){
+      const ObjectID &object_id = eager_spilled_it->first;
+	  if(!is_plasma_object_spillable_(object_id) && !SkiRental(eager_spilled_it->second)){
+        RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects object " << object_id
+	    <<" not spillable";
+		++eager_spilled_it;
+	    continue;
 	  }
-	  eager_spilled_objects_.clear();
-	}else{
-      //TODO(Jae) Ski-Rental
+	  ret = true;
+      RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleting " << object_id;
+	  RemovePinnedObjects(object_id, eager_spilled_it->second.first);
+      store_object_count_(object_id, false, true);
+      RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleted " << object_id;
+	  eager_spilled_objects_.erase(eager_spilled_it++);
 	}
-	if(!ret){
-      RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects nothing to delete pinned:"
-		  << pinned_objects_.size() << " eager_spilled:" << eager_spilled_objects_.size()
-		  <<" pending_eager_spill:"<< objects_pending_eager_spill_.size();
+  }else{
+    for (auto eager_spilled_it = eager_spilled_objects_.cbegin(); eager_spilled_it != eager_spilled_objects_.cend();){
+      const ObjectID &object_id = eager_spilled_it->first;
+	  if(!is_plasma_object_spillable_(object_id)){
+        RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects object " << object_id
+	    <<" not spillable";
+		++eager_spilled_it;
+	    continue;
+	  }
+	  ret = true;
+      RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleting " << object_id;
+	  RemovePinnedObjects(object_id, eager_spilled_it->second.first);
+      store_object_count_(object_id, false, true);
+      RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleted " << object_id;
+	  eager_spilled_objects_.erase(eager_spilled_it++);
 	}
-	return ret;
+  } 
+  if(!ret){
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects nothing to delete pinned:"
+	  << pinned_objects_.size() << " eager_spilled:" << eager_spilled_objects_.size()
+	  <<" pending_eager_spill:"<< objects_pending_eager_spill_.size();
+  }
+  return ret;
 }
 
 void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &object_ids,
@@ -800,7 +809,9 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
     object_directory_->ReportObjectSpilled(
         object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
 
-	eager_spilled_objects_.emplace(object_id, std::make_pair(object_size, worker_addr));
+    uint64_t current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>
+							     (std::chrono::system_clock::now().time_since_epoch()).count();
+	eager_spilled_objects_.emplace(object_id, std::make_pair(object_size, current_timestamp));
 	RemovePinnedObjects(object_id, object_size);
 	objectID_to_priority_.erase(object_id);
 	if(freed_during_eager_spill_.contains(object_id)){

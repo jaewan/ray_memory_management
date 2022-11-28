@@ -381,6 +381,15 @@ size_t ClusterTaskManager::GetPendingQueueSize() const {
   return count;
 }
 
+/*
+static inline void DeleteEagerSpilledObjects(LocalObjectManager &local_object_manager,
+		instrumented_io_context &io_service, bool delete_all){
+  io_service.post([&local_object_manager, this](){
+    local_object_manager.DeleteEagerSpilledObjects(delete_all);
+  },"");
+}
+*/
+
 void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t first_pending_obj_size,
 		LocalObjectManager &local_object_manager, instrumented_io_context &io_service,
         rpc::CoreWorkerClientPool &owner_client_pool){
@@ -388,47 +397,52 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
   static const bool enable_deadlock1 = RayConfig::instance().enable_Deadlock1();
   static const bool enable_deadlock2 = RayConfig::instance().enable_Deadlock2();
   static Priority init_priority;
-  //Deadlock #1
+  //Deadlock #1 this is diff from all workes spinning
   if(enable_deadlock1 && num_spinning_workers && num_spinning_workers == leased_workers_size_()){
 	RAY_LOG(DEBUG) << "[" << __func__ << "] All leased workers are spinning ";
 	if(enable_eagerSpill){
-	  io_service.post([this](){
-	    object_manager_->SetShouldSpill(true);
-	  },"");
-	}else{
+      //DeleteEagerSpilledObjects(local_objects_, local_object_manager, true);
 	  io_service.post([&local_object_manager, this](){
 	    local_object_manager.DeleteEagerSpilledObjects(true);
 	  },"");
+	}else{
+	  io_service.post([this](){
+	    object_manager_->SetShouldSpill(true);
+	  },"");
 	}
 	BlockTasks(init_priority, io_service);
-  }else{
-	if(!enable_deadlock2){
-      if(enable_eagerSpill){
-	    io_service.post([&local_object_manager, this](){
-	      local_object_manager.DeleteEagerSpilledObjects(true);
-	    },"");
-	  }
-	  return;
-	}
+	return;
+  }
+  if(!enable_deadlock2){
+    if(enable_eagerSpill){
+      io_service.post([&local_object_manager, this](){
+        local_object_manager.DeleteEagerSpilledObjects(false);
+      },"");
+    }
+    return;
+  }
   //Deadlock Detection #2
-	std::vector<const ObjectID*> objects_in_obj_store;
-	int64_t free_memory = object_manager_->GetObjectsInObjectStore(&objects_in_obj_store);
-	//No Objects in the object store == No GCable object
-	if(objects_in_obj_store.empty()){
-	  RAY_LOG(DEBUG) << "[" << __func__ << "] Object Store is empty ";
-	  BlockTasks(init_priority, io_service);
-	  return;
-	}
-	rpc::Address address = object_manager_->GetOwnerAddress(*objects_in_obj_store[0]);
+  std::vector<const ObjectID*> objects_in_obj_store;
+  int64_t free_memory = object_manager_->GetObjectsInObjectStore(&objects_in_obj_store);
+  //No Objects in the object store == No GCable object
+  if(objects_in_obj_store.empty()){
+    RAY_LOG(DEBUG) << "[" << __func__ << "] Object Store is empty ";
+    io_service.post([&local_object_manager, this](){
+      local_object_manager.DeleteEagerSpilledObjects(false);
+    },"");
+    BlockTasks(init_priority, io_service);
+    return;
+  }
+  rpc::Address address = object_manager_->GetOwnerAddress(*objects_in_obj_store[0]);
 
-	auto conn = owner_client_pool.GetOrConnect(address);
-	rpc::GetObjectWorkingSetRequest request;
-	for(size_t i=0; i< objects_in_obj_store.size(); i++){
-	  request.add_object_ids(objects_in_obj_store[i]->Binary());
-	}
-	conn->GetObjectWorkingSet(request,
-			[&io_service, &local_object_manager, this, first_pending_obj_size, free_memory]
-	  (const Status &status, const rpc::GetObjectWorkingSetReply &reply){
+  auto conn = owner_client_pool.GetOrConnect(address);
+  rpc::GetObjectWorkingSetRequest request;
+  for(size_t i=0; i< objects_in_obj_store.size(); i++){
+    request.add_object_ids(objects_in_obj_store[i]->Binary());
+  }
+  conn->GetObjectWorkingSet(request,
+		[&io_service, &local_object_manager, this, first_pending_obj_size, free_memory]
+	    (const Status &status, const rpc::GetObjectWorkingSetReply &reply){
 	  int64_t gcable_size = free_memory;
 	  for(int i=0; i<reply.gcable_object_ids_size(); i++){
 		TaskID task_id = TaskID::FromBinary(reply.gcable_object_ids(i));
@@ -452,8 +466,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 		  object_manager_->SetShouldSpill(is_deadlock);
 	    },"");
 	  }
-	});
-  }
+  });
 }
 
 bool ClusterTaskManager::EvictTasks(Priority base_priority) {

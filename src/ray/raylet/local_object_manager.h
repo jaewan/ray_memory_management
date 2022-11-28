@@ -377,7 +377,7 @@ class LocalObjectManager {
                        const rpc::SpillObjectsReply &worker_reply);
   void RemovePinnedObjects(const ObjectID &object_id, size_t);
   double GetSpillTime();
-  bool SkiRental();
+  bool SkiRental(const std::pair<size_t, uint64_t> &object_info);
 
   bool eager_spill_running_ = false;
   // Replicas of pinned_objects_ sorted by Priority
@@ -385,7 +385,7 @@ class LocalObjectManager {
   absl::flat_hash_map<ObjectID, ray::Priority> objectID_to_priority_;
   absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject> >
       objects_pending_eager_spill_;
-  absl::flat_hash_map<ObjectID, std::pair<size_t, rpc::Address>> eager_spilled_objects_;
+  absl::flat_hash_map<ObjectID, std::pair<size_t, uint64_t> > eager_spilled_objects_;
   // Ski-rental triggered Objects that stayed in the object store
   absl::flat_hash_set<ObjectID> expired_objects_;
   absl::flat_hash_set<ObjectID> freed_during_eager_spill_;
