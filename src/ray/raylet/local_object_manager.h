@@ -376,6 +376,8 @@ class LocalObjectManager {
   void OnObjectEagerSpilled(const std::vector<ObjectID> &object_ids,
                        const rpc::SpillObjectsReply &worker_reply);
   void RemovePinnedObjects(const ObjectID &object_id, size_t);
+  double GetSpillTime();
+  bool SkiRental();
 
   bool eager_spill_running_ = false;
   // Replicas of pinned_objects_ sorted by Priority

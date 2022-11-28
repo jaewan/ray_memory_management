@@ -126,8 +126,69 @@ void LocalObjectManager::EagerSpill() {
   eager_spill_running_ = false;
 }
 
+double LocalObjectManager::GetSpillTime(){
+  //Default 3 seconds
+  //TODO(Jae) Set according to objects in the object store
+  return RayConfig::instance().spill_wait_time();
+}
+
+static inline double distribution(double i, double b){
+  return pow(((b-1)/b),(b-i))*(1/(b*(1-pow(1-(1/b),b))));
+}
+
+bool LocalObjectManager::SkiRental(){
+  static uint64_t ski_rental_timestamp;
+  static bool ski_rental_started = false;
+  uint64_t current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>
+							 (std::chrono::system_clock::now().time_since_epoch()).count();
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] SkiRental Called ";
+  if(!ski_rental_started){
+    ski_rental_started = true;
+    ski_rental_timestamp = current_timestamp;
+	return false;
+  }
+  if((current_timestamp - ski_rental_timestamp) >= GetSpillTime()){
+	ski_rental_started = false;
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] SkiRental Return true ";
+	return true;
+  }
+  return false;
+  /*
+
+  double diff = (double)(current_timestamp - ski_rental_timestamp);
+  double avg = (double)((diff + last_called - ski_rental_timestamp)/2);
+  double b = GetSpillTime();
+  if(diff >= b)
+    return true;
+  double n = current_timestamp - last_called;
+  bool spill = false;
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  double p = distribution(avg, b);
+  std::discrete_distribution<> distrib({1-p, p});
+  //SkiRental() is not called every timestep, thus compensate
+  for(double i=0; i<n; i++){
+    spill |= distrib(gen);
+  }
+
+  last_called = current_timestamp;
+  if(spill)
+    ski_rental_started = false;
+  return spill;
+  */
+}
+
 void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
+  static const bool enable_eagerSpill = RayConfig::instance().enable_EagerSpill();
+  static const bool enable_blocktasks_spill = RayConfig::instance().enable_BlockTasksSpill();
   // Only free the object if it is not already freed.
+  if(enable_eagerSpill && enable_blocktasks_spill){
+    if (!SkiRental()){
+      RAY_LOG(DEBUG) << "[JAE_DEBUG] Wait for Ski-Rental ";
+	  return;
+	}
+  }
   auto it = local_objects_.find(object_id);
   if (it == local_objects_.end() || it->second.second) {
     return;
