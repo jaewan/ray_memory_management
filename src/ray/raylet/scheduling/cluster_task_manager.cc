@@ -488,7 +488,7 @@ bool ClusterTaskManager::EvictTasks(Priority base_priority) {
 }
 
 void ClusterTaskManager::BlockTasks(Priority base_priority, instrumented_io_context &io_service) {
-  static Priority init_priority;
+  static const Priority init_priority;
   static const bool enable_blockTasks = RayConfig::instance().enable_BlockTasks();
   if(enable_blockTasks){
     block_requested_priority_ = base_priority;

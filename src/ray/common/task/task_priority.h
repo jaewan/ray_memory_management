@@ -28,9 +28,12 @@ struct Priority {
   void SetFromParentPriority(Priority &parent, int);
 
   bool operator==(const Priority &rhs) const {
-    rhs.extend(score.size());
-    extend(rhs.score.size());
-    return score == rhs.score;
+	if(score.size() != rhs.score.size())
+	  return false;
+	for(long unsigned int i=0; i<score.size(); i++)
+	  if(score[i] != rhs.score[i])
+	    return false;
+    return true;
   }
 
   bool operator!=(const Priority &rhs) const {

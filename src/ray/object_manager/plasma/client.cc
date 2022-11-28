@@ -59,7 +59,7 @@ class PlasmaBuffer : public SharedMemoryBuffer {
                const std::shared_ptr<Buffer> &buffer)
       : SharedMemoryBuffer(buffer, 0, buffer->Size()),
         client_(client),
-        object_id_(object_id) {RAY_LOG(DEBUG) << "[JAE_DEBUG] PlasmaBuffer created";}
+        object_id_(object_id) {}
 
  private:
   std::shared_ptr<PlasmaClient::Impl> client_;
@@ -593,10 +593,7 @@ void PlasmaClient::Impl::EagerSpillDecreaseObjectCount(const ObjectID &object_id
   }
   //object_entry->count -= 1;
   if(object_entry == nullptr){
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] EagerSpillDecreaseObjectCount Error No object entry";
   }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] EagerSpillDecreaseObjectCount calling Release: "
-	  << object_id << ", count:" << object_entry->count;
   Release(object_id);
 }
 
@@ -610,30 +607,24 @@ void PlasmaClient::Impl::EagerSpillIncreaseObjectCount(const ObjectID &object_id
     RAY_CHECK(object_entry->count > 0);
   }
   object_entry->count += 1;
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] EagerSpillIncreaseObjectCount called: "
-	  << object_id << ", count:" << object_entry->count;
 }
 
 Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] Release called: " << object_id;
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   // If the client is already disconnected, ignore release requests.
   if (!store_conn_) {
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] [Release] no connection";
     return Status::OK();
   }
   auto object_entry = objects_in_use_.find(object_id);
   RAY_CHECK(object_entry != objects_in_use_.end());
 
   object_entry->second->count -= 1;
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] Release count it:" << object_entry->second->count;
   RAY_CHECK(object_entry->second->count >= 0);
   // Check if the client is no longer using this object.
   if (object_entry->second->count == 0) {
     // Tell the store that the client no longer needs the object.
     RAY_RETURN_NOT_OK(MarkObjectUnused(object_id));
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] Release() call SendReleaseRequest";
     RAY_RETURN_NOT_OK(SendReleaseRequest(store_conn_, object_id));
     auto iter = deletion_cache_.find(object_id);
     if (iter != deletion_cache_.end()) {
@@ -667,7 +658,6 @@ Status PlasmaClient::Impl::Contains(const ObjectID &object_id, bool *has_object)
 }
 
 Status PlasmaClient::Impl::Seal(const ObjectID &object_id) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] Seal called";
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   // Make sure this client has a reference to the object before sending the
@@ -725,7 +715,6 @@ Status PlasmaClient::Impl::Abort(const ObjectID &object_id) {
 }
 
 Status PlasmaClient::Impl::Delete(const std::vector<ObjectID> &object_ids) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] Delete called";
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   std::vector<ObjectID> not_in_use_ids;
@@ -752,7 +741,6 @@ Status PlasmaClient::Impl::Delete(const std::vector<ObjectID> &object_ids) {
 }
 
 Status PlasmaClient::Impl::Evict(int64_t num_bytes, int64_t &num_bytes_evicted) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] Evict called";
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   // Send a request to the store to evict objects.
