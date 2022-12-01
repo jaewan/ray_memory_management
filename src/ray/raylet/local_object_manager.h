@@ -369,6 +369,11 @@ class LocalObjectManager {
   friend class LocalObjectManagerTest;
   friend class LocalObjectManagerFusedTest;
 
+  struct object_info{
+    size_t size;
+	uint64_t check_pointed_time;
+	uint64_t ski_rentaled_time;
+  };
   void EagerSpill();
   bool EagerSpillObjectsOfSize(int64_t num_bytes_to_spill);
   void EagerSpillObjectsInternal(const std::vector<ObjectID> &objects_ids,
@@ -376,8 +381,8 @@ class LocalObjectManager {
   void OnObjectEagerSpilled(const std::vector<ObjectID> &object_ids,
                        const rpc::SpillObjectsReply &worker_reply);
   void RemovePinnedObjects(const ObjectID &object_id, size_t);
-  double GetSpillTime();
-  bool SkiRental(const std::pair<size_t, uint64_t> &object_info);
+  double GetSpillTime(size_t object_size);
+  bool SkiRental(struct object_info &obj_info);
 
   bool eager_spill_running_ = false;
   // Replicas of pinned_objects_ sorted by Priority
@@ -385,7 +390,7 @@ class LocalObjectManager {
   absl::flat_hash_map<ObjectID, ray::Priority> objectID_to_priority_;
   absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject> >
       objects_pending_eager_spill_;
-  absl::flat_hash_map<ObjectID, std::pair<size_t, uint64_t> > eager_spilled_objects_;
+  absl::flat_hash_map<ObjectID, struct object_info > eager_spilled_objects_;
   // Ski-rental triggered Objects that stayed in the object store
   absl::flat_hash_set<ObjectID> expired_objects_;
   absl::flat_hash_set<ObjectID> freed_during_eager_spill_;
