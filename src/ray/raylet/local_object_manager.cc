@@ -271,7 +271,11 @@ void LocalObjectManager::SpillObjectUptoMaxThroughput() {
 
 bool LocalObjectManager::IsSpillingInProgress() {
   absl::MutexLock lock(&mutex_);
-  return num_active_workers_ > 0;
+  if (num_active_workers_ > 0)
+    return true;
+  if(eager_spilled_objects_.size())
+	return true;
+  return false;
 }
 
 bool LocalObjectManager::EagerSpillObjectsOfSize(int64_t num_bytes_to_spill) {
