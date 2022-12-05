@@ -111,14 +111,16 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
 }
 
 void LocalObjectManager::EagerSpill() {
-	/*
   if (eager_spill_running_ || !objects_pending_eager_spill_.empty()
 		  || RayConfig::instance().object_spilling_config().empty()) {
-		  */
+    return;
+  }
+  /*
   if (eager_spill_running_ ||
 		  RayConfig::instance().object_spilling_config().empty()) {
     return;
   }
+  */
   eager_spill_running_ = true;
 
   EagerSpillObjectsOfSize(min_spilling_size_);
@@ -132,6 +134,7 @@ double LocalObjectManager::GetSpillTime(size_t object_size){
   double ret = std::min(spill_time, spill_wait_time);
   RAY_LOG(DEBUG) << "[JAE_DEBUG] GetSpillTime:" << ret;
   return ret;
+  //return spill_wait_time;
 }
 
 static inline double distribution(double i, double b){
@@ -139,6 +142,7 @@ static inline double distribution(double i, double b){
 }
 
 bool LocalObjectManager::SkiRental(struct object_info &obj_info){
+  /*
   static uint64_t ski_rental_timestamp;
   static bool ski_rental_started = false;
   uint64_t current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -156,6 +160,14 @@ bool LocalObjectManager::SkiRental(struct object_info &obj_info){
 	return true;
   }
   return false;
+  */
+  uint64_t current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>
+							 (std::chrono::system_clock::now().time_since_epoch()).count();
+  const uint64_t check_pointed_duration = current_timestamp - obj_info.check_pointed_time;
+  if(check_pointed_duration >= GetSpillTime(obj_info.size))
+    return true;
+  return false;
+  
   /*
 
   double diff = (double)(current_timestamp - ski_rental_timestamp);
@@ -218,12 +230,13 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
     RAY_LOG(DEBUG) << "[JAE_DEBUG] delete eager spilled object " << object_id;
     std::vector<std::string> object_url_to_delete;
     object_url_to_delete.emplace_back(object_url);
+	DeleteEagerSpilledObject(object_id, 0);
     eager_spilled_objects_.erase(object_id);
 
     //DeleteSpilledObjects(object_url_to_delete);
 
   }else if(objects_pending_eager_spill_.contains(object_id)){
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] object " << object_id << "was freed during eager spill";
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] object " << object_id << " was freed during eager spill";
 	freed_during_eager_spill_.emplace(object_id);
   }
 
@@ -243,7 +256,8 @@ void LocalObjectManager::FlushFreeObjects() {
     on_objects_freed_(objects_to_free_);
     objects_to_free_.clear();
   }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] from FlushFreeObjects calling ProcessSpilledObjectsDeleteQueue for:" << spilled_object_pending_delete_.size();
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] from FlushFreeObjects calling ProcessSpilledObjectsDeleteQueue for:" 
+	  << spilled_object_pending_delete_.size();
   ProcessSpilledObjectsDeleteQueue(free_objects_batch_size_);
   last_free_objects_at_ms_ = current_time_ms();
 }
@@ -255,7 +269,6 @@ void LocalObjectManager::SpillObjectUptoMaxThroughput() {
     return;
   }
 
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] Called";
   // Spill as fast as we can using all our spill workers.
   bool can_spill_more = true;
   while (can_spill_more) {
@@ -532,6 +545,7 @@ void LocalObjectManager::EagerSpillObjectsInternal(
           RAY_LOG(DEBUG) << "Sending eager spill request for object " << object_id;
 		  if(freed_during_eager_spill_.contains(object_id)){
             RAY_LOG(DEBUG) << "[JAE_DEEBUG] freed before eager spill";
+			freed_during_eager_spill_.erase(object_id);
 		    continue;
 		  }
           auto it = objects_pending_eager_spill_.find(object_id);
@@ -727,27 +741,34 @@ void LocalObjectManager::SpillObjectsInternal(
   }
 }
 
+void LocalObjectManager::DeleteEagerSpilledObject(const ObjectID &object_id, size_t obj_size){
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObject deleting " << object_id;
+  if(obj_size > 0) 
+    RemovePinnedObjects(object_id, obj_size);
+  store_object_count_(object_id, false, true);
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObject deleted " << object_id;
+}
+
 bool LocalObjectManager::DeleteEagerSpilledObjects(bool delete_all){
   const static bool enable_blocktasks_spill = RayConfig::instance().enable_BlockTasksSpill();
   bool ret = false;
   if(!delete_all && enable_blocktasks_spill){
 	// Wait SkiRental before deleting
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects wait SkiRental before deleting";
     for (auto eager_spilled_it = eager_spilled_objects_.begin(); eager_spilled_it != eager_spilled_objects_.end();){
       const ObjectID &object_id = eager_spilled_it->first;
 	  if(!is_plasma_object_spillable_(object_id) && !SkiRental(eager_spilled_it->second)){
         RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects object " << object_id
-	    <<" not spillable";
+	    <<" not spillable or SkiRental Wait";
 		++eager_spilled_it;
 	  }else{
 	    ret = true;
-        RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleting " << object_id;
-	    RemovePinnedObjects(object_id, eager_spilled_it->second.size);
-        store_object_count_(object_id, false, true);
-        RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleted " << object_id;
+		DeleteEagerSpilledObject(object_id, eager_spilled_it->second.size);
 	    eager_spilled_objects_.erase(eager_spilled_it++);
 	  }
 	}
   }else{
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects delete all eager spilled objects";
     for (auto eager_spilled_it = eager_spilled_objects_.begin(); eager_spilled_it != eager_spilled_objects_.end();){
       const ObjectID &object_id = eager_spilled_it->first;
 	  if(!is_plasma_object_spillable_(object_id)){
@@ -757,10 +778,7 @@ bool LocalObjectManager::DeleteEagerSpilledObjects(bool delete_all){
 	    continue;
 	  }
 	  ret = true;
-      RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleting " << object_id;
-	  RemovePinnedObjects(object_id, eager_spilled_it->second.size);
-      store_object_count_(object_id, false, true);
-      RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects deleted " << object_id;
+      DeleteEagerSpilledObject(object_id, eager_spilled_it->second.size);
 	  eager_spilled_objects_.erase(eager_spilled_it++);
 	}
   } 
@@ -824,13 +842,15 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
 	if(freed_during_eager_spill_.contains(object_id)){
 	  object_url_to_delete.emplace_back(object_url);
 	  freed_during_eager_spill_.erase(object_id);
+	  DeleteEagerSpilledObject(object_id, 0);
+	  RAY_LOG(DEBUG) << "[JAE_DEBUG] deleted freed objects during eager spill";
 	}
   }
   if(!object_url_to_delete.empty()){
     RAY_LOG(DEBUG) << "[JAE_DEBUG] deleting freed objects during eager spill";
     //DeleteSpilledObjects(object_url_to_delete);
   }
-  RAY_LOG(DEBUG) << "Finished spilling " << object_ids.size() << " objects. Calling EagerSpill()";
+  RAY_LOG(DEBUG) << "Finished eager spilling " << object_ids.size() << " objects. Calling EagerSpill()";
   EagerSpill();
 }
 
@@ -964,7 +984,7 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
     // processed, but it should be fine because the spilling will be eventually done,
     // and deleting objects is the low priority tasks. This will instead enable simpler
     // logic after this block.
-    if (objects_pending_spill_.contains(object_id)) {
+    if (objects_pending_spill_.contains(object_id) || objects_pending_eager_spill_.contains(object_id)) {
       break;
     }
 

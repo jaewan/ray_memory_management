@@ -222,6 +222,18 @@ Status CreateRequestQueue::ProcessRequests() {
 	  bool spill_pending;
 	  static const ObjectID base_object;
 
+      num_spinning_workers = spinning_tasks_.GetNumSpinningTasks();
+	  //*********************************************
+	  num_spinning_workers = 0;
+	  absl::flat_hash_set<ray::TaskID> task_set;
+
+	  for(auto &q: queue_){
+	    task_set.insert(q.second->object_id.TaskId());
+	  }
+
+	  num_spinning_workers = task_set.size();
+	  RAY_LOG(DEBUG) << "[JAE_DEBUG] Num of spinning tasks: "  << num_spinning_workers;
+	  //*********************************************
 	  if(!enable_eagerSpill){
 	    if (enable_blocktasks || enable_evicttasks || enable_blocktasks_spill) {
           RAY_LOG(DEBUG) << "[JAE_DEBUG] calling object_creation_blocked_callback ("
@@ -230,18 +242,6 @@ Status CreateRequestQueue::ProcessRequests() {
 			  << lowest_pri << " should_spill " << should_spill_;
             RAY_LOG(DEBUG) << "[JAE_DEBUG] Num of requests: "  << queue_.size();
 		    should_spill_ |= SkiRental();
-            num_spinning_workers = spinning_tasks_.GetNumSpinningTasks();
-		    //*********************************************
-		    num_spinning_workers = 0;
-		    absl::flat_hash_set<ray::TaskID> task_set;
-
-		    for(auto &q: queue_){
-		      task_set.insert(q.second->object_id.TaskId());
-		    }
-
-		    num_spinning_workers = task_set.size();
-            RAY_LOG(DEBUG) << "[JAE_DEBUG] Num of spinning tasks: "  << num_spinning_workers;
-		    //*********************************************
 		  if(new_dependency_added_ && new_request_added_ && enable_blocktasks_spill && !should_spill_){
 	        on_object_creation_blocked_callback_(lowest_pri, base_object, false, enable_blocktasks,
 		      enable_evicttasks, true, num_spinning_workers, (request)->object_size);
@@ -269,8 +269,8 @@ Status CreateRequestQueue::ProcessRequests() {
 
         spill_pending = spill_objects_callback_();
 	  }else{
-	    spill_pending = on_object_creation_blocked_callback_(lowest_pri, base_object, true, enable_blocktasks,
-		      enable_evicttasks, enable_blocktasks_spill, num_spinning_workers, (request)->object_size);
+	    spill_pending = on_object_creation_blocked_callback_(lowest_pri, base_object, true/*delete_eager_spilled_objects*/,
+				enable_blocktasks, enable_evicttasks, enable_blocktasks_spill, num_spinning_workers, (request)->object_size);
 	   RAY_LOG(DEBUG) << "[JAE_DEBUG] delete eager spilled objects called from ProcessRequests: ";
 	  }
       auto grace_period_ns = oom_grace_period_ns_;

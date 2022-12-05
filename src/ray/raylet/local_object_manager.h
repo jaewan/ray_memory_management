@@ -170,6 +170,7 @@ class LocalObjectManager {
 	RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] Called";
     objectID_to_priority_[object_id] = priority;
   }
+  void DeleteEagerSpilledObject(const ObjectID &object_id, size_t obj_size);
   bool DeleteEagerSpilledObjects(bool delete_all);
  private:
   FRIEND_TEST(LocalObjectManagerTest, TestSpillObjectsOfSizeZero);
