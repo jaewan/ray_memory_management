@@ -546,6 +546,7 @@ void LocalObjectManager::EagerSpillObjectsInternal(
 		  if(freed_during_eager_spill_.contains(object_id)){
             RAY_LOG(DEBUG) << "[JAE_DEEBUG] freed before eager spill";
 			freed_during_eager_spill_.erase(object_id);
+			freed_during_eager_spill_deleted_.emplace(object_id);
 		    continue;
 		  }
           auto it = objects_pending_eager_spill_.find(object_id);
@@ -830,9 +831,6 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
                      << object_id;
       continue;
     }
-    const auto &worker_addr = freed_it->second.first;
-    object_directory_->ReportObjectSpilled(
-        object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
 
     uint64_t current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>
 							     (std::chrono::system_clock::now().time_since_epoch()).count();
@@ -844,7 +842,11 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
 	  freed_during_eager_spill_.erase(object_id);
 	  DeleteEagerSpilledObject(object_id, 0);
 	  RAY_LOG(DEBUG) << "[JAE_DEBUG] deleted freed objects during eager spill";
+	  continue;
 	}
+    const auto &worker_addr = freed_it->second.first;
+    object_directory_->ReportObjectSpilled(
+        object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
   }
   if(!object_url_to_delete.empty()){
     RAY_LOG(DEBUG) << "[JAE_DEBUG] deleting freed objects during eager spill";
@@ -984,6 +986,11 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
     // processed, but it should be fine because the spilling will be eventually done,
     // and deleting objects is the low priority tasks. This will instead enable simpler
     // logic after this block.
+	if (freed_during_eager_spill_deleted_.contains(object_id)){
+      spilled_object_pending_delete_.pop();
+	  freed_during_eager_spill_deleted_.erase(object_id);
+	  continue;
+	}
     if (objects_pending_spill_.contains(object_id) || objects_pending_eager_spill_.contains(object_id)) {
       break;
     }

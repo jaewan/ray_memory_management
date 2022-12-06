@@ -395,6 +395,7 @@ class LocalObjectManager {
   // Ski-rental triggered Objects that stayed in the object store
   absl::flat_hash_set<ObjectID> expired_objects_;
   absl::flat_hash_set<ObjectID> freed_during_eager_spill_;
+  absl::flat_hash_set<ObjectID> freed_during_eager_spill_deleted_;
 };
 
 };  // namespace raylet
