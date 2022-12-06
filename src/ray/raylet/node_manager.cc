@@ -284,7 +284,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 					    object_manager_->SetShouldSpill(true);
 				      },"");
 					}
-				    return true;
+                    return GetLocalObjectManager().IsSpillingInProgress();
+				     //return true;
 			      }else{
                     RAY_LOG(DEBUG) << "[" << __func__ <<
 						"] EvictTasks destroyed workers num_workers now: "<<
@@ -301,7 +302,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 				      object_manager_->SetShouldSpill(true);
 				    },"");
 				  }
-				  return true;
+                  return GetLocalObjectManager().IsSpillingInProgress();
+				  //return true;
 				}
 			  }
 			}

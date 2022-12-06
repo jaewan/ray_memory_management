@@ -283,11 +283,17 @@ void LocalObjectManager::SpillObjectUptoMaxThroughput() {
 }
 
 bool LocalObjectManager::IsSpillingInProgress() {
+  {
   absl::MutexLock lock(&mutex_);
   if (num_active_workers_ > 0)
     return true;
-  if(eager_spilled_objects_.size())
-	return true;
+  }
+
+  if(eager_spilled_objects_.size()){
+    if(!all_eager_spilled_non_deletable_)
+      return true;
+  }
+
   return false;
 }
 
@@ -322,12 +328,16 @@ bool LocalObjectManager::EagerSpillObjectsOfSize(int64_t num_bytes_to_spill) {
       if (is_plasma_object_eager_spillable_(obj_id)) {
         bytes_to_spill += pinned_objects_[obj_id]->GetSize();
         objects_to_eager_spill.push_back(obj_id);
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] 0";
       }
 	  it++;
 	  counts++;
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] 1";
 	}
     it_priority++;
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] 2";
   }
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] 3";
   if(it_priority == pinned_objects_prioity_.rend() && it_expired == expired_objects_.end() &&
      bytes_to_spill < num_bytes_to_spill && !objects_pending_eager_spill_.empty()) {
     // We have gone through all spillable objects but we have not yet reached
@@ -344,7 +354,6 @@ bool LocalObjectManager::EagerSpillObjectsOfSize(int64_t num_bytes_to_spill) {
     auto start_time = absl::GetCurrentTimeNanos();
     EagerSpillObjectsInternal(objects_to_eager_spill, [this, bytes_to_spill, objects_to_eager_spill,
                                             start_time](const Status &status) {
-	 //TODO(JAE) this is weird. Here is what causes seg fault
       if (!status.ok()) {
         RAY_LOG(DEBUG) << "Failed to eager spill objects: " << status.ToString();
       } else {
@@ -756,20 +765,25 @@ bool LocalObjectManager::DeleteEagerSpilledObjects(bool delete_all){
   if(!delete_all && enable_blocktasks_spill){
 	// Wait SkiRental before deleting
     RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects wait SkiRental before deleting";
+    bool all_eager_spilled_non_deletable = true;
     for (auto eager_spilled_it = eager_spilled_objects_.begin(); eager_spilled_it != eager_spilled_objects_.end();){
       const ObjectID &object_id = eager_spilled_it->first;
-	  if(!is_plasma_object_spillable_(object_id) && !SkiRental(eager_spilled_it->second)){
+	  if(!is_plasma_object_spillable_(object_id)){
+		++eager_spilled_it;
+	  }else if(!SkiRental(eager_spilled_it->second)){
         RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects object " << object_id
 	    <<" not spillable or SkiRental Wait";
 		++eager_spilled_it;
+        all_eager_spilled_non_deletable = false;
 	  }else{
 	    ret = true;
 		DeleteEagerSpilledObject(object_id, eager_spilled_it->second.size);
 	    eager_spilled_objects_.erase(eager_spilled_it++);
 	  }
 	}
+    all_eager_spilled_non_deletable_ = all_eager_spilled_non_deletable;
   }else{
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects delete all eager spilled objects";
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects delete all eager spilled objects:" << eager_spilled_objects_.size();
     for (auto eager_spilled_it = eager_spilled_objects_.begin(); eager_spilled_it != eager_spilled_objects_.end();){
       const ObjectID &object_id = eager_spilled_it->first;
 	  if(!is_plasma_object_spillable_(object_id)){
@@ -782,6 +796,7 @@ bool LocalObjectManager::DeleteEagerSpilledObjects(bool delete_all){
       DeleteEagerSpilledObject(object_id, eager_spilled_it->second.size);
 	  eager_spilled_objects_.erase(eager_spilled_it++);
 	}
+    all_eager_spilled_non_deletable_ = true;
   } 
   if(!ret){
     RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObjects nothing to delete pinned:"
@@ -835,6 +850,7 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
     uint64_t current_timestamp = std::chrono::duration_cast<std::chrono::milliseconds>
 							     (std::chrono::system_clock::now().time_since_epoch()).count();
 	eager_spilled_objects_.emplace(object_id, object_info{object_size, current_timestamp, current_timestamp});
+	all_eager_spilled_non_deletable_  = false;
 	RemovePinnedObjects(object_id, object_size);
 	objectID_to_priority_.erase(object_id);
 	if(freed_during_eager_spill_.contains(object_id)){

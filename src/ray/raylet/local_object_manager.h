@@ -391,11 +391,12 @@ class LocalObjectManager {
   absl::flat_hash_map<ObjectID, ray::Priority> objectID_to_priority_;
   absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject> >
       objects_pending_eager_spill_;
-  absl::flat_hash_map<ObjectID, struct object_info > eager_spilled_objects_;
+  absl::flat_hash_map<ObjectID, struct object_info > eager_spilled_objects_;;
   // Ski-rental triggered Objects that stayed in the object store
   absl::flat_hash_set<ObjectID> expired_objects_;
   absl::flat_hash_set<ObjectID> freed_during_eager_spill_;
   absl::flat_hash_set<ObjectID> freed_during_eager_spill_deleted_;
+  bool all_eager_spilled_non_deletable_ = false;
 };
 
 };  // namespace raylet
