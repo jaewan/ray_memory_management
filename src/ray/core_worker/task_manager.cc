@@ -42,12 +42,12 @@ Priority TaskManager::GenerateTaskPriority(
 	}
   }
 
-	/*
-  static Priority dummy_pri = Priority();
-  Priority &max_priority = dummy_pri;
-  */
   Priority pri;
-  pri.SetFromParentPriority(max_priority, new_priority_s++);
+  if(max_priority == pri){
+    pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
+  }else{
+    pri.SetFromParentPriority(max_priority, new_priority_s++);
+  }
   spec.SetPriority(pri);
   return pri;
 }

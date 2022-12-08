@@ -116,6 +116,17 @@ class ReferenceCounter : public ReferenceCounterInterface,
       LOCKS_EXCLUDED(mutex_);
 
   Priority& GetObjectPriority(const ObjectID &object_id);
+  void SetCurrentTaskPriority(Priority pri){
+    int size = pri.GetDepth();
+	for(int i=0; i<size; i++){
+	  current_task_priority_.SetScore(i, pri.GetScore(i));
+	}
+  }
+
+  Priority& GetCurrentTaskPriority(){
+    return current_task_priority_;
+  }
+
   void UpdateObjectPriority(
 		const TaskID &task_id,
 		const Priority &priority);
@@ -976,6 +987,7 @@ class ReferenceCounter : public ReferenceCounterInterface,
   /// Holds priority of tracked ObjectIDs.
   PriorityTable task_id_priority_ GUARDED_BY(mutex_);
 
+  Priority current_task_priority_;
   /// Objects whose values have been freed by the language frontend.
   /// The values in plasma will not be pinned. An object ID is
   /// removed from this set once its Reference has been deleted
