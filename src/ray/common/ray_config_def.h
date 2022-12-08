@@ -503,13 +503,16 @@ RAY_CONFIG(float, block_tasks_threshold, 1.0)
 RAY_CONFIG(float, evict_tasks_threshold, 1.0)
 
 RAY_CONFIG(int64_t, spill_wait_time, 10000)
+
 RAY_CONFIG(int64_t, spill_bandwidth, 3000000)
-// Whether to use BlockTasks 
+
+RAY_CONFIG(bool, ENSEMBLE_SERVE, false)
 
 RAY_CONFIG(bool, enable_Deadlock1, false)
 
 RAY_CONFIG(bool, enable_Deadlock2, false)
 
+// Whether to use BlockTasks 
 RAY_CONFIG(bool, enable_BlockTasks, false)
 
 // Whether to block Spill at BlockTasks

@@ -117,10 +117,17 @@ class ReferenceCounter : public ReferenceCounterInterface,
 
   Priority& GetObjectPriority(const ObjectID &object_id);
   void SetCurrentTaskPriority(Priority pri){
+	/*
+	const static Priority default_pri;
+	if(current_task_priority_ != default_pri)
+	  return;
     int size = pri.GetDepth();
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] current_priority: " << current_task_priority_ << " pri: "<< pri;
 	for(int i=0; i<size; i++){
 	  current_task_priority_.SetScore(i, pri.GetScore(i));
 	}
+	*/
+	current_task_priority_.Set(pri);
   }
 
   Priority& GetCurrentTaskPriority(){

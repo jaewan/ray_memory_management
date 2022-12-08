@@ -2232,11 +2232,16 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
                                std::vector<std::shared_ptr<RayObject>> *return_objects,
                                ReferenceCounter::ReferenceTableProto *borrowed_refs,
                                bool *is_retryable_error) {
-  RAY_LOG(DEBUG) << "Executing task, task info = " << task_spec.DebugString() 
-	  << " priority:" << task_spec.GetPriority();
-  //TODO(Jae) This is a patch to alleviate priority when tasks submit tasks.
+  static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
+  //TODO(Jae) is this needed?
   reference_counter_->UpdateObjectPriority(task_spec.TaskId(), task_spec.GetPriority());
-  reference_counter_->SetCurrentTaskPriority(task_spec.GetPriority());
+  RAY_LOG(DEBUG) << "Executing task, task info = " << task_spec.DebugString();
+  //TODO(Jae) This is a patch to alleviate priority when tasks submit tasks.
+  if(ensemble_serving){
+    if(task_spec.GetName().compare("aggregator()") == 0){
+      reference_counter_->SetCurrentTaskPriority(task_spec.GetPriority());
+	}
+  }
   task_queue_length_ -= 1;
   num_executed_tasks_ += 1;
 

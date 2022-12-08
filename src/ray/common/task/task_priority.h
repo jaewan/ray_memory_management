@@ -54,7 +54,16 @@ struct Priority {
   }
 
   int GetDepth() {
-	  return (int)score.size();
+	return (int)score.size();
+  }
+
+  //This is for ensemble serve patch. When setting task's current_task_priority_ (aggregator) 
+  void Set(Priority &pri){
+	size_t len = pri.GetDepth();
+    score.resize(len);
+	for (size_t i=0; i<len; i++){
+	  score[i] = pri.GetScore(i);
+	}
   }
 
   void SetScore(int64_t depth, int s) {
