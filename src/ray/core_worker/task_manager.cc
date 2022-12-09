@@ -31,10 +31,10 @@ const int64_t kTaskFailureLoggingFrequencyMillis = 5000;
 //TODO(Jae) Delete object priority when a task is finished
 Priority TaskManager::GenerateTaskPriority(
 		TaskSpecification &spec, std::vector<ObjectID> &task_deps) {
+  static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
   RAY_LOG(DEBUG) << "Generating priority of task " << spec.TaskId()
 	  <<" num deps:" << task_deps.size();
-  static Priority dummy_pri = Priority();
-  Priority &max_priority = dummy_pri;
+  Priority max_priority;
   for (const ObjectID &argument_id : task_deps) {
     Priority &p = reference_counter_->GetObjectPriority(argument_id);
     if(max_priority > p){
@@ -43,9 +43,11 @@ Priority TaskManager::GenerateTaskPriority(
   }
 
   Priority pri;
-  if(max_priority == pri){
+  if(ensemble_serving && max_priority == pri && task_deps.size() && reference_counter_->GetCurrentTaskPriority() != pri){
+    RAY_LOG(DEBUG) << "GenerateTaskPriority serve current:" << reference_counter_->GetCurrentTaskPriority() << " new" << new_priority_s;
     pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
   }else{
+    RAY_LOG(DEBUG) << "GenerateTaskPriority max:" << max_priority << " new" << new_priority_s;
     pri.SetFromParentPriority(max_priority, new_priority_s++);
   }
   spec.SetPriority(pri);

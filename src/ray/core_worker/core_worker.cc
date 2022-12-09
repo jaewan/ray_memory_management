@@ -1652,13 +1652,13 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
                             serialized_retry_exception_allowlist,
                             scheduling_strategy);
   TaskSpecification task_spec = builder.Build();
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] Submitting normal task " << task_spec.DebugString();
   std::vector<rpc::ObjectReference> returned_refs;
   if (options_.is_local_mode) {
     returned_refs = ExecuteTaskLocalMode(task_spec);
   } else {
     returned_refs = task_manager_->AddPendingTask(
         task_spec.CallerAddress(), task_spec, CurrentCallSite(), max_retries);
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Submitting normal task " << task_spec.DebugString();
     if(RayConfig::instance().enable_BlockTasksSpill())
 	  BuildObjectWorkingSet(task_spec);
     io_service_.post(
@@ -2234,7 +2234,7 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
                                bool *is_retryable_error) {
   static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
   //TODO(Jae) is this needed?
-  reference_counter_->UpdateObjectPriority(task_spec.TaskId(), task_spec.GetPriority());
+  //reference_counter_->UpdateObjectPriority(task_spec.TaskId(), task_spec.GetPriority());
   RAY_LOG(DEBUG) << "Executing task, task info = " << task_spec.DebugString();
   //TODO(Jae) This is a patch to alleviate priority when tasks submit tasks.
   if(ensemble_serving){
