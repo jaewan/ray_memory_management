@@ -668,6 +668,7 @@ void ReferenceCounter::EraseReference(ReferenceTable::iterator it) {
     reconstructable_owned_objects_.erase(index_it->second);
     reconstructable_owned_objects_index_.erase(index_it);
   }
+  task_id_priority_.erase(it->first.TaskId());
   freed_objects_.erase(it->first);
   object_id_refs_.erase(it);
   ShutdownIfNeeded();

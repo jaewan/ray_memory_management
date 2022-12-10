@@ -119,7 +119,6 @@ std::vector<rpc::ObjectReference> TaskManager::AddPendingTask(
       ref.set_object_id(spec.ReturnId(i).Binary());
       ref.mutable_owner_address()->CopyFrom(caller_address);
       ref.set_call_site(call_site);
-  	  //TODO(Jae)This is deprecated as now we treat all objects from the same task as the same
       returned_refs.push_back(std::move(ref));
     }
   	reference_counter_->UpdateObjectPriority(spec.ReturnId(0), task_priority);
