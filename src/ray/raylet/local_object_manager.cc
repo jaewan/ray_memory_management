@@ -284,16 +284,15 @@ void LocalObjectManager::SpillObjectUptoMaxThroughput() {
 
 bool LocalObjectManager::IsSpillingInProgress() {
   {
-  absl::MutexLock lock(&mutex_);
-  if (num_active_workers_ > 0)
-    return true;
-  }
-
-  if(eager_spilled_objects_.size()){
-    if(!all_eager_spilled_non_deletable_)
+    absl::MutexLock lock(&mutex_);
+    if (num_active_workers_ > 0)
       return true;
   }
 
+  if(eager_spilled_objects_.size())
+    if(!all_eager_spilled_non_deletable_)
+      return true;
+  
   return false;
 }
 
@@ -328,16 +327,12 @@ bool LocalObjectManager::EagerSpillObjectsOfSize(int64_t num_bytes_to_spill) {
       if (is_plasma_object_eager_spillable_(obj_id)) {
         bytes_to_spill += pinned_objects_[obj_id]->GetSize();
         objects_to_eager_spill.push_back(obj_id);
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] 0";
       }
 	  it++;
 	  counts++;
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] 1";
 	}
     it_priority++;
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] 2";
   }
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] 3";
   if(it_priority == pinned_objects_prioity_.rend() && it_expired == expired_objects_.end() &&
      bytes_to_spill < num_bytes_to_spill && !objects_pending_eager_spill_.empty()) {
     // We have gone through all spillable objects but we have not yet reached

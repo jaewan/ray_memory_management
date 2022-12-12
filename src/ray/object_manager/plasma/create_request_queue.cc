@@ -240,8 +240,8 @@ Status CreateRequestQueue::ProcessRequests() {
 			  << enable_blocktasks <<" " << enable_evicttasks << " "
 			  << enable_blocktasks_spill << ") on priority "
 			  << lowest_pri << " should_spill " << should_spill_;
-            RAY_LOG(DEBUG) << "[JAE_DEBUG] Num of requests: "  << queue_.size();
-		    should_spill_ |= SkiRental();
+          RAY_LOG(DEBUG) << "[JAE_DEBUG] Num of requests: "  << queue_.size();
+		  should_spill_ |= SkiRental();
 		  if(new_dependency_added_ && new_request_added_ && enable_blocktasks_spill && !should_spill_){
 	        on_object_creation_blocked_callback_(lowest_pri, base_object, false, enable_blocktasks,
 		      enable_evicttasks, true, num_spinning_workers, (request)->object_size);
@@ -251,7 +251,7 @@ Status CreateRequestQueue::ProcessRequests() {
 		  }else{
 	        on_object_creation_blocked_callback_(lowest_pri, base_object, false, enable_blocktasks,
 		      enable_evicttasks, false, num_spinning_workers, (request)->object_size);
-		}
+		  }
 
 	      if ((enable_blocktasks_spill || enable_evicttasks) && (!should_spill_)) {
 		    //should_spill is set in 2 cases
@@ -260,18 +260,18 @@ Status CreateRequestQueue::ProcessRequests() {
 		    //2. If evict_tasks does not evict any tasks
             return Status::TransientObjectStoreFull(
               "Waiting for higher priority tasks to finish");
-		  }
-		  //Alternative Design point. Always set should_spill_ from task_manager.
-		  //Current design reduce callback function. But spill called once only
-		  RAY_LOG(DEBUG) << "[JAE_DEBUG] should_spill unset";
-		  //should_spill_ = false;
+		   }
+		   //Alternative Design point. Always set should_spill_ from task_manager.
+		   //Current design reduce callback function. But spill called once only
+		   RAY_LOG(DEBUG) << "[JAE_DEBUG] should_spill unset";
+		   //should_spill_ = false;
 	    }
 
         spill_pending = spill_objects_callback_();
 	  }else{
 	    spill_pending = on_object_creation_blocked_callback_(lowest_pri, base_object, true/*delete_eager_spilled_objects*/,
 				enable_blocktasks, enable_evicttasks, enable_blocktasks_spill, num_spinning_workers, (request)->object_size);
-	   RAY_LOG(DEBUG) << "[JAE_DEBUG] delete eager spilled objects called from ProcessRequests: ";
+	    RAY_LOG(DEBUG) << "[JAE_DEBUG] delete eager spilled objects called from ProcessRequests: ";
 	  }
       auto grace_period_ns = oom_grace_period_ns_;
       if (spill_pending) {
