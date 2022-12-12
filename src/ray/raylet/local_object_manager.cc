@@ -133,6 +133,9 @@ double LocalObjectManager::GetSpillTime(size_t object_size){
   double spill_time = (double)object_size/RayConfig::instance().spill_bandwidth();
   double ret = std::min(spill_time, spill_wait_time);
   RAY_LOG(DEBUG) << "[JAE_DEBUG] GetSpillTime:" << ret;
+  //static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
+  //if(ensemble_serving)
+    //return std::max( spill_time, spill_wait_time);
   return ret;
   //return spill_wait_time;
 }
@@ -283,17 +286,23 @@ void LocalObjectManager::SpillObjectUptoMaxThroughput() {
 }
 
 bool LocalObjectManager::IsSpillingInProgress() {
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] IsSpillingInProgress called";
   {
   absl::MutexLock lock(&mutex_);
-  if (num_active_workers_ > 0)
+  if (num_active_workers_ > 0){
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] IsSpillingInProgress spilling true 1";
     return true;
+  }
   }
 
   if(eager_spilled_objects_.size()){
-    if(!all_eager_spilled_non_deletable_)
+    if(!all_eager_spilled_non_deletable_){
+	  RAY_LOG(DEBUG) << "[JAE_DEBUG] IsSpillingInProgress spilling true 2";
       return true;
+	}
   }
 
+	  RAY_LOG(DEBUG) << "[JAE_DEBUG] IsSpillingInProgress spilling false";
   return false;
 }
 
@@ -753,6 +762,16 @@ void LocalObjectManager::SpillObjectsInternal(
 
 void LocalObjectManager::DeleteEagerSpilledObject(const ObjectID &object_id, size_t obj_size){
   RAY_LOG(DEBUG) << "[JAE_DEBUG] DeleteEagerSpilledObject deleting " << object_id;
+  auto freed_it = local_objects_.find(object_id);
+  if (freed_it == local_objects_.end() || freed_it->second.second) {
+    RAY_LOG(DEBUG) << "Eager Spilled object already freed, skipping send of spilled URL to "
+                      "object directory for object "
+                   << object_id;
+  }else{
+    const auto &worker_addr = freed_it->second.first;
+    object_directory_->ReportObjectSpilled(
+        object_id, self_node_id_, worker_addr, GetLocalSpilledObjectURL(object_id), is_external_storage_type_fs_);
+  }
   if(obj_size > 0) 
     RemovePinnedObjects(object_id, obj_size);
   store_object_count_(object_id, false, true);
@@ -860,9 +879,11 @@ void LocalObjectManager::OnObjectEagerSpilled(const std::vector<ObjectID> &objec
 	  RAY_LOG(DEBUG) << "[JAE_DEBUG] deleted freed objects during eager spill";
 	  continue;
 	}
-    const auto &worker_addr = freed_it->second.first;
+    //const auto &worker_addr = freed_it->second.first;
+	/*
     object_directory_->ReportObjectSpilled(
         object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
+		*/
   }
   if(!object_url_to_delete.empty()){
     RAY_LOG(DEBUG) << "[JAE_DEBUG] deleting freed objects during eager spill";
