@@ -315,7 +315,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 			  io_service_.post([this](){
 				local_object_manager_.DeleteEagerSpilledObjects(false);
 			  },"");
-              return GetLocalObjectManager().IsSpillingInProgress();
+			  bool r = GetLocalObjectManager().IsSpillingInProgress();
+              return r;
 			}
 			return true;
 		  },
