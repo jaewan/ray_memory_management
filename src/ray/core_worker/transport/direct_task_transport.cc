@@ -339,6 +339,16 @@ void CoreWorkerDirectTaskSubmitter::ReportWorkerBacklogIfNeeded(
   }
 }
 
+inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, Priority &pri){
+  std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
+  std::ostringstream stream;
+  stream << task_id <<" " <<
+	fnc_name << " " << pri << "\n";
+  std::string log_str = stream.str();
+  log_stream << log_str;
+  log_stream.close();
+}
+
 void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     const SchedulingKey &scheduling_key, const rpc::Address *raylet_address) {
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
@@ -378,13 +388,14 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
   const TaskID task_id = resource_spec.TaskId();
 
+  // Fining priority of the request
   Priority dummy_pri = Priority();
   Priority &pri = dummy_pri;
   for (const auto& priority_it : task_priority_queue){
     if(priority_it.second == scheduling_key_entry.resource_spec.TaskId()){
-	  pri = priority_it.first;
+	    pri = priority_it.first;
       break;
-	}
+	  }
   }
   resource_spec.SetPriority(pri);
   num_leases_requested_++;
@@ -406,15 +417,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   // Subtract 1 so we don't double count the task we are requesting for.
   int64_t queue_size = task_priority_queue.size() - 1;
 
-  //********* log*********
-  std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
-  std::ostringstream stream;
-  stream << task_id <<" " <<
-	resource_spec.GetName() << " " << pri << "\n";
-  std::string log_str = stream.str();
-  log_stream << log_str;
-  log_stream.close();
-  //********* log*********
+  LogLeaseSeq(task_id, resource_spec.GetName(), pri);
 
   lease_client->RequestWorkerLease(
       resource_spec.GetMessage(),

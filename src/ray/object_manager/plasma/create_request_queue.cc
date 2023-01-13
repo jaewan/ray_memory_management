@@ -113,9 +113,11 @@ double CreateRequestQueue::GetSpillTime(){
   return RayConfig::instance().spill_wait_time();
 }
 
+/*
 static inline double distribution(double i, double b){
   return pow(((b-1)/b),(b-i))*(1/(b*(1-pow(1-(1/b),b))));
 }
+*/
 
 bool CreateRequestQueue::SkiRental(){
   static uint64_t ski_rental_timestamp;

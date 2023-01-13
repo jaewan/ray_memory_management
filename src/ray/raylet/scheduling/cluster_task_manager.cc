@@ -402,7 +402,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	RAY_LOG(DEBUG) << "[" << __func__ << "] All leased workers are spinning ";
 	if(enable_eagerSpill){
       //DeleteEagerSpilledObjects(local_objects_, local_object_manager, true);
-	  io_service.post([&local_object_manager, this](){
+	  io_service.post([&local_object_manager](){
 	    local_object_manager.DeleteEagerSpilledObjects(true);
 	  },"");
 	}else{
@@ -415,7 +415,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
   }
   if(!enable_deadlock2){
     if(enable_eagerSpill){
-      io_service.post([&local_object_manager, this](){
+      io_service.post([&local_object_manager](){
         local_object_manager.DeleteEagerSpilledObjects(false);
       },"");
     }
@@ -427,7 +427,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
   //No Objects in the object store == No GCable object
   if(objects_in_obj_store.empty()){
     RAY_LOG(DEBUG) << "[" << __func__ << "] Object Store is empty ";
-    io_service.post([&local_object_manager, this](){
+    io_service.post([&local_object_manager](){
       local_object_manager.DeleteEagerSpilledObjects(false);
     },"");
     BlockTasks(init_priority, io_service);
@@ -458,7 +458,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	  <<gcable_size << " first pending object size:" << first_pending_obj_size;
 
 	  if(enable_eagerSpill){
-	    io_service.post([&local_object_manager, this, is_deadlock](){
+	    io_service.post([&local_object_manager, is_deadlock](){
 	      local_object_manager.DeleteEagerSpilledObjects(is_deadlock);
 	    },"");
 	  }else{

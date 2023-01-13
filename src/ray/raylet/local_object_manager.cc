@@ -140,9 +140,11 @@ double LocalObjectManager::GetSpillTime(size_t object_size){
   //return spill_wait_time;
 }
 
+/*
 static inline double distribution(double i, double b){
   return pow(((b-1)/b),(b-i))*(1/(b*(1-pow(1-(1/b),b))));
 }
+*/
 
 bool LocalObjectManager::SkiRental(struct object_info &obj_info){
   /*
@@ -287,6 +289,7 @@ void LocalObjectManager::SpillObjectUptoMaxThroughput() {
 
 bool LocalObjectManager::IsSpillingInProgress() {
   {
+    absl::MutexLock lock(&mutex_);
     if (num_active_workers_ > 0){
       return true;
     }

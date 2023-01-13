@@ -594,7 +594,8 @@ void PlasmaClient::Impl::EagerSpillDecreaseObjectCount(const ObjectID &object_id
   //object_entry->count -= 1;
   if(object_entry == nullptr){
   }
-  Release(object_id);
+  auto l = Release(object_id);
+  RAY_LOG(DEBUG) << l;
 }
 
 void PlasmaClient::Impl::EagerSpillIncreaseObjectCount(const ObjectID &object_id) {
