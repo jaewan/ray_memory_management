@@ -422,7 +422,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   lease_client->RequestWorkerLease(
       resource_spec.GetMessage(),
       /*grant_or_reject=*/is_spillback,
-      [this, scheduling_key, task_id, is_spillback, raylet_address = *raylet_address](
+      [this, scheduling_key, task_id, is_spillback, raylet_address = *raylet_address, pri](
           const Status &status, const rpc::RequestWorkerLeaseReply &reply) {
         std::deque<TaskSpecification> tasks_to_fail;
         rpc::RayErrorInfo error_info;
@@ -501,8 +501,8 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               // We got a lease for a worker. Add the lease client state and try to
               // assign work to the worker.
               rpc::WorkerAddress addr(reply.worker_address());
-              RAY_LOG(DEBUG) << "Lease granted to task " << task_id << " from raylet "
-                             << addr.raylet_id << " with worker " << addr.worker_id;
+              RAY_LOG(DEBUG) << "Lease granted to task " << task_id << " with priority " 
+                << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id;
 
               auto resources_copy = reply.resource_mapping();
 
