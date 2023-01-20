@@ -14,11 +14,12 @@
 
 #include "gtest/gtest.h"
 #include <limits.h>
-#include "absl/container/btree_set.h"
-#include "absl/container/flat_hash_set.h"
 
 #include "ray/common/common_protocol.h"
 #include "ray/common/task/task_priority.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/btree_set.h"
 
 namespace ray {
 
@@ -62,8 +63,10 @@ TEST(TaskPriorityTest, TestCompare) {
 }
 
 TEST(TaskPriorityTest, TestCompare2) {
+  std::vector<int> single;
+  single.push_back(2);
   Priority priority1({1, 0});
-  Priority priority2({2});
+  Priority priority2(single);
 
   ASSERT_LT(priority1, priority2);
 }
@@ -110,7 +113,7 @@ TEST(TaskPriorityTest, TestDataStructures) {
     std::make_pair(p3, ObjectID::FromRandom().TaskId())
   };
 
-  absl::btree_set<TaskKey> set;
+  absl::btree_set<TaskKey> set = absl::btree_set<TaskKey>();
   for (auto &p : vec) {
     ASSERT_TRUE(set.emplace(p).second);
     ASSERT_TRUE(set.find(p) != set.end());
@@ -149,6 +152,21 @@ TEST(TaskPriorityTest, TestDataStructures) {
   ASSERT_TRUE(task_key_hash_set.count(vec[1]));
   ASSERT_TRUE(task_key_hash_set.count(vec[2]));
   ASSERT_FALSE(task_key_hash_set.count(TaskKey(p4, ObjectID::FromRandom().TaskId())));
+}
+
+TEST(TaskPriorityTest, TestBtree){
+  std::vector<int> single;
+  single.push_back(10);
+  Priority p10(single);
+  Priority p3_30({3,30});
+  absl::btree_set<TaskKey> set = absl::btree_set<TaskKey>();
+  TaskKey producer(p10, ObjectID::FromRandom().TaskId());
+  TaskKey consumer(p3_30, ObjectID::FromRandom().TaskId());
+  set.emplace(producer);
+  set.emplace(consumer);
+  auto it = set.begin();
+  ASSERT_EQ(it->first, p3_30);
+  std::cerr << it->first;
 }
 
 }  // namespace ray

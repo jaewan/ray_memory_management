@@ -23,6 +23,16 @@
 namespace ray {
 namespace core {
 
+inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri){
+  std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
+  std::ostringstream stream;
+  stream << task_id <<" " <<
+	fnc_name << " " << pri << "\n";
+  std::string log_str = stream.str();
+  log_stream << log_str;
+  log_stream.close();
+}
+
 Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
   RAY_LOG(DEBUG) << "Submit task " << task_spec.TaskId();
   num_tasks_submitted_++;
@@ -185,16 +195,15 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   auto &lease_entry = worker_to_lease_entry_[addr];
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id <<
-	  "was_error:" << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
-	  << (current_time_ms() > lease_entry.lease_expiration_time);
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
+                 << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
+	               << (current_time_ms() > lease_entry.lease_expiration_time);
   if (!lease_entry.lease_client) {
     return;
   }
 
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
   auto &current_queue = scheduling_key_entry.task_priority_queue;
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] current_queue size:" << current_queue.size(); 
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
@@ -211,10 +220,10 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
     while (!current_queue.empty() && !lease_entry.is_busy) {
-	  const auto task_key_it = current_queue.begin();
-	  const auto &task_id = task_key_it->second;
-	  const auto task_it = tasks_.find(task_id);
-	  RAY_CHECK(task_it != tasks_.end()) << task_id;
+      const auto task_key_it = current_queue.begin();
+      const auto &task_id = task_key_it->second;
+      const auto task_it = tasks_.find(task_id);
+	    RAY_CHECK(task_it != tasks_.end()) << task_id;
       const auto &task_spec = task_it->second.task_spec;
       lease_entry.is_busy = true;
 
@@ -339,16 +348,6 @@ void CoreWorkerDirectTaskSubmitter::ReportWorkerBacklogIfNeeded(
   }
 }
 
-inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, Priority &pri){
-  std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
-  std::ostringstream stream;
-  stream << task_id <<" " <<
-	fnc_name << " " << pri << "\n";
-  std::string log_str = stream.str();
-  log_stream << log_str;
-  log_stream.close();
-}
-
 void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     const SchedulingKey &scheduling_key, const rpc::Address *raylet_address) {
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
@@ -417,7 +416,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   // Subtract 1 so we don't double count the task we are requesting for.
   int64_t queue_size = task_priority_queue.size() - 1;
 
-  LogLeaseSeq(task_id, resource_spec.GetName(), pri);
 
   lease_client->RequestWorkerLease(
       resource_spec.GetMessage(),
@@ -478,7 +476,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                 const auto task_it = tasks_.find(task_id);
                 RAY_CHECK(task_it != tasks_.end());
                 task_priority_queue.erase(task_key_it);
-				tasks_to_fail.push_back(std::move(task_it->second.task_spec));
+                tasks_to_fail.push_back(std::move(task_it->second.task_spec));
                 tasks_.erase(task_it);
               }
                 //tasks_to_fail = std::move(scheduling_key_entry.task_queue);
@@ -557,7 +555,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                 const auto task_it = tasks_.find(task_id);
                 RAY_CHECK(task_it != tasks_.end());
                 task_priority_queue.erase(task_key_it);
-				tasks_to_fail.push_back(std::move(task_it->second.task_spec));
+                tasks_to_fail.push_back(std::move(task_it->second.task_spec));
                 tasks_.erase(task_it);
               }
               //tasks_to_fail = std::move(scheduling_key_entry.task_queue);
@@ -607,7 +605,10 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
     const Priority &priority,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   RAY_LOG(DEBUG) << "Pushing task " << task_spec.TaskId() << " to worker "
-                 << addr.worker_id << " of raylet " << addr.raylet_id;
+                 << addr.worker_id << " of raylet " << addr.raylet_id
+                 << " with priority:" << task_spec.GetPriority();
+  LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), task_spec.GetPriority());
+
   auto task_id = task_spec.TaskId();
   auto request = std::make_unique<rpc::PushTaskRequest>();
   bool is_actor = task_spec.IsActorTask();
