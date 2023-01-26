@@ -195,9 +195,12 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   auto &lease_entry = worker_to_lease_entry_[addr];
+  static int JAE_DEBUG_COUNT = 0;
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
-	               << (current_time_ms() > lease_entry.lease_expiration_time);
+	             << (current_time_ms() > lease_entry.lease_expiration_time)
+			  	 << " OnWorkerIdle Called:" << JAE_DEBUG_COUNT;
+			  	JAE_DEBUG_COUNT++;
   if (!lease_entry.lease_client) {
     return;
   }
@@ -215,7 +218,9 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     // Return the worker only if there are no tasks to do.
     if (!lease_entry.is_busy) {
       ReturnWorker(addr, was_error, worker_exiting, scheduling_key);
-    }
+    }else{
+	  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
+	}
   } else {
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
@@ -234,6 +239,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       scheduling_key_entry.num_busy_workers++;
 
       executing_tasks_.emplace(task_spec.TaskId(), addr);
+	  lease_entry.lease_expiration_time = current_time_ms() - 1;
       PushNormalTask(addr, client, scheduling_key, task_spec, task_key_it->first, assigned_resources);
       current_queue.erase(task_key_it);
       tasks_.erase(task_it);
@@ -387,7 +393,8 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
   const TaskID task_id = resource_spec.TaskId();
 
-  // Fining priority of the request
+  /*
+  // Finding priority of the request
   Priority dummy_pri = Priority();
   Priority &pri = dummy_pri;
   for (const auto& priority_it : task_priority_queue){
@@ -396,6 +403,8 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
       break;
 	  }
   }
+  */
+  const Priority &pri = task_priority_queue.begin()->first;
   resource_spec.SetPriority(pri);
   num_leases_requested_++;
 
@@ -416,6 +425,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   // Subtract 1 so we don't double count the task we are requesting for.
   int64_t queue_size = task_priority_queue.size() - 1;
 
+  static int JAE_DEBUG_COUNT = 0;
 
   lease_client->RequestWorkerLease(
       resource_spec.GetMessage(),
@@ -500,7 +510,9 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               // assign work to the worker.
               rpc::WorkerAddress addr(reply.worker_address());
               RAY_LOG(DEBUG) << "Lease granted to task " << task_id << " with priority " 
-                << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id;
+                << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id
+			  	<< " num leased:" << JAE_DEBUG_COUNT;
+			  JAE_DEBUG_COUNT++;
 
               auto resources_copy = reply.resource_mapping();
 
