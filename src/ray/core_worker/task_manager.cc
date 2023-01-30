@@ -44,11 +44,10 @@ Priority TaskManager::GenerateTaskPriority(
   }
 
   Priority pri;
+  //This is an ensemble serve patch for multi driver
   if(ensemble_serving && max_priority == pri && task_deps.size() && reference_counter_->GetCurrentTaskPriority() != pri){
-    RAY_LOG(DEBUG) << "GenerateTaskPriority serve current:" << reference_counter_->GetCurrentTaskPriority() << " new" << new_priority_s;
     pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
   }else{
-    RAY_LOG(DEBUG) << "GenerateTaskPriority max:" << max_priority << " new" << new_priority_s;
     pri.SetFromParentPriority(max_priority, new_priority_s++);
   }
   spec.SetPriority(pri);

@@ -86,8 +86,6 @@ class CoreWorkerDirectTaskSubmitter {
         actor_creator_(actor_creator),
         client_cache_(core_worker_client_pool),
         job_id_(job_id),
-        max_pending_lease_requests_per_scheduling_category_(
-            max_pending_lease_requests_per_scheduling_category),
         cancel_retry_timer_(std::move(cancel_timer)),
         get_task_priority_(get_task_priority) {}
 
@@ -145,6 +143,15 @@ class CoreWorkerDirectTaskSubmitter {
       const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources)
       EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
+  void OnWorkerIdle(
+      const rpc::WorkerAddress &addr,
+      const SchedulingKey &task_queue_key,
+      const Priority &pri,
+      bool was_error,
+      bool worker_exiting,
+      const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources)
+      EXCLUSIVE_LOCKS_REQUIRED(mu_);
+
   /// Get an existing lease client or connect a new one. If a raylet_address is
   /// provided, this connects to a remote raylet. Else, this connects to the
   /// local raylet.
@@ -189,6 +196,9 @@ class CoreWorkerDirectTaskSubmitter {
                     bool was_error,
                     bool worker_exiting,
                     const SchedulingKey &scheduling_key) EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  void ReturnWorker(const rpc::WorkerAddress addr,
+                    bool was_error,
+                    bool worker_exiting) EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   /// Check that the scheduling_key_entries_ hashmap is empty.
   inline bool CheckNoSchedulingKeyEntries() const EXCLUSIVE_LOCKS_REQUIRED(mu_) {
@@ -200,7 +210,7 @@ class CoreWorkerDirectTaskSubmitter {
                       rpc::CoreWorkerClientInterface &client,
                       const SchedulingKey &task_queue_key,
                       const TaskSpecification &task_spec,
-                      const Priority &priority,
+                      Priority priority,
                       const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry>
                           &assigned_resources);
 
@@ -251,7 +261,7 @@ class CoreWorkerDirectTaskSubmitter {
   const JobID job_id_;
 
   // Max number of pending lease requests per SchedulingKey.
-  const uint64_t max_pending_lease_requests_per_scheduling_category_;
+  //const uint64_t max_pending_lease_requests_per_scheduling_category_;
 
   /// A LeaseEntry struct is used to condense the metadata about a single executor:
   /// (1) The lease client through which the worker should be returned
@@ -345,6 +355,24 @@ class CoreWorkerDirectTaskSubmitter {
   // Used to cache TaskSpecs and to look up the task's position in
   // scheduling_key_entries_.
   absl::flat_hash_map<TaskID, TaskEntry> tasks_;
+
+  // Ignorant of scheduling key. Task queues for DFS scheduling only.
+  // All tasks are managed in this single queue
+  absl::btree_set<Priority> priority_task_queues_;
+  // priority_task_queues_ are used to decide the sequence of worker lease and this is used to
+  // find the task spec of the priority
+  absl::flat_hash_map<Priority, TaskSpecification> priority_to_task_spec_;
+
+  // Keep track of the active workers globally to check rooms for task alloc
+  absl::flat_hash_set<rpc::WorkerAddress> active_workers_ =
+      absl::flat_hash_set<rpc::WorkerAddress>();
+  // Keep track of how many workers have tasks to do.
+  uint32_t num_busy_workers_ = 0;
+  // Check whether all workers are busy.
+  inline bool AllWorkersBusy() const {
+    RAY_CHECK_LE(num_busy_workers_, active_workers_.size());
+    return num_busy_workers_ == active_workers_.size();
+  }
 
   // Tasks that were cancelled while being resolved.
   absl::flat_hash_set<TaskID> cancelled_tasks_ GUARDED_BY(mu_);
