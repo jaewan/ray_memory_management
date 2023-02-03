@@ -62,6 +62,7 @@ class PlasmaStore {
               float object_spilling_threshold,
               ray::SpillObjectsCallback spill_objects_callback,
               std::function<void()> object_store_full_callback,
+              /// RSTODO: add ray::SpillRemoteObjectsCallback for parameter.
               ray::AddObjectCallback add_object_callback,
               ray::DeleteObjectCallback delete_object_callback);
 
