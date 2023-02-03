@@ -8,7 +8,7 @@ if [[ ! $port ]]; then
 fi
 
 if [ "$mode" = "head" ]; then
-    ray start --head --port=$port
+    ray start --head --port=$port --ray-client-server-port=7001 --node-ip-address=$(ipconfig getifaddr en0)
     # get ips
     if [[ "$OSTYPE" = "darwin"* ]]; then # macOS
         ip=$(ipconfig getifaddr en0)
