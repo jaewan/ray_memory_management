@@ -160,6 +160,9 @@ class LocalObjectManager {
 
   std::string DebugString() const;
 
+  /// RSTODO: add getter function for the flat_hash_map.
+  absl::flat_hash_map<ObjectID, NodeID> GetRemoteSpillMapping() { return spilled_remote_objects_url_; }
+  
  private:
   FRIEND_TEST(LocalObjectManagerTest, TestSpillObjectsOfSizeZero);
   FRIEND_TEST(LocalObjectManagerTest, TestSpillUptoMaxFuseCount);
@@ -272,6 +275,9 @@ class LocalObjectManager {
   /// Mapping from object id to url_with_offsets. We cannot reuse pinned_objects_ because
   /// pinned_objects_ entries are deleted when spilling happens.
   absl::flat_hash_map<ObjectID, std::string> spilled_objects_url_;
+
+  /// RSTODO: Add a flat_hash_map of object ids and rpc node addresses for remotely spilled.
+  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
 
   /// Base URL -> ref_count. It is used because there could be multiple objects
   /// within a single spilled file. We need to ref count to avoid deleting the file

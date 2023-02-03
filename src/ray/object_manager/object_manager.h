@@ -114,6 +114,9 @@ class ObjectManagerInterface {
 class ObjectManager : public ObjectManagerInterface,
                       public rpc::ObjectManagerServiceHandler {
  public:
+  /// RSTODO: create wrapper handlers for push and pull.
+  /// RSTODO: figure out how to create custom gRPC calls???? is this even necessary????
+ 
   /// Implementation of object manager service
 
   /// Handle push request from remote object manager
@@ -170,6 +173,7 @@ class ObjectManager : public ObjectManagerInterface,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
       SpillObjectsCallback spill_objects_callback,
       std::function<void()> object_store_full_callback,
+      /// RSTODO: add definition for spill_remote_callback
       AddObjectCallback add_object_callback,
       DeleteObjectCallback delete_object_callback,
       std::function<std::unique_ptr<RayObject>(const ObjectID &object_id)> pin_object,
