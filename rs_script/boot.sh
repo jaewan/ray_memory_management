@@ -4,7 +4,7 @@ head_ip="$2"
 listener="$3"
 port="$4"
 
-if [[ ! listener ]]; then
+if [[ ! $listener ]]; then
     listener="7001"
 fi
 
@@ -21,10 +21,10 @@ if [ "$mode" = "head" ]; then
     # TODO: add linux configs to find IP.
     fi
 
-    # start ray 
+    # start ray
     ray start --head --port=$port --ray-client-server-port=$listener --node-ip-address=$ip
 elif [ "$mode" = "worker" ]; then
-    adrs="$head_ip:$port"
+    adrs="$head_ip:$listener"
     echo "Connecting worker to: $adrs"
     ray start --address=$adrs
 else
