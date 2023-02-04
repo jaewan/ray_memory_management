@@ -172,8 +172,9 @@ class ObjectManager : public ObjectManagerInterface,
       RestoreSpilledObjectCallback restore_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
       SpillObjectsCallback spill_objects_callback,
+      /// RSCODE: definition for spill_remote_callback
+      SpillRemoteCallback spill_remote_callback,
       std::function<void()> object_store_full_callback,
-      /// RSTODO: add definition for spill_remote_callback
       AddObjectCallback add_object_callback,
       DeleteObjectCallback delete_object_callback,
       std::function<std::unique_ptr<RayObject>(const ObjectID &object_id)> pin_object,
@@ -191,6 +192,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// pinned by the raylet, so we can comfotable evict after spilling the object from
   /// local object manager. False otherwise.
   bool IsPlasmaObjectSpillable(const ObjectID &object_id);
+
+  /// RSCODE:
+  /// \param object_id The object's object id.
+  /// \param node_id The remote node's id.
+  /// \return Void.
+  void RemoteSpill(const ObjectID &object_id, const NodeID &node_id);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row

@@ -160,7 +160,7 @@ class LocalObjectManager {
 
   std::string DebugString() const;
 
-  /// RSTODO: add getter function for the flat_hash_map.
+  /// RSCODE: add getter function for the flat_hash_map.
   absl::flat_hash_map<ObjectID, NodeID> GetRemoteSpillMapping() { return spilled_remote_objects_url_; }
   
  private:
@@ -276,7 +276,7 @@ class LocalObjectManager {
   /// pinned_objects_ entries are deleted when spilling happens.
   absl::flat_hash_map<ObjectID, std::string> spilled_objects_url_;
 
-  /// RSTODO: Add a flat_hash_map of object ids and rpc node addresses for remotely spilled.
+  /// RSCODE: Mapping from object ids to rpc node addresses for remotely spilled objects.
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
 
   /// Base URL -> ref_count. It is used because there could be multiple objects

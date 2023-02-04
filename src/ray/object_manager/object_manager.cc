@@ -61,6 +61,8 @@ ObjectManager::ObjectManager(
     RestoreSpilledObjectCallback restore_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
     SpillObjectsCallback spill_objects_callback,
+    /// RSCODE: definition for spill_remote_callback
+    SpillRemoteCallback spill_remote_callback,
     std::function<void()> object_store_full_callback,
     AddObjectCallback add_object_callback,
     DeleteObjectCallback delete_object_callback,
@@ -331,6 +333,13 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
     RAY_LOG(DEBUG) << "Failed to send a push request for an object " << object_id
                    << " to " << node_id << ". Chunk index: " << chunk_index;
   }
+}
+
+/// RSTODO: Implement spill function to spil object to remote memory
+void ObjectManager::RemoteSpill(const ObjectID &object_id, const NodeID &node_id) {
+  RAY_LOG(DEBUG) << "Push on " << self_node_id_ << " to " << node_id << " of object "
+                 << object_id;
+  
 }
 
 void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id) {

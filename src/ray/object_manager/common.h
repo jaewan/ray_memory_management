@@ -22,7 +22,7 @@
 
 namespace ray {
 
-/// RSTODO: A callback to asynchronously spill objects to remote nodes when space is needed.
+/// RSCODE: A callback to asynchronously spill objects to remote nodes when space is needed.
 /// It spills enough objects to saturate all spill IO workers.
 using SpillRemoteCallback = std::function<bool(const ObjectID &, const NodeID &)>;
 

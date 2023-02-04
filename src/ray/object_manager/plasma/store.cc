@@ -76,7 +76,8 @@ PlasmaStore::PlasmaStore(instrumented_io_context &main_service,
                          uint32_t delay_on_oom_ms,
                          float object_spilling_threshold,
                          ray::SpillObjectsCallback spill_objects_callback,
-                         /// RSTODO: add SpillRemoteObjectsCallback
+                         /// RSCODE: add SpillRemoteObjectsCallback
+                         ray::SpillRemoteCallback spill_remote_callback,
                          std::function<void()> object_store_full_callback,
                          ray::AddObjectCallback add_object_callback,
                          ray::DeleteObjectCallback delete_object_callback)
@@ -95,7 +96,8 @@ PlasmaStore::PlasmaStore(instrumented_io_context &main_service,
           fs_monitor_,
           /*oom_grace_period_s=*/RayConfig::instance().oom_grace_period_s(),
           spill_objects_callback,
-          /// RSTODO: add spill_remote_objects_callback
+          /// RSCODE: add spill_remote_objects_callback
+          spill_remote_callback,
           object_store_full_callback,
           /*get_time=*/
           []() { return absl::GetCurrentTimeNanos(); },

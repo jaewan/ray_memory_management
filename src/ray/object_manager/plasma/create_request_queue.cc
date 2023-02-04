@@ -105,6 +105,8 @@ Status CreateRequestQueue::ProcessRequests() {
     }
 
     if (spilling_required) {
+      /// RSTODO: Add spill_remote_callback_ here
+      /// If spill_remote_callback_ fails, call spill_objects_callback_()
       spill_objects_callback_();
     }
     auto now = get_time_();
