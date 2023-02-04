@@ -92,6 +92,8 @@ class ObjectStoreRunner {
  public:
   ObjectStoreRunner(const ObjectManagerConfig &config,
                     SpillObjectsCallback spill_objects_callback,
+                    /// RSCODE:
+                    SpillRemoteCallback spill_remote_callback,
                     std::function<void()> object_store_full_callback,
                     AddObjectCallback add_object_callback,
                     DeleteObjectCallback delete_object_callback);
@@ -197,7 +199,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param object_id The object's object id.
   /// \param node_id The remote node's id.
   /// \return Void.
-  void RemoteSpill(const ObjectID &object_id, const NodeID &node_id);
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_id);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row

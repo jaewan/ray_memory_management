@@ -26,6 +26,8 @@ namespace ray {
 
 ObjectStoreRunner::ObjectStoreRunner(const ObjectManagerConfig &config,
                                      SpillObjectsCallback spill_objects_callback,
+                                     /// RSCODE:
+                                     SpillRemoteCallback spill_remote_callback,
                                      std::function<void()> object_store_full_callback,
                                      AddObjectCallback add_object_callback,
                                      DeleteObjectCallback delete_object_callback) {
@@ -39,6 +41,8 @@ ObjectStoreRunner::ObjectStoreRunner(const ObjectManagerConfig &config,
   store_thread_ = std::thread(&plasma::PlasmaStoreRunner::Start,
                               plasma::plasma_store_runner.get(),
                               spill_objects_callback,
+                              /// RSCODE:
+                              spill_remote_callback,
                               object_store_full_callback,
                               add_object_callback,
                               delete_object_callback);
@@ -75,6 +79,7 @@ ObjectManager::ObjectManager(
       object_store_internal_(
           config,
           spill_objects_callback,
+          spill_remote_callback,
           object_store_full_callback,
           /*add_object_callback=*/
           [this, add_object_callback = std::move(add_object_callback)](
@@ -336,7 +341,7 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
 }
 
 /// RSTODO: Implement spill function to spil object to remote memory
-void ObjectManager::RemoteSpill(const ObjectID &object_id, const NodeID &node_id) {
+void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
   RAY_LOG(DEBUG) << "Push on " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
   

@@ -254,7 +254,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
                 "NodeManager.SpillObjects");
             return GetLocalObjectManager().IsSpillingInProgress();
           },
-                    /*spill_remote_callback=*/
+          /*spill_remote_callback=*/
           /// RSTODO: try to spill to remote first. Call RPC and get a reply back
           /// Send with io_service_??? --> async.
           /// When got reply, update remote spill hashmap on local object manager.
@@ -268,6 +268,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 
 
             // return is spilling in progress
+            // placeholder true for compiling for now. 
+            return true;
           },
           /*object_store_full_callback=*/
           [this]() {
