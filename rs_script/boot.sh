@@ -1,26 +1,27 @@
 #!/bin/bash
-mode="$1"
-head_ip="$2"
-listener="$3"
-port="$4"
+mode="$1"       # head or worker node. 
+listener="$2"   # listening port. 
+port="$3"       # other port. 
 
 if [[ ! $listener ]]; then
+    # random port. Ray's default is 10001, but
+    # this doesn't work on Berkeley's wifi...
     listener="7001"
 fi
 
 if [[ ! $port ]]; then
-    port="6379"
+    port="6379" # ray's default value. 
 fi
 
 if [ "$mode" = "head" ]; then
     ip=""
     # get ips
-    if [[ "$OSTYPE" = "darwin"* ]]; then # macOS
+    # macOS
+    if [[ "$OSTYPE" = "darwin"* ]]; then
         ip=$(ipconfig getifaddr en0)
         echo "Started head node on: $ip"
-    # TODO: add linux configs to find IP.
     fi
-
+    # TODO: add linux configs to find IP.
     # start ray
     ray start --head --port=$port --ray-client-server-port=$listener --node-ip-address=$ip
 elif [ "$mode" = "worker" ]; then
