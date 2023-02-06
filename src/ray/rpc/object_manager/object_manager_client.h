@@ -45,6 +45,12 @@ class ObjectManagerClient {
     push_rr_index_ = rand() % num_connections_;
     pull_rr_index_ = rand() % num_connections_;
     freeobjects_rr_index_ = rand() % num_connections_;
+    /// RSTODO:
+    /// ALSO WE MIGHT WANT TO INCREASE NUM_CONNECTIONS_
+    /// AS WE ARE ADDING ANOTHER RPC TO THE SERVER. 
+    /*
+    spillremote_rr_index_ = rand() % num_connections_;
+    */
     grpc_clients_.reserve(num_connections_);
     for (int i = 0; i < num_connections_; i++) {
       grpc_clients_.emplace_back(new GrpcClient<ObjectManagerService>(
@@ -79,6 +85,18 @@ class ObjectManagerClient {
                          grpc_clients_[freeobjects_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )
 
+  /// RSTODO:
+  /*
+  /// Tell remote object manager to free objects
+  ///
+  /// \param request The request message
+  /// \param callback  The callback function that handles reply
+  VOID_RPC_CLIENT_METHOD(ObjectManagerService,
+                         SpillRemote,
+                         grpc_clients_[spillremote_rr_index_++ % num_connections_],
+                         -1, )
+  */
+
  private:
   /// To optimize object manager performance we create multiple concurrent
   /// GRPC connections, and use these connections in a round-robin way.
@@ -90,6 +108,12 @@ class ObjectManagerClient {
   std::atomic<unsigned int> pull_rr_index_;
   /// Current connection index for `FreeObjects`.
   std::atomic<unsigned int> freeobjects_rr_index_;
+
+  /// RSTODO:
+  /*
+  // Current connection index for `SpillRemote`.
+  std::atomic<unsigned int> spillremote_rr_index_;
+  */
 
   /// The RPC clients.
   std::vector<std::unique_ptr<GrpcClient<ObjectManagerService>>> grpc_clients_;
