@@ -42,6 +42,7 @@ message PushRequest {
 // RSTODO: create same RPC as PushRequest above.
 /* prototype below:
 message SpillRemoteRequest {
+  // WE MIGHT WANT TO CHANGE THIS PART. 
   // The push ID to allow the receiver to differentiate different push attempts
   // from the same sender.
   bytes push_id = 1;
