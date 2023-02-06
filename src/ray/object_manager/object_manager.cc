@@ -342,9 +342,12 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
 
 /// RSTODO: Implement spill function to spil object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
-  RAY_LOG(DEBUG) << "Push on " << self_node_id_ << " to " << node_id << " of object "
+  RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
   
+  if (local_objects_.count(object_id) != 0) {
+    return PushLocalObject(object_id, node_id);
+  }
 }
 
 void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id) {

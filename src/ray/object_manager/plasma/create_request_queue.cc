@@ -105,7 +105,7 @@ Status CreateRequestQueue::ProcessRequests() {
     }
 
     if (spilling_required) {
-      /// RSTODO: Add spill_remote_callback_ here
+      /// RSTODO: Add spill_remote_callback_ here <-- might not need to do this
       /// If spill_remote_callback_ fails, call spill_objects_callback_()
       spill_objects_callback_();
     }
