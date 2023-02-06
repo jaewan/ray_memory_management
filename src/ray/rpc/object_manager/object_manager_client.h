@@ -45,7 +45,7 @@ class ObjectManagerClient {
     push_rr_index_ = rand() % num_connections_;
     pull_rr_index_ = rand() % num_connections_;
     freeobjects_rr_index_ = rand() % num_connections_;
-    /// RSTODO:
+    /// RSTODO: (RSCOMMENT)
     /// ALSO WE MIGHT WANT TO INCREASE NUM_CONNECTIONS_
     /// AS WE ARE ADDING ANOTHER RPC TO THE SERVER. 
     /*
@@ -85,7 +85,7 @@ class ObjectManagerClient {
                          grpc_clients_[freeobjects_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )
 
-  /// RSTODO:
+  /// RSTODO: (RSCOMMENT)
   /*
   /// Tell remote object manager to free objects
   ///
@@ -109,7 +109,7 @@ class ObjectManagerClient {
   /// Current connection index for `FreeObjects`.
   std::atomic<unsigned int> freeobjects_rr_index_;
 
-  /// RSTODO:
+  /// RSTODO: (RSCOMMENT)
   /*
   // Current connection index for `SpillRemote`.
   std::atomic<unsigned int> spillremote_rr_index_;

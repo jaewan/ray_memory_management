@@ -151,7 +151,7 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::FreeObjectsReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
 
-  /// RSTODO:
+  /// RSTODO: (RSCOMMENT)
   /*
   /// Handle spill remote request
   ///

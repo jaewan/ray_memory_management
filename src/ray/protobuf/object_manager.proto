@@ -39,7 +39,7 @@ message PushRequest {
   bytes data = 8;
 }
 
-// RSTODO: create same RPC as PushRequest above.
+// RSTODO: create same RPC as PushRequest above. (RSCOMMENT)
 /* prototype below:
 message SpillRemoteRequest {
   // WE MIGHT WANT TO CHANGE THIS PART. 

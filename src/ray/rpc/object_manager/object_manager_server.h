@@ -27,7 +27,7 @@ namespace rpc {
   RPC_SERVICE_HANDLER(ObjectManagerService, Push, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, Pull, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, FreeObjects, -1) // add backslash
-  /// RSTODO:
+  /// RSTODO: (RSCOMMENT)
   /*
   RPC_SERVICE_HANDLER(ObjectManagerService, SpillRemote, -1)
   */
@@ -54,7 +54,7 @@ class ObjectManagerServiceHandler {
   virtual void HandleFreeObjects(const FreeObjectsRequest &request,
                                  FreeObjectsReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
-  /// RSTODO: Handle a `SpillRemote` request
+  /// RSTODO: Handle a `SpillRemote` request (RSCOMMENT)
   /*
   virtual void HandleSpillRemote(const SpillRemoteRequest &request,
                                  SpillRemoteReply *reply,
