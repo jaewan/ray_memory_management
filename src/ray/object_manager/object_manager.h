@@ -151,6 +151,18 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::FreeObjectsReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
 
+  /// RSTODO:
+  /*
+  /// Handle spill remote request
+  ///
+  /// \param request Spill remote request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+                         rpc::SpillRemoteReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;
+  */
+
   /// Get the port of the object manager rpc server.
   int GetServerPort() const { return object_manager_server_.GetPort(); }
 
