@@ -39,7 +39,8 @@ message PushRequest {
   bytes data = 8;
 }
 
-// RSTODO: create same RPC as PushRequest above. (RSCOMMENT)
+// RSCODE: create same RPC as PushRequest above. (GRPC)
+// RSTODO: might need to modify fields later. 
 // prototype below:
 message SpillRemoteRequest {
   // WE MIGHT WANT TO CHANGE THIS PART. 
@@ -79,7 +80,8 @@ message FreeObjectsRequest {
 // Reply for request
 message PushReply {
 }
-// RSTODO: reply for SpillRemote RPC (RSCOMMENT)
+// RSCODE: reply for SpillRemote RPC (GRPC)
+// RSTODO: might need to add reply field later (for protocol)
 // prototype below:
 message SpillRemoteReply {
 }
@@ -95,4 +97,6 @@ service ObjectManagerService {
   rpc Pull(PullRequest) returns (PullReply);
   // Tell remote object manager to free some objects
   rpc FreeObjects(FreeObjectsRequest) returns (FreeObjectsReply);
+  // RSCODE: (GRPC)
+  rpc SpillRemote(SpillRemoteRequest) returns (SpillRemoteReply);
 }

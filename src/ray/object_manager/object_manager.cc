@@ -600,12 +600,14 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
-/// RSTODO: (RSCOMMENT)
+/// RSCODE: (GRPC)
 void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                                       rpc::SpillRemoteReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) {
-  ObjectID object_id = ObjectID::FromBinary(request.object_id());
-  NodeID node_id = NodeID::FromBinary(request.node_id());
+  // Commented the part out as unused variables lead to compile
+  // error in bazel.... :(
+  //ObjectID object_id = ObjectID::FromBinary(request.object_id());
+  //NodeID node_id = NodeID::FromBinary(request.node_id());
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
