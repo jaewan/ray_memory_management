@@ -26,11 +26,10 @@ namespace rpc {
 #define RAY_OBJECT_MANAGER_RPC_HANDLERS               \
   RPC_SERVICE_HANDLER(ObjectManagerService, Push, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, Pull, -1) \
-  RPC_SERVICE_HANDLER(ObjectManagerService, FreeObjects, -1) // add backslash
-  /// RSTODO: (RSCOMMENT)
-  /*
+  RPC_SERVICE_HANDLER(ObjectManagerService, FreeObjects, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, SpillRemote, -1)
-  */
+  /// RSTODO: *above (RSCOMMENT)
+  
 
 /// Implementations of the `ObjectManagerGrpcService`, check interface in
 /// `src/ray/protobuf/object_manager.proto`.
@@ -55,11 +54,9 @@ class ObjectManagerServiceHandler {
                                  FreeObjectsReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
   /// RSTODO: Handle a `SpillRemote` request (RSCOMMENT)
-  /*
   virtual void HandleSpillRemote(const SpillRemoteRequest &request,
                                  SpillRemoteReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
-  */
 };
 
 /// The `GrpcService` for `ObjectManagerGrpcService`.

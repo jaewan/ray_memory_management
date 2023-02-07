@@ -600,6 +600,17 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
+/// RSTODO: (RSCOMMENT)
+void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+                                      rpc::SpillRemoteReply *reply,
+                                      rpc::SendReplyCallback send_reply_callback) {
+  ObjectID object_id = ObjectID::FromBinary(request.object_id());
+  NodeID node_id = NodeID::FromBinary(request.node_id());
+
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
+
 bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        const ObjectID &object_id,
                                        const rpc::Address &owner_address,

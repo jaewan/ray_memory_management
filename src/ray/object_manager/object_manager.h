@@ -152,7 +152,6 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::SendReplyCallback send_reply_callback) override;
 
   /// RSTODO: (RSCOMMENT)
-  /*
   /// Handle spill remote request
   ///
   /// \param request Spill remote request
@@ -161,8 +160,7 @@ class ObjectManager : public ObjectManagerInterface,
   void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                          rpc::SpillRemoteReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
-  */
-
+  
   /// Get the port of the object manager rpc server.
   int GetServerPort() const { return object_manager_server_.GetPort(); }
 
@@ -492,6 +490,15 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// Running total of received chunks.
   size_t num_chunks_received_total_ = 0;
+
+  /// RSTODO: (RSCOMMENT)
+  /*
+  /// Total number of remote chunks received.
+  size_t num_remote_chunks_received_ = 0;
+
+  /// Total number of remote chunks failed. 
+  size_t num_remote_chunks_failed_ = 0;
+  */
 
   /// Running total of received chunks that failed. A finer-grained breakdown
   /// is recorded below.

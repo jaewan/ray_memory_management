@@ -3107,32 +3107,13 @@ void CoreWorker::HandleLocalGC(const rpc::LocalGCRequest &request,
   }
 }
 
-/// RSTODO: Pseudecode for remote spill implementation <-- might not need
-// void CoreWorker::HandleRemoteSpillObjects(const rpc::RemoteSpillObjectsRequest &request,
-//                                     rpc::RemoteSpillObjectsReply *reply,
-//                                     rpc::SendReplyCallback send_reply_callback) {
-  /// Use send chunks functionality here to transfer data to remote node
-
 void CoreWorker::HandleSpillObjects(const rpc::SpillObjectsRequest &request,
                                     rpc::SpillObjectsReply *reply,
                                     rpc::SendReplyCallback send_reply_callback) {
   if (options_.spill_objects != nullptr) {
     auto object_refs =
         VectorFromProtobuf<rpc::ObjectReference>(request.object_refs_to_spill());
-
-    /// RSTODO: Pseudecode for remote spill implementation
-    // if (remote memory is available) {
-    //   std::vector<std::string> object_urls = options_.spill_remote_objects(object_refs);
-    // } else {
-    //    std::vector<std::string> object_urls = options_.spill_objects(object_refs);
-    // }
-
-    // if (true) {
-    //   std::vector<std::string> object_urls = spill_remote_objects(object_refs);
-    // } else {
-    //   std::vector<std::string> object_urls = options_.spill_objects(object_refs);
-    // }
-
+    std::vector<std::string> object_urls = options_.spill_objects(object_refs);
     for (size_t i = 0; i < object_urls.size(); i++) {
       reply->add_spilled_objects_url(std::move(object_urls[i]));
     }

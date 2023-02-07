@@ -40,28 +40,29 @@ message PushRequest {
 }
 
 // RSTODO: create same RPC as PushRequest above. (RSCOMMENT)
-/* prototype below:
+// prototype below:
 message SpillRemoteRequest {
   // WE MIGHT WANT TO CHANGE THIS PART. 
-  // The push ID to allow the receiver to differentiate different push attempts
+  // The spill ID to allow the receiver to differentiate different spill attempts
   // from the same sender.
-  bytes push_id = 1;
+  bytes spill_id = 1;
   // The object ID being transferred.
   bytes object_id = 2;
   // The node ID of client sending this object
   bytes node_id = 3;
-  // The owner address
-  Address owner_address = 4;
+  // The owner address (seems unnecessary)
+  // Address owner_address = 4;
   // The index of the chunk being transferred.
-  uint32 chunk_index = 5;
+  // (not implementing chunks for now)
+  // uint32 chunk_index = 5;
   // The data_size include object_size and metadata_size
-  uint64 data_size = 6;
+  uint64 data_size = 4;
   // The metadata size.
-  uint64 metadata_size = 7;
-  // The chunk data
-  bytes data = 8;
+  uint64 metadata_size = 5;
+  // The chunk data (actual data for now)
+  bytes data = 6;
 }
-*/
+
 
 
 message PullRequest {
@@ -78,12 +79,10 @@ message FreeObjectsRequest {
 // Reply for request
 message PushReply {
 }
-// RSTODO: reply for SpillRemote RPC
-/* prototype below:
+// RSTODO: reply for SpillRemote RPC (RSCOMMENT)
+// prototype below:
 message SpillRemoteReply {
-
 }
-*/
 message PullReply {
 }
 message FreeObjectsReply {
