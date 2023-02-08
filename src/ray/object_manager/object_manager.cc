@@ -344,10 +344,64 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
   RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
-  
-  if (local_objects_.count(object_id) != 0) {
-    return PushLocalObject(object_id, node_id);
+  const ObjectInfo &object_info = local_objects_[object_id].object_info;
+  uint64_t data_size = static_cast<uint64_t>(object_info.data_size);
+  uint64_t metadata_size = static_cast<uint64_t>(object_info.metadata_size);
+  uint64_t offset = 0;
+
+  rpc::Address owner_address;
+  owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
+  owner_address.set_ip_address(object_info.owner_ip_address);
+  owner_address.set_port(object_info.owner_port);
+  owner_address.set_worker_id(object_info.owner_worker_id.Binary());
+
+  std::pair<std::shared_ptr<MemoryObjectReader>, ray::Status> reader_status =
+      buffer_pool_.CreateObjectReader(object_id, owner_address);
+  Status status = reader_status.second;
+  if (!status.ok()) {
+    RAY_LOG_EVERY_N_OR_DEBUG(INFO, 100)
+        << "Ignoring stale read request for already deleted object: " << object_id;
+    return;
   }
+
+  auto object_reader = std::move(reader_status.first);
+  RAY_CHECK(object_reader) << "object_reader can't be null";
+
+  // if (object_reader->GetDataSize() != data_size ||
+  //     object_reader->GetMetadataSize() != metadata_size) {
+  //   // TODO(scv119): handle object size changes in a more graceful way.
+  //   RAY_LOG(WARNING) << "Object id:" << object_id
+  //                    << "'s size mismatches our record. Expected data size: " << data_size
+  //                    << ", expected metadata size: " << metadata_size
+  //                    << ", actual data size: " << object_reader->GetDataSize()
+  //                    << ", actual metadata size: " << object_reader->GetMetadataSize()
+  //                    << ". This is likely due to a race condition."
+  //                    << " We will update the object size and proceed sending the object.";
+  //   local_objects_[object_id].object_info.data_size = 0;
+  //   local_objects_[object_id].object_info.metadata_size = 1;
+  // }
+
+  std::string result(data_size, '\0');
+  object_reader->ReadFromDataSection(offset, data_size, &result[0]);
+  auto rpc_client = GetRpcClient(node_id);
+
+  rpc::SpillRemoteRequest spill_remote_request;
+  auto push_id = UniqueID::FromRandom();
+  spill_remote_request.set_spill_id(push_id.Binary());
+  spill_remote_request.set_object_id(object_id.Binary());
+  spill_remote_request.set_node_id(node_id.Binary());
+  spill_remote_request.set_allocated_owner_address(&owner_address);
+  spill_remote_request.set_chunk_index(0);
+  spill_remote_request.set_data_size(data_size);
+  spill_remote_request.set_metadata_size(metadata_size);
+  spill_remote_request.set_data(result);  
+
+  rpc::ClientCallback<rpc::SpillRemoteReply> callback =
+      [] (const Status &status, const rpc::SpillRemoteReply &reply) {
+        std::cout << "hello";
+      };
+
+  rpc_client->SpillRemote(spill_remote_request, callback);
 }
 
 void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id) {
@@ -604,10 +658,18 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
 void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                                       rpc::SpillRemoteReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) {
-  // Commented the part out as unused variables lead to compile
-  // error in bazel.... :(
-  //ObjectID object_id = ObjectID::FromBinary(request.object_id());
-  //NodeID node_id = NodeID::FromBinary(request.node_id());
+  ObjectID object_id = ObjectID::FromBinary(request.object_id());
+  NodeID node_id = NodeID::FromBinary(request.node_id());
+    uint64_t chunk_index = request.chunk_index();
+  uint64_t data_size = request.data_size();
+  uint64_t metadata_size = request.metadata_size();
+  const std::string &data = request.data();
+  const rpc::Address &owner_address = request.owner_address();
+
+  bool success = ReceiveObjectChunk(
+      node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data);
+
+  std::cout << success;
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }

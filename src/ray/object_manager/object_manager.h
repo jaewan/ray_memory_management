@@ -115,10 +115,7 @@ class ObjectManagerInterface {
 // TODO(hme): Add success/failure callbacks for push and pull.
 class ObjectManager : public ObjectManagerInterface,
                       public rpc::ObjectManagerServiceHandler {
- public:
-  /// RSTODO: create wrapper handlers for push and pull.
-  /// RSTODO: figure out how to create custom gRPC calls???? is this even necessary????
- 
+ public: 
   /// Implementation of object manager service
 
   /// Handle push request from remote object manager

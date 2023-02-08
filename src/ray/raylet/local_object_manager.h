@@ -45,6 +45,8 @@ class LocalObjectManager {
       int64_t free_objects_period_ms,
       IOWorkerPoolInterface &io_worker_pool,
       rpc::CoreWorkerClientPool &owner_client_pool,
+      /// RSCODE: passing in SpillRemote() function to local object manager
+      std::function<void(const ray::ObjectID &, const ray::NodeID &)> spill_remote,
       int max_io_workers,
       int64_t min_spilling_size,
       bool is_external_storage_type_fs,
@@ -218,6 +220,10 @@ class LocalObjectManager {
   /// Cache of gRPC clients to owners of objects pinned on
   /// this node.
   rpc::CoreWorkerClientPool &owner_client_pool_;
+
+  /// RSCODE:
+  // SpillRemote() function from object manager
+  std::function<void(const ray::ObjectID &, const ray::NodeID &)> spill_remote_;
 
   /// A callback to call when an object has been freed.
   std::function<void(const std::vector<ObjectID> &)> on_objects_freed_;

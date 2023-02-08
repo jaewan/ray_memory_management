@@ -52,16 +52,16 @@ message SpillRemoteRequest {
   // The node ID of client sending this object
   bytes node_id = 3;
   // The owner address (seems unnecessary)
-  // Address owner_address = 4;
+  Address owner_address = 4;
   // The index of the chunk being transferred.
   // (not implementing chunks for now)
-  // uint32 chunk_index = 5;
+  uint32 chunk_index = 5;
   // The data_size include object_size and metadata_size
-  uint64 data_size = 4;
+  uint64 data_size = 6;
   // The metadata size.
-  uint64 metadata_size = 5;
+  uint64 metadata_size = 7;
   // The chunk data (actual data for now)
-  bytes data = 6;
+  bytes data = 8;
 }
 
 
