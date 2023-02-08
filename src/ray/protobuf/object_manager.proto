@@ -64,7 +64,19 @@ message SpillRemoteRequest {
   bytes data = 8;
 }
 
+/// RSCODE:
+message SpillRemoteCheckRequest {
+  bytes node_id = 1;
+  bytes object_id = 2;
+  uint64 data_size = 3;
+  uint64 metadata_size = 4;
+}
 
+/// RSCODE:
+message GetRemoteObjectRequest {
+  bytes node_id = 1;
+  bytes object_id = 2;
+}
 
 message PullRequest {
   // Node ID of the requesting client.
@@ -85,6 +97,12 @@ message PushReply {
 // prototype below:
 message SpillRemoteReply {
 }
+message SpillRemoteCheckReply {
+  bool success = 1;
+}
+message GetRemoteObjectReply {
+}
+
 message PullReply {
 }
 message FreeObjectsReply {
@@ -99,4 +117,6 @@ service ObjectManagerService {
   rpc FreeObjects(FreeObjectsRequest) returns (FreeObjectsReply);
   // RSCODE: (GRPC)
   rpc SpillRemote(SpillRemoteRequest) returns (SpillRemoteReply);
+  rpc SpillRemoteCheck(SpillRemoteCheckRequest) returns (SpillRemoteCheckReply);
+  rpc GetRemoteObject(GetRemoteObjectRequest) returns (GetRemoteObjectReply);
 }

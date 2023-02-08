@@ -677,6 +677,20 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
+/// RSCODE: (GRPC)
+void ObjectManager::HandleSpillRemoteCheck(const rpc::SpillRemoteCheckRequest &request,
+                                           rpc::SpillRemoteCheckReply *reply,
+                                           rpc::SendReplyCallback send_reply_callback) {
+  reply->set_success(false);
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
+void ObjectManager::HandleGetRemoteObject(const rpc::GetRemoteObjectRequest &request,
+                                         rpc::GetRemoteObjectReply *reply,
+                                         rpc::SendReplyCallback send_reply_callback) {
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
 
 bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        const ObjectID &object_id,
