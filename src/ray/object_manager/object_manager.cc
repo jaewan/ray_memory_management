@@ -660,7 +660,7 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                                       rpc::SendReplyCallback send_reply_callback) {
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
   NodeID node_id = NodeID::FromBinary(request.node_id());
-    uint64_t chunk_index = request.chunk_index();
+  uint64_t chunk_index = request.chunk_index();
   uint64_t data_size = request.data_size();
   uint64_t metadata_size = request.metadata_size();
   const std::string &data = request.data();
