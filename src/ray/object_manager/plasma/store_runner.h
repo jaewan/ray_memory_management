@@ -19,8 +19,6 @@ class PlasmaStoreRunner {
                     std::string plasma_directory,
                     std::string fallback_directory);
   void Start(ray::SpillObjectsCallback spill_objects_callback,
-             /// RSCODE: add spill_remote_callback
-             ray::SpillRemoteCallback spill_remote_callback,
              std::function<void()> object_store_full_callback,
              ray::AddObjectCallback add_object_callback,
              ray::DeleteObjectCallback delete_object_callback);

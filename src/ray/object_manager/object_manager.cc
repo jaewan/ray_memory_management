@@ -26,8 +26,6 @@ namespace ray {
 
 ObjectStoreRunner::ObjectStoreRunner(const ObjectManagerConfig &config,
                                      SpillObjectsCallback spill_objects_callback,
-                                     /// RSCODE:
-                                     SpillRemoteCallback spill_remote_callback,
                                      std::function<void()> object_store_full_callback,
                                      AddObjectCallback add_object_callback,
                                      DeleteObjectCallback delete_object_callback) {
@@ -41,8 +39,6 @@ ObjectStoreRunner::ObjectStoreRunner(const ObjectManagerConfig &config,
   store_thread_ = std::thread(&plasma::PlasmaStoreRunner::Start,
                               plasma::plasma_store_runner.get(),
                               spill_objects_callback,
-                              /// RSCODE:
-                              spill_remote_callback,
                               object_store_full_callback,
                               add_object_callback,
                               delete_object_callback);
@@ -65,8 +61,6 @@ ObjectManager::ObjectManager(
     RestoreSpilledObjectCallback restore_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
     SpillObjectsCallback spill_objects_callback,
-    /// RSCODE: definition for spill_remote_callback
-    SpillRemoteCallback spill_remote_callback,
     std::function<void()> object_store_full_callback,
     AddObjectCallback add_object_callback,
     DeleteObjectCallback delete_object_callback,
@@ -79,7 +73,6 @@ ObjectManager::ObjectManager(
       object_store_internal_(
           config,
           spill_objects_callback,
-          spill_remote_callback,
           object_store_full_callback,
           /*add_object_callback=*/
           [this, add_object_callback = std::move(add_object_callback)](
@@ -340,11 +333,12 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
   }
 }
 
-/// RSTODO: Implement spill function to spil object to remote memory
+/// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
   RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
   const ObjectInfo &object_info = local_objects_[object_id].object_info;
+  /// RSTODO: Uncomment this code if you want to test spilling
   uint64_t data_size = static_cast<uint64_t>(object_info.data_size);
   uint64_t metadata_size = static_cast<uint64_t>(object_info.metadata_size);
   uint64_t offset = 0;
@@ -367,6 +361,7 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   auto object_reader = std::move(reader_status.first);
   RAY_CHECK(object_reader) << "object_reader can't be null";
 
+  /// RSTODO: Comment out for now
   // if (object_reader->GetDataSize() != data_size ||
   //     object_reader->GetMetadataSize() != metadata_size) {
   //   // TODO(scv119): handle object size changes in a more graceful way.
@@ -381,13 +376,20 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   //   local_objects_[object_id].object_info.metadata_size = 1;
   // }
 
+  /// RSTODO: Comment this code if you want to test spillin
+  // SpillRemoteInternal(object_id,
+  //                    node_id,
+  //                    std::make_shared<ChunkObjectReader>(std::move(object_reader),
+  //                                                        config_.object_chunk_size));
+
+  /// RSTODO: Uncomment this code if you want to test spilling
   std::string result(data_size, '\0');
   object_reader->ReadFromDataSection(offset, data_size, &result[0]);
   auto rpc_client = GetRpcClient(node_id);
 
   rpc::SpillRemoteRequest spill_remote_request;
-  auto push_id = UniqueID::FromRandom();
-  spill_remote_request.set_spill_id(push_id.Binary());
+  auto spill_id = UniqueID::FromRandom();
+  spill_remote_request.set_spill_id(spill_id.Binary());
   spill_remote_request.set_object_id(object_id.Binary());
   spill_remote_request.set_node_id(node_id.Binary());
   spill_remote_request.set_allocated_owner_address(&owner_address);
@@ -528,6 +530,50 @@ void ObjectManager::PushFromFilesystem(const ObjectID &object_id,
       "ObjectManager.CreateSpilledObject");
 }
 
+/// RSTODO: SpillRemoteInternal function called from SpillRemote
+void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
+                                       const NodeID &node_id,
+                                       std::shared_ptr<ChunkObjectReader> chunk_reader) {
+  auto rpc_client = GetRpcClient(node_id);
+  if (!rpc_client) {
+    RAY_LOG(INFO)
+        << "Failed to establish connection for SpillRemote with remote object manager.";
+    return;
+  }
+
+  RAY_LOG(DEBUG) << "Sending object chunks of " << object_id << " to node " << node_id
+                 << ", number of chunks: " << chunk_reader->GetNumChunks()
+                 << ", total data size: " << chunk_reader->GetObject().GetObjectSize();
+
+
+  auto spill_id = UniqueID::FromRandom();
+  push_manager_->StartPush(
+      node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
+        rpc_service_.post(
+            [=]() {
+              // Post to the multithreaded RPC event loop so that data is copied
+              // off of the main thread.
+              SpillObjectChunk(
+                  spill_id,
+                  object_id,
+                  node_id,
+                  chunk_id,
+                  rpc_client,
+                  [=](const Status &status) {
+                    // Post back to the main event loop because the
+                    // PushManager is thread-safe.
+                    main_service_->post(
+                        [this, node_id, object_id]() {
+                          push_manager_->OnChunkComplete(node_id, object_id);
+                        },
+                        "ObjectManager.Push");
+                  },
+                  chunk_reader);
+            },
+            "ObjectManager.Push");
+      });      
+}
+
 void ObjectManager::PushObjectInternal(const ObjectID &object_id,
                                        const NodeID &node_id,
                                        std::shared_ptr<ChunkObjectReader> chunk_reader,
@@ -571,6 +617,43 @@ void ObjectManager::PushObjectInternal(const ObjectID &object_id,
             },
             "ObjectManager.Push");
       });
+}
+
+/// RSCODE: Code to spill chunk
+void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
+                                    const ObjectID &object_id,
+                                    const NodeID &node_id,
+                                    uint64_t chunk_index,
+                                    std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
+                                    std::function<void(const Status &)> on_complete,
+                                    std::shared_ptr<ChunkObjectReader> chunk_reader) {
+  rpc::SpillRemoteRequest spill_remote_request;
+  spill_remote_request.set_spill_id(spill_id.Binary());
+  spill_remote_request.set_object_id(object_id.Binary());
+  spill_remote_request.set_node_id(node_id.Binary());
+  spill_remote_request.mutable_owner_address()->CopyFrom(
+      chunk_reader->GetObject().GetOwnerAddress());
+  spill_remote_request.set_chunk_index(chunk_index);
+  spill_remote_request.set_data_size(chunk_reader->GetObject().GetObjectSize());
+  spill_remote_request.set_metadata_size(chunk_reader->GetObject().GetMetadataSize());
+
+  auto optional_chunk = chunk_reader->GetChunk(chunk_index);
+  if (!optional_chunk.has_value()) {
+    RAY_LOG(DEBUG) << "Read chunk " << chunk_index << " of object " << object_id
+                   << " failed. It may have been evicted.";
+    on_complete(Status::IOError("Failed to read spilled object"));
+    return;
+  }
+  spill_remote_request.set_data(std::move(optional_chunk.value()));
+
+  num_bytes_pushed_from_plasma_ += spill_remote_request.data().length();
+
+  rpc::ClientCallback<rpc::SpillRemoteReply> callback =
+      [] (const Status &status, const rpc::SpillRemoteReply &reply) {
+        std::cout << "hello";
+      };
+
+  rpc_client->SpillRemote(spill_remote_request, callback);  
 }
 
 void ObjectManager::SendObjectChunk(const UniqueID &push_id,
@@ -685,9 +768,17 @@ void ObjectManager::HandleSpillRemoteCheck(const rpc::SpillRemoteCheckRequest &r
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
+/// RSCODE: (GRPC)
 void ObjectManager::HandleGetRemoteObject(const rpc::GetRemoteObjectRequest &request,
                                          rpc::GetRemoteObjectReply *reply,
                                          rpc::SendReplyCallback send_reply_callback) {
+  ObjectID object_id = ObjectID::FromBinary(request.object_id());
+  NodeID node_id = NodeID::FromBinary(request.node_id());                           
+  
+  SpillRemote(object_id, node_id);  
+
+  /// RSTODO: Call free object here???                  
+
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 

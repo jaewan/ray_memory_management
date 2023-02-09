@@ -92,8 +92,6 @@ class ObjectStoreRunner {
  public:
   ObjectStoreRunner(const ObjectManagerConfig &config,
                     SpillObjectsCallback spill_objects_callback,
-                    /// RSCODE:
-                    SpillRemoteCallback spill_remote_callback,
                     std::function<void()> object_store_full_callback,
                     AddObjectCallback add_object_callback,
                     DeleteObjectCallback delete_object_callback);
@@ -201,8 +199,6 @@ class ObjectManager : public ObjectManagerInterface,
       RestoreSpilledObjectCallback restore_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
       SpillObjectsCallback spill_objects_callback,
-      /// RSCODE: definition for spill_remote_callback
-      SpillRemoteCallback spill_remote_callback,
       std::function<void()> object_store_full_callback,
       AddObjectCallback add_object_callback,
       DeleteObjectCallback delete_object_callback,
@@ -312,6 +308,17 @@ class ObjectManager : public ObjectManagerInterface,
                           const NodeID &node_id,
                           const std::string &spilled_url);
 
+  /// RSCODE: The internal implementation of spilling an object
+  ///
+  /// \param object_id The object's id.
+  /// \param node_id The remote node's id.
+  /// \param chunk_reader Chunk reader used to read a chunk of the object
+  /// Status::OK() if the read succeeded.
+  void SpillRemoteInternal(const ObjectID &object_id,
+                          const NodeID &node_id,
+                          std::shared_ptr<ChunkObjectReader> chunk_reader);
+
+
   /// The internal implementation of pushing an object.
   ///
   /// \param object_id The object's id.
@@ -346,6 +353,25 @@ class ObjectManager : public ObjectManagerInterface,
                        std::function<void(const Status &)> on_complete,
                        std::shared_ptr<ChunkObjectReader> chunk_reader,
                        bool from_disk);
+
+  /// RSCODE: Spill one chunk of the object to remote object manager
+  ///
+  /// Object will be transfered as a sequence of chunks, small object(defined in config)
+  /// contains only one chunk
+  /// \param spill_id Unique spill id to indicate this spill remote request
+  /// \param object_id Object id
+  /// \param node_id The id of the receiver.
+  /// \param chunk_index Chunk index of this object chunk, start with 0
+  /// \param rpc_client Rpc client used to send message to remote object manager
+  /// \param on_complete Callback when the chunk is sent
+  /// \param chunk_reader Chunk reader used to read a chunk of the object
+  void SpillObjectChunk(const UniqueID &push_id,
+                       const ObjectID &object_id,
+                       const NodeID &node_id,
+                       uint64_t chunk_index,
+                       std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
+                       std::function<void(const Status &)> on_complete,
+                       std::shared_ptr<ChunkObjectReader> chunk_reader);
 
   /// Handle starting, running, and stopping asio rpc_service.
   void StartRpcService();
