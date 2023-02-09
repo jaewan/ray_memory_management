@@ -146,7 +146,7 @@ class CoreWorkerDirectTaskSubmitter {
   void OnWorkerIdle(
       const rpc::WorkerAddress &addr,
       const SchedulingKey &task_queue_key,
-      const Priority &pri,
+      const Priority &lease_granted_pri,
       bool was_error,
       bool worker_exiting,
       const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources)

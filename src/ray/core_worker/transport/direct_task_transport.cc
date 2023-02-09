@@ -237,7 +237,7 @@ void CoreWorkerDirectTaskSubmitter::ReturnWorker(const rpc::WorkerAddress addr,
 void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const rpc::WorkerAddress &addr,
     const SchedulingKey &scheduling_key,
-    const Priority &pri,
+    const Priority &lease_granted_pri,
     bool was_error,
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
@@ -245,7 +245,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
 	             << (current_time_ms() > lease_entry.lease_expiration_time)
-			  	 << " OnWorkerIdle Called on priority:" << pri;
+			  	 << " OnWorkerIdle Called on priority:" << lease_granted_pri;
   if (!lease_entry.lease_client) {
     return;
   }
@@ -263,6 +263,19 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     }
   } else {
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
+
+    const auto priority_it = priority_task_queues_.begin();
+    Priority lease_granted_p(lease_granted_pri.score);
+    Priority &pri = lease_granted_p;
+    if(priority_it != priority_task_queues_.end()){
+    Priority p(priority_it->score);
+      if(lease_granted_pri < *priority_it){
+          auto ptq_inserted = priority_task_queues_.emplace(lease_granted_pri);
+          RAY_CHECK(ptq_inserted.second);
+          priority_task_queues_.erase(*priority_it);
+          pri = p;
+      }
+    }
 
     while (!lease_entry.is_busy) {
       const auto &task_spec = priority_to_task_spec_[pri];
