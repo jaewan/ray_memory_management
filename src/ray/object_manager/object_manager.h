@@ -146,7 +146,7 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::FreeObjectsReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
 
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   /// Handle spill remote request
   ///
   /// \param request Spill remote request
@@ -156,7 +156,7 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::SpillRemoteReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
 
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   /// Handle spill remote check request
   ///
   /// \param request Spill remote check request
@@ -166,7 +166,7 @@ class ObjectManager : public ObjectManagerInterface,
                               rpc::SpillRemoteCheckReply *reply,
                               rpc::SendReplyCallback send_reply_callback) override;
 
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   /// Handle get remote object request
   ///
   /// \param request Get remote object request

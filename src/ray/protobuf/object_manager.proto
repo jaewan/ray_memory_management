@@ -39,7 +39,7 @@ message PushRequest {
   bytes data = 8;
 }
 
-// RSCODE: create same RPC as PushRequest above. (GRPC)
+// RSGRPC: create same RPC as PushRequest above. (GRPC)
 // RSTODO: might need to modify fields later. 
 // prototype below:
 message SpillRemoteRequest {
@@ -64,7 +64,7 @@ message SpillRemoteRequest {
   bytes data = 8;
 }
 
-/// RSCODE:
+/// RSGRPC:
 message SpillRemoteCheckRequest {
   bytes node_id = 1;
   bytes object_id = 2;
@@ -72,7 +72,7 @@ message SpillRemoteCheckRequest {
   uint64 metadata_size = 4;
 }
 
-/// RSCODE:
+/// RSGRPC:
 message GetRemoteObjectRequest {
   bytes node_id = 1;
   bytes object_id = 2;
@@ -92,7 +92,7 @@ message FreeObjectsRequest {
 // Reply for request
 message PushReply {
 }
-// RSCODE: reply for SpillRemote RPC (GRPC)
+// RSGRPC: reply for SpillRemote RPC (GRPC)
 // RSTODO: might need to add reply field later (for protocol)
 // prototype below:
 message SpillRemoteReply {
@@ -115,7 +115,7 @@ service ObjectManagerService {
   rpc Pull(PullRequest) returns (PullReply);
   // Tell remote object manager to free some objects
   rpc FreeObjects(FreeObjectsRequest) returns (FreeObjectsReply);
-  // RSCODE: (GRPC)
+  // RSGRPC: (GRPC)
   rpc SpillRemote(SpillRemoteRequest) returns (SpillRemoteReply);
   rpc SpillRemoteCheck(SpillRemoteCheckRequest) returns (SpillRemoteCheckReply);
   rpc GetRemoteObject(GetRemoteObjectRequest) returns (GetRemoteObjectReply);

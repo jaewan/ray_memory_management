@@ -7,7 +7,7 @@ head_ip="$2"
 #if [[ ! $listener ]]; then
     # random port. Ray's default is 10001, but
     # this doesn't work on Berkeley's wifi...
-listener="7001"
+listener="7002"
 #fi
 
 #if [[ ! $port ]]; then

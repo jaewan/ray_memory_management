@@ -45,10 +45,12 @@ class ObjectManagerClient {
     push_rr_index_ = rand() % num_connections_;
     pull_rr_index_ = rand() % num_connections_;
     freeobjects_rr_index_ = rand() % num_connections_;
-    /// RSCODE: (RSTODO)
+    /// RSGRPC: (RSTODO)
     /// ALSO WE MIGHT WANT TO INCREASE NUM_CONNECTIONS_
     /// AS WE ARE ADDING ANOTHER RPC TO THE SERVER. 
     spillremote_rr_index_ = rand() % num_connections_;
+    spillcheck_rr_index_ = rand() % num_connections_;
+    getremote_rr_index_ = rand() % num_connections_;
     
     grpc_clients_.reserve(num_connections_);
     for (int i = 0; i < num_connections_; i++) {
@@ -84,7 +86,7 @@ class ObjectManagerClient {
                          grpc_clients_[freeobjects_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )
 
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   /// Tell remote object manager to accept spilling objects
   ///
   /// \param request The request message
@@ -94,7 +96,7 @@ class ObjectManagerClient {
                          grpc_clients_[spillremote_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )
 
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   /// Tell remote object manager to accept spilling objects
   ///
   /// \param request The request message
@@ -104,7 +106,7 @@ class ObjectManagerClient {
                          grpc_clients_[spillcheck_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )
 
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   /// Tell remote object manager to accept spilling objects
   ///
   /// \param request The request message
@@ -127,13 +129,13 @@ class ObjectManagerClient {
   /// Current connection index for `FreeObjects`.
   std::atomic<unsigned int> freeobjects_rr_index_;
 
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   // Current connection index for `SpillRemote`.
   std::atomic<unsigned int> spillremote_rr_index_;
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   // Current connection index for `SpillRemoteCheck`.
   std::atomic<unsigned int> spillcheck_rr_index_;
-  /// RSCODE: (GRPC)
+  /// RSGRPC: (GRPC)
   // Current connection index for `GetRemoteObject`.
   std::atomic<unsigned int> getremote_rr_index_;
 

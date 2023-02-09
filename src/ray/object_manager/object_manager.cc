@@ -737,7 +737,7 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
-/// RSCODE: (GRPC)
+/// RSGRPC: (GRPC)
 void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                                       rpc::SpillRemoteReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) {
@@ -760,7 +760,7 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
-/// RSCODE: (GRPC)
+/// RSGRPC: (GRPC)
 void ObjectManager::HandleSpillRemoteCheck(const rpc::SpillRemoteCheckRequest &request,
                                            rpc::SpillRemoteCheckReply *reply,
                                            rpc::SendReplyCallback send_reply_callback) {
@@ -768,7 +768,7 @@ void ObjectManager::HandleSpillRemoteCheck(const rpc::SpillRemoteCheckRequest &r
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
-/// RSCODE: (GRPC)
+/// RSGRPC: (GRPC)
 void ObjectManager::HandleGetRemoteObject(const rpc::GetRemoteObjectRequest &request,
                                          rpc::GetRemoteObjectReply *reply,
                                          rpc::SendReplyCallback send_reply_callback) {
