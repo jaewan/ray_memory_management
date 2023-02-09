@@ -21,6 +21,10 @@
 #include "ray/stats/metric_defs.h"
 #include "ray/util/logging.h"
 
+#include <string>
+#include <fstream>
+#include <iostream>
+
 namespace ray {
 namespace raylet {
 
@@ -46,6 +50,15 @@ ClusterTaskManager::ClusterTaskManager(
       leased_workers_size_(leased_workers_size),
       get_time_ms_(get_time_ms){}
 
+inline void LogLeaseSeq(const std::string &fnc_name, const Priority &pri){
+  std::ofstream log_stream("/tmp/ray/raylet_log", std::ios_base::app);
+  std::ostringstream stream;
+  stream << fnc_name << " " << pri << "\n";
+  std::string log_str = stream.str();
+  log_stream << log_str;
+  log_stream.close();
+}
+
 void ClusterTaskManager::QueueAndScheduleTask(
     const RayTask &task,
     bool grant_or_reject,
@@ -58,7 +71,9 @@ void ClusterTaskManager::QueueAndScheduleTask(
       task, grant_or_reject, is_selected_based_on_locality, reply, [send_reply_callback] {
         send_reply_callback(Status::OK(), nullptr, nullptr);
       });
-  const auto &scheduling_class = task.GetTaskSpecification().GetSchedulingClass();
+  //const auto &scheduling_class = task.GetTaskSpecification().GetSchedulingClass();
+  const auto &scheduling_class = 0;
+	// Jae this is DFS patch to have a single queue for all tasks
   // If the scheduling class is infeasible, just add the work to the infeasible queue
   // directly.
   if (infeasible_tasks_.count(scheduling_class) > 0) {
@@ -66,6 +81,7 @@ void ClusterTaskManager::QueueAndScheduleTask(
   } else {
     tasks_to_schedule_[scheduling_class].push_back(work);
   }
+	LogLeaseSeq("Lease Req", task.GetTaskSpecification().GetPriority());
   ScheduleAndDispatchTasks();
 }
 
@@ -144,7 +160,7 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 
         break;
       }
-
+			LogLeaseSeq("\t\t Granted to ", task.GetTaskSpecification().GetPriority());
       NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
       ScheduleOnNode(node_id, work);
       work_it = work_queue.erase(work_it);

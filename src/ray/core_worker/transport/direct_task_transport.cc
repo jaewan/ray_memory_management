@@ -23,6 +23,15 @@
 namespace ray {
 namespace core {
 
+inline void LogPlaceSeq(const std::string &fnc_name, const Priority &pri){
+  std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
+  std::ostringstream stream;
+  stream << fnc_name << " " << pri << "\n";
+  std::string log_str = stream.str();
+  log_stream << log_str;
+  log_stream.close();
+}
+
 inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri){
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
@@ -98,12 +107,22 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
       if (keep_executing) {
         // Note that the dependencies in the task spec are mutated to only contain
         // plasma dependencies after ResolveDependencies finishes.
+				/*
         const SchedulingKey scheduling_key(task_spec.GetSchedulingClass(),
                                            task_spec.GetDependencyIds(),
                                            task_spec.IsActorCreationTask()
                                                ? task_spec.ActorCreationId()
                                                : ActorID::Nil(),
                                            task_spec.GetRuntimeEnvHash());
+																					 */
+				// This is a DFS patch
+				static const std::vector<ObjectID> empty_dependencies;
+        const SchedulingKey scheduling_key(0,
+																					 empty_dependencies,
+                                           task_spec.IsActorCreationTask()
+                                               ? task_spec.ActorCreationId()
+                                               : ActorID::Nil(),
+                                           0);
         const auto priority = task_spec.GetPriority();
         auto inserted = tasks_.emplace(task_spec.TaskId(), TaskEntry(task_spec, scheduling_key, priority));
         RAY_CHECK(inserted.second);
@@ -116,6 +135,7 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
         RAY_CHECK(ptts_inserted.second);
 
+				LogPlaceSeq("Placed", priority);
         RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first
                        << " queue size is now " << scheduling_key_entry.task_priority_queue.size();
         scheduling_key_entry.resource_spec = task_spec;
@@ -593,6 +613,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               // We got a lease for a worker. Add the lease client state and try to
               // assign work to the worker.
               rpc::WorkerAddress addr(reply.worker_address());
+							LogPlaceSeq("\t\tRequest Granted" , pri);
               RAY_LOG(DEBUG) << "Lease granted to task " << task_id << " with priority " 
                 << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id
 			  	<< " num leased:" << JAE_DEBUG_COUNT;
