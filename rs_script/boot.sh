@@ -23,12 +23,16 @@ if [ "$mode" = "head" ]; then
     fi
     # TODO: add linux configs to find IP.
     # start ray
-    ray start --head --port=$port --ray-client-server-port=$listener --node-ip-address=$ip
+    ray start --head --port=$port \
+              --ray-client-server-port=$listener \
+              --node-ip-address=$ip \
+              --object-store-memory=$(dc -e "10 9 ^ p")
     echo "Started head node on: $ip:$listener"
 elif [ "$mode" = "worker" ]; then
     adrs="$head_ip:$port"
     echo "Connecting worker to: $adrs"
-    ray start --address=$adrs
+    ray start --address=$adrs \
+              --object-store-memory=$(dc -e "10 10 ^ p")
 else
     echo "Unknown mode: select head or worker."
 fi
