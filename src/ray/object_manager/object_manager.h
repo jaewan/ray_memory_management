@@ -446,7 +446,7 @@ class ObjectManager : public ObjectManagerInterface,
   ///
   /// \param object_id Object id
   /// \param client_id Remote server client id
-  void SendPullRequest(const ObjectID &object_id, const NodeID &client_id);
+  void SendPullRequest(const ObjectID &object_id, const NodeID &client_id, bool from_remote = false);
 
   /// Get the rpc client according to the node ID
   ///
@@ -485,6 +485,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// Mapping from locally available objects to information about those objects
   /// including when the object was last pushed to other object managers.
   absl::flat_hash_map<ObjectID, LocalObjectInfo> local_objects_;
+
+  /// RSCODE: Mapping from object ids to rpc node addresses for remotely spilled objects.
+  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
+
+  /// RSCODE: add getter function for the flat_hash_map.
+  absl::flat_hash_map<ObjectID, NodeID> GetRemoteSpillMapping() { return spilled_remote_objects_url_; }
 
   /// This is used as the callback identifier in Pull for
   /// SubscribeObjectLocations. We only need one identifier because we never need to

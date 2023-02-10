@@ -269,7 +269,7 @@ void ObjectManager::CancelPull(uint64_t request_id) {
   }
 }
 
-void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id) {
+void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id, bool from_remote) {
   auto rpc_client = GetRpcClient(client_id);
   if (rpc_client) {
     // Try pulling from the client.
@@ -278,6 +278,9 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
           rpc::PullRequest pull_request;
           pull_request.set_object_id(object_id.Binary());
           pull_request.set_node_id(self_node_id_.Binary());
+
+          /// RSCODE: Add from_remote argument to request
+          // pull_request.set_from_remote(from_remote);
 
           rpc_client->Pull(
               pull_request,
@@ -541,7 +544,7 @@ void ObjectManager::PushFromFilesystem(const ObjectID &object_id,
       "ObjectManager.CreateSpilledObject");
 }
 
-/// RSTODO: SpillRemoteInternal function called from SpillRemote
+/// RSCODE: SpillRemoteInternal function called from SpillRemote
 void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                                        const NodeID &node_id,
                                        std::shared_ptr<ChunkObjectReader> chunk_reader) {
@@ -793,7 +796,6 @@ void ObjectManager::HandleGetRemoteObject(const rpc::GetRemoteObjectRequest &req
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
-
 bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        const ObjectID &object_id,
                                        const rpc::Address &owner_address,
@@ -845,11 +847,21 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
                                rpc::SendReplyCallback send_reply_callback) {
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
   NodeID node_id = NodeID::FromBinary(request.node_id());
+  /// RSCODE:
+  // bool from_remote = request.from_remote();
+
   RAY_LOG(DEBUG) << "Received pull request from node " << node_id << " for object ["
                  << object_id << "].";
 
   main_service_->post([this, object_id, node_id]() { Push(object_id, node_id); },
                       "ObjectManager.HandlePull");
+
+  /// RSCODE: Check if request is for remote object
+  // If so, add functionality such as freeing the object in the remote node
+  // if (from_remote) {
+  //   /// RSTODO: Free object here
+  // }
+    
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
