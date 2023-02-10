@@ -46,7 +46,7 @@ class LocalObjectManager {
       IOWorkerPoolInterface &io_worker_pool,
       rpc::CoreWorkerClientPool &owner_client_pool,
       /// RSCODE: passing in SpillRemote() function to local object manager
-      std::function<void(const ray::ObjectID &, const ray::NodeID &)> spill_remote,
+      std::function<void(const ray::ObjectID &)> spill_remote,
       int max_io_workers,
       int64_t min_spilling_size,
       bool is_external_storage_type_fs,
@@ -62,6 +62,8 @@ class LocalObjectManager {
         free_objects_batch_size_(free_objects_batch_size),
         io_worker_pool_(io_worker_pool),
         owner_client_pool_(owner_client_pool),
+        /// RSCODE:
+        spill_remote_(spill_remote),
         on_objects_freed_(on_objects_freed),
         last_free_objects_at_ms_(current_time_ms()),
         min_spilling_size_(min_spilling_size),
@@ -223,7 +225,7 @@ class LocalObjectManager {
 
   /// RSCODE:
   // SpillRemote() function from object manager
-  std::function<void(const ray::ObjectID &, const ray::NodeID &)> spill_remote_;
+  std::function<void(const ray::ObjectID &)> spill_remote_;
 
   /// A callback to call when an object has been freed.
   std::function<void(const std::vector<ObjectID> &)> on_objects_freed_;

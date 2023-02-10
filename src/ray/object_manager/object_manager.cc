@@ -333,10 +333,22 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
   }
 }
 
+/// RSCODE: Function to identify remote node with available memory
+void ObjectManager::FindNodeToSpill(const ObjectID &object_id) {
+  const auto remote_connections = object_directory_->LookupAllRemoteConnections();
+  /// RSTODO: Figure out how to exit this for loop once we find a node that can store data
+  for (const auto &connection_info : remote_connections) {
+    const NodeID node_id = connection_info.node_id;
+    SpillRemote(object_id, node_id);
+  }
+}
+
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
+  auto rpc_client = GetRpcClient(node_id);
+
   RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
-                 << object_id;
+              << object_id;
   const ObjectInfo &object_info = local_objects_[object_id].object_info;
   /// RSTODO: Uncomment this code if you want to test spilling
   uint64_t data_size = static_cast<uint64_t>(object_info.data_size);
@@ -385,7 +397,6 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   /// RSTODO: Uncomment this code if you want to test spilling
   std::string result(data_size, '\0');
   object_reader->ReadFromDataSection(offset, data_size, &result[0]);
-  auto rpc_client = GetRpcClient(node_id);
 
   rpc::SpillRemoteRequest spill_remote_request;
   auto spill_id = UniqueID::FromRandom();
@@ -775,7 +786,7 @@ void ObjectManager::HandleGetRemoteObject(const rpc::GetRemoteObjectRequest &req
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
   NodeID node_id = NodeID::FromBinary(request.node_id());                           
   
-  SpillRemote(object_id, node_id);  
+  SpillRemote(object_id, node_id);
 
   /// RSTODO: Call free object here???                  
 
