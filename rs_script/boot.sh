@@ -7,7 +7,7 @@ head_ip="$2"
 #if [[ ! $listener ]]; then
     # random port. Ray's default is 10001, but
     # this doesn't work on Berkeley's wifi...
-listener="7002"
+listener="7001"
 #fi
 
 #if [[ ! $port ]]; then
@@ -26,7 +26,7 @@ if [ "$mode" = "head" ]; then
     ray start --head --port=$port --ray-client-server-port=$listener --node-ip-address=$ip
     echo "Started head node on: $ip:$listener"
 elif [ "$mode" = "worker" ]; then
-    adrs="$head_ip:$listener"
+    adrs="$head_ip:$port"
     echo "Connecting worker to: $adrs"
     ray start --address=$adrs
 else
