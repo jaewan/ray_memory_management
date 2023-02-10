@@ -83,6 +83,9 @@ message PullRequest {
   bytes node_id = 1;
   // Requested ObjectID.
   bytes object_id = 2;
+  /// RSGRPC: New argument to pull request
+  // Boolean to check whether request is for remote object
+  bool from_remote = 3;
 }
 
 message FreeObjectsRequest {

@@ -333,7 +333,6 @@ void LocalObjectManager::SpillObjectsInternal(
         /// RSTODO: Have to determine node id
         for (const auto &object_id: requested_objects_to_spill) {
             spill_remote_(object_id);
-            //spilled_remote_objects_url_.emplace(object_id, temp_node_id);
         }
 
         /// RSTODO: Comment this out for now
