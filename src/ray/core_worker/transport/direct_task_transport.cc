@@ -132,6 +132,8 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
 
         auto ptq_inserted = priority_task_queues_.emplace(priority);
         RAY_CHECK(ptq_inserted.second);
+        auto ptqnp_inserted = priority_task_queues_not_pushed_.emplace(priority);
+        RAY_CHECK(ptqnp_inserted.second);
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
         RAY_CHECK(ptts_inserted.second);
 
@@ -241,6 +243,18 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool was_error,
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
+	// This is because the lease granted task has already been pushed as core_worker pushes
+	// tasks to workers regardless of granted task
+	if(!priority_to_task_spec_.contains(lease_granted_pri)){
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle task with priority:"<<lease_granted_pri 
+			<< " does not exist, redirecting to general OnWorkerIdle";
+		OnWorkerIdle(addr,
+								 scheduling_key,
+								 /*error=*/was_error,
+								 /*worker_exiting=*/worker_exiting,
+								 assigned_resources);
+		return;
+	}
   auto &lease_entry = worker_to_lease_entry_[addr];
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
@@ -264,19 +278,20 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   } else {
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
-    const auto priority_it = priority_task_queues_.begin();
-    Priority lease_granted_p(lease_granted_pri.score);
-    Priority &pri = lease_granted_p;
-    if(priority_it != priority_task_queues_.end()){
-    Priority p(priority_it->score);
-      if(lease_granted_pri < *priority_it){
+    const auto priority_it = priority_task_queues_not_pushed_.begin();
+    Priority pri(lease_granted_pri.score);
+    if(priority_it != priority_task_queues_not_pushed_.end()){
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] lease granted pri "<<lease_granted_pri << " front "  << *priority_it << " = " << (lease_granted_pri > *priority_it);
+      if(lease_granted_pri > *priority_it){
+					pri.Set(*priority_it);
           auto ptq_inserted = priority_task_queues_.emplace(lease_granted_pri);
           RAY_CHECK(ptq_inserted.second);
-          priority_task_queues_.erase(*priority_it);
-          pri = p;
       }
     }
-
+		priority_task_queues_not_pushed_.erase(pri);
+		// If a task is granted lease but not pushed for higher priority task, the task is pushed back to grant req queue
+		// It is possible to push this task before the lease request, so remove it from the grant req queue just in case
+		priority_task_queues_.erase(pri);
     while (!lease_entry.is_busy) {
       const auto &task_spec = priority_to_task_spec_[pri];
       lease_entry.is_busy = true;
@@ -287,7 +302,6 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       executing_tasks_.emplace(task_spec.TaskId(), addr);
       PushNormalTask(addr, client, scheduling_key, task_spec, pri, assigned_resources);
       //tasks_.erase(task_spec.TaskId());
-      priority_to_task_spec_.erase(pri);
     }
 
     CancelWorkerLeaseIfNeeded(scheduling_key);
@@ -309,8 +323,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     return;
   }
 
-  auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
-  auto &current_queue = priority_task_queues_;
+  auto &current_queue = priority_task_queues_not_pushed_;
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
@@ -336,7 +349,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       // Increment the total number of tasks in flight to any worker associated with the
       // current scheduling_key
 
-      RAY_CHECK(scheduling_key_entry.active_workers.size() >= 1);
+      RAY_CHECK(active_workers_.size() >= 1);
       num_busy_workers_++;
 
       executing_tasks_.emplace(task_spec.TaskId(), addr);
@@ -758,6 +771,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
   for (auto &s : priority.score) {
     msg_priority->Add(s);
   }
+	priority_to_task_spec_.erase(priority);
 
   request->mutable_resource_mapping()->CopyFrom(assigned_resources);
   request->set_intended_worker_id(addr.worker_id.Binary());
@@ -788,7 +802,6 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
           RAY_CHECK_GE(active_workers_.size(), 1u);
           RAY_CHECK_GE(num_busy_workers_, 1u);
           num_busy_workers_--;
-          priority_to_task_spec_.erase(task_spec.GetPriority());
 
           if (!status.ok() || !is_actor_creation || reply.worker_exiting()) {
             // Successful actor creation leases the worker indefinitely from the raylet.
@@ -801,6 +814,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
         }
 
         if (!status.ok()) {
+					priority_to_task_spec_.emplace(task_spec.GetPriority(), task_spec);
           // TODO: It'd be nice to differentiate here between process vs node
           // failure (e.g., by contacting the raylet). If it was a process
           // failure, it may have been an application-level error and it may

@@ -359,6 +359,7 @@ class CoreWorkerDirectTaskSubmitter {
   // Ignorant of scheduling key. Task queues for DFS scheduling only.
   // All tasks are managed in this single queue
   absl::btree_set<Priority> priority_task_queues_;
+  absl::btree_set<Priority> priority_task_queues_not_pushed_;
   // priority_task_queues_ are used to decide the sequence of worker lease and this is used to
   // find the task spec of the priority
   absl::flat_hash_map<Priority, TaskSpecification> priority_to_task_spec_;
