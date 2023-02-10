@@ -220,9 +220,13 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE:
   /// \param object_id The object's object id.
-  /// \param node_id The remote node's id.
   /// \return Void.
-  void SpillRemote(const ObjectID &object_id, const NodeID &node_id);
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_i);
+
+  /// RSCODE:
+  /// \param object_id The object's object id.
+  /// \return Void.
+  void FindNodeToSpill(const ObjectID &object_id);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
