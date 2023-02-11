@@ -269,18 +269,23 @@ void ObjectManager::CancelPull(uint64_t request_id) {
   }
 }
 
-void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id, bool from_remote) {
+void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const bool from_remote) {
+  /// RSCODE: Add code to delete object entry from hash map if remote
+  if (from_remote) {
+    spilled_remote_objects_url_.erase(object_id);
+  }
+
   auto rpc_client = GetRpcClient(client_id);
   if (rpc_client) {
     // Try pulling from the client.
     rpc_service_.post(
-        [this, object_id, client_id, rpc_client]() {
+        [this, object_id, client_id, from_remote, rpc_client]() {
           rpc::PullRequest pull_request;
           pull_request.set_object_id(object_id.Binary());
           pull_request.set_node_id(self_node_id_.Binary());
 
           /// RSCODE: Add from_remote argument to request
-          // pull_request.set_from_remote(from_remote);
+          pull_request.set_from_remote(from_remote);
 
           rpc_client->Pull(
               pull_request,
@@ -348,6 +353,9 @@ void ObjectManager::FindNodeToSpill(const ObjectID &object_id) {
 
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
+  /// RSCODE: Add code to add object id to node id mapping
+  spilled_remote_objects_url_.emplace(object_id, node_id);
+
   auto rpc_client = GetRpcClient(node_id);
 
   RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
@@ -848,7 +856,7 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
   NodeID node_id = NodeID::FromBinary(request.node_id());
   /// RSCODE:
-  // bool from_remote = request.from_remote();
+  bool from_remote = request.from_remote();
 
   RAY_LOG(DEBUG) << "Received pull request from node " << node_id << " for object ["
                  << object_id << "].";
@@ -858,9 +866,9 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
 
   /// RSCODE: Check if request is for remote object
   // If so, add functionality such as freeing the object in the remote node
-  // if (from_remote) {
-  //   /// RSTODO: Free object here
-  // }
+  if (from_remote) {
+    /// RSTODO: Free object here
+  }
     
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }

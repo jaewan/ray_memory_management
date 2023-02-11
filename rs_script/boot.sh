@@ -32,7 +32,7 @@ elif [ "$mode" = "worker" ]; then
     adrs="$head_ip:$port"
     echo "Connecting worker to: $adrs"
     ray start --address=$adrs \
-              --object-store-memory=$(dc -e "10 10 ^ p")
+              --object-store-memory=$(dc -e "10 9 ^ p")
 else
     echo "Unknown mode: select head or worker."
 fi
