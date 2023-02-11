@@ -427,7 +427,7 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
 
   // rpc_client->SpillRemote(spill_remote_request, callback);
 
-  /// RSTODO: Delete this code when we finish debugging RPC issue
+  /// RSREVERT: Delete this code when we finish debugging RPC issue
   RAY_LOG(DEBUG) << "Push on " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
   if (local_objects_.count(object_id) != 0) {
