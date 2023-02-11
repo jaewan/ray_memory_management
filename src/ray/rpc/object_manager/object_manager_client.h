@@ -43,6 +43,7 @@ class ObjectManagerClient {
                       int num_connections = 4)
       : num_connections_(num_connections) {
     push_rr_index_ = rand() % num_connections_;
+    sendremote_rr_index_ = rand() % num_connections_;
     pull_rr_index_ = rand() % num_connections_;
     freeobjects_rr_index_ = rand() % num_connections_;
     grpc_clients_.reserve(num_connections_);
@@ -59,6 +60,15 @@ class ObjectManagerClient {
   VOID_RPC_CLIENT_METHOD(ObjectManagerService,
                          Push,
                          grpc_clients_[push_rr_index_++ % num_connections_],
+                         /*method_timeout_ms*/ -1, )
+
+  /// RSGRPC: Send (spill) object to remote object manager
+  ///
+  /// \param request The request message.
+  /// \param callback The callback function that handles reply from server
+  VOID_RPC_CLIENT_METHOD(ObjectManagerService,
+                         SendRemote,
+                         grpc_clients_[sendremote_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )
 
   /// Pull object from remote object manager
@@ -86,6 +96,8 @@ class ObjectManagerClient {
 
   /// Current connection index for `Push`.
   std::atomic<unsigned int> push_rr_index_;
+  /// RSGRPC: Current connection index for `SendRemote`.
+  std::atomic<unsigned int> sendremote_rr_index_;
   /// Current connection index for `Pull`.
   std::atomic<unsigned int> pull_rr_index_;
   /// Current connection index for `FreeObjects`.

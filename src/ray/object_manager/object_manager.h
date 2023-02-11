@@ -127,6 +127,9 @@ class ObjectManager : public ObjectManagerInterface,
   void HandlePush(const rpc::PushRequest &request,
                   rpc::PushReply *reply,
                   rpc::SendReplyCallback send_reply_callback) override;
+  void HandleSendRemote(const rpc::SendRemoteRequest &request,
+                        rpc::SendRemoteReply *reply,
+                        rpc::SendReplyCallback send_reply_callback) override;
 
   /// Handle pull request from remote object manager
   ///
@@ -245,6 +248,9 @@ class ObjectManager : public ObjectManagerInterface,
   }
 
   bool PullManagerHasPullsQueued() const { return pull_manager_->HasPullsQueued(); }
+
+  /// RSGRPC: DELETE
+  void CallSendRemote(const NodeID &node_id);
 
  private:
   friend class TestObjectManager;

@@ -50,12 +50,20 @@ message FreeObjectsRequest {
   repeated bytes object_ids = 1;
 }
 
+// RSGRPC: dummy for now, but remote spilling
+message SendRemoteRequest {
+  uint32 object_id = 1;
+}
+
 // Reply for request
 message PushReply {
 }
 message PullReply {
 }
 message FreeObjectsReply {
+}
+// RSGRPC: dummy for now
+message SendRemoteReply {
 }
 
 service ObjectManagerService {
@@ -65,4 +73,6 @@ service ObjectManagerService {
   rpc Pull(PullRequest) returns (PullReply);
   // Tell remote object manager to free some objects
   rpc FreeObjects(FreeObjectsRequest) returns (FreeObjectsReply);
+  // RSGRPC: remote spilling
+  rpc SendRemote(SendRemoteRequest) returns (SendRemoteReply);
 }

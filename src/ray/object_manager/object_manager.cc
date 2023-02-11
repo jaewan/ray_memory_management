@@ -555,6 +555,19 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
   rpc_client->Push(push_request, callback);
 }
 
+/// RSGRPC: DELETE
+void ObjectManager::CallSendRemote(const NodeID &node_id) {
+  rpc::SendRemoteRequest request;
+  request.set_object_id(1);
+  auto rpc_client = GetRpcClient(node_id);
+
+  rpc::ClientCallback<rpc::SendRemoteReply> callback = 
+      [this](const Status, const rpc::SendRemoteReply &reply) {
+        RAY_LOG(DEBUG) << "RSGRPC: entered callback for send remote.";
+      };
+  rpc_client->SendRemote(request, callback);
+}
+
 /// Implementation of ObjectManagerServiceHandler
 void ObjectManager::HandlePush(const rpc::PushRequest &request,
                                rpc::PushReply *reply,
@@ -580,6 +593,14 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
                   << num_chunks_received_total_ << " failed";
   }
 
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
+/// RSGRPC: dummy
+void ObjectManager::HandleSendRemote(const rpc::SendRemoteRequest &request,
+                                     rpc::SendRemoteReply *reply,
+                                     rpc::SendReplyCallback send_reply_callback) {
+  RAY_LOG(DEBUG) << "RSCODE: entered HandleSendRemote";
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
