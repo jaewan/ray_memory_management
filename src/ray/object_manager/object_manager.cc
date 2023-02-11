@@ -782,28 +782,6 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
-/// RSGRPC: (GRPC)
-void ObjectManager::HandleSpillRemoteCheck(const rpc::SpillRemoteCheckRequest &request,
-                                           rpc::SpillRemoteCheckReply *reply,
-                                           rpc::SendReplyCallback send_reply_callback) {
-  reply->set_success(false);
-  send_reply_callback(Status::OK(), nullptr, nullptr);
-}
-
-/// RSGRPC: (GRPC)
-void ObjectManager::HandleGetRemoteObject(const rpc::GetRemoteObjectRequest &request,
-                                         rpc::GetRemoteObjectReply *reply,
-                                         rpc::SendReplyCallback send_reply_callback) {
-  ObjectID object_id = ObjectID::FromBinary(request.object_id());
-  NodeID node_id = NodeID::FromBinary(request.node_id());                           
-  
-  SpillRemote(object_id, node_id);
-
-  /// RSTODO: Call free object here???                  
-
-  send_reply_callback(Status::OK(), nullptr, nullptr);
-}
-
 bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        const ObjectID &object_id,
                                        const rpc::Address &owner_address,

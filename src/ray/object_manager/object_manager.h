@@ -155,26 +155,6 @@ class ObjectManager : public ObjectManagerInterface,
   void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                          rpc::SpillRemoteReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
-
-  /// RSGRPC: (GRPC)
-  /// Handle spill remote check request
-  ///
-  /// \param request Spill remote check request
-  /// \param reply Reply
-  /// \param send_reply_callback
-  void HandleSpillRemoteCheck(const rpc::SpillRemoteCheckRequest &request,
-                              rpc::SpillRemoteCheckReply *reply,
-                              rpc::SendReplyCallback send_reply_callback) override;
-
-  /// RSGRPC: (GRPC)
-  /// Handle get remote object request
-  ///
-  /// \param request Get remote object request
-  /// \param reply Reply
-  /// \param send_reply_callback
-  void HandleGetRemoteObject(const rpc::GetRemoteObjectRequest &request,
-                             rpc::GetRemoteObjectReply *reply,
-                             rpc::SendReplyCallback send_reply_callback) override;
   
   /// Get the port of the object manager rpc server.
   int GetServerPort() const { return object_manager_server_.GetPort(); }
