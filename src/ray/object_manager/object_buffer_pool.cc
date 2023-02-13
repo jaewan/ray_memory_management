@@ -238,6 +238,7 @@ ray::Status ObjectBufferPool::EnsureBufferExists(const ObjectID &object_id,
 
   // Release pool_mutex_ during the blocking create call.
   pool_mutex_.Unlock();
+  /// RSCOMMENT: this is where createrequestqueue is entered. 
   Status s = store_client_->CreateAndSpillIfNeeded(
       object_id,
       owner_address,

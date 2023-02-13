@@ -234,6 +234,7 @@ class LocalObjectManager {
   /// - pinned_objects_: objects pinned in shared memory
   /// - objects_pending_spill_: objects pinned and waiting for spill to complete
   /// - spilled_objects_url_: objects already spilled
+  /// RSTODO: figure out if this is significant. 
   absl::flat_hash_map<ObjectID, std::pair<rpc::Address, bool>> local_objects_;
 
   // Objects that are pinned on this node.
