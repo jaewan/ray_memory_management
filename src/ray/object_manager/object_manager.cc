@@ -346,6 +346,8 @@ void ObjectManager::FindNodeToSpill(const ObjectID &object_id) {
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
   /// RSTODO: Figure out how to exit this for loop once we find a node that can store data
   for (const auto &connection_info : remote_connections) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "remote connection has been made";
     const NodeID node_id = connection_info.node_id;
     SpillRemote(object_id, node_id);
   }
@@ -360,11 +362,16 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
 
   RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
               << object_id;
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
+              << object_id;
+
   const ObjectInfo &object_info = local_objects_[object_id].object_info;
-  /// RSTODO: Uncomment this code if you want to test spilling
-  uint64_t data_size = static_cast<uint64_t>(object_info.data_size);
-  uint64_t metadata_size = static_cast<uint64_t>(object_info.metadata_size);
-  uint64_t offset = 0;
+  /// RSTODO: Original code but doesn't work with remote spill
+  // uint64_t data_size = static_cast<uint64_t>(object_info.data_size);
+  // uint64_t metadata_size = static_cast<uint64_t>(object_info.metadata_size);
+  // uint64_t offset = 0;
 
   rpc::Address owner_address;
   owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
@@ -385,47 +392,52 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   RAY_CHECK(object_reader) << "object_reader can't be null";
 
   /// RSTODO: Comment out for now
-  // if (object_reader->GetDataSize() != data_size ||
-  //     object_reader->GetMetadataSize() != metadata_size) {
-  //   // TODO(scv119): handle object size changes in a more graceful way.
-  //   RAY_LOG(WARNING) << "Object id:" << object_id
-  //                    << "'s size mismatches our record. Expected data size: " << data_size
-  //                    << ", expected metadata size: " << metadata_size
-  //                    << ", actual data size: " << object_reader->GetDataSize()
-  //                    << ", actual metadata size: " << object_reader->GetMetadataSize()
-  //                    << ". This is likely due to a race condition."
-  //                    << " We will update the object size and proceed sending the object.";
-  //   local_objects_[object_id].object_info.data_size = 0;
-  //   local_objects_[object_id].object_info.metadata_size = 1;
-  // }
+  // // if (object_reader->GetDataSize() != data_size ||
+  // //     object_reader->GetMetadataSize() != metadata_size) {
+  // //   // TODO(scv119): handle object size changes in a more graceful way.
+  // //   RAY_LOG(WARNING) << "Object id:" << object_id
+  // //                    << "'s size mismatches our record. Expected data size: " << data_size
+  // //                    << ", expected metadata size: " << metadata_size
+  // //                    << ", actual data size: " << object_reader->GetDataSize()
+  // //                    << ", actual metadata size: " << object_reader->GetMetadataSize()
+  // //                    << ". This is likely due to a race condition."
+  // //                    << " We will update the object size and proceed sending the object.";
+  // //   local_objects_[object_id].object_info.data_size = 0;
+  // //   local_objects_[object_id].object_info.metadata_size = 1;
+  // // }
 
-  /// RSTODO: Comment this code if you want to test spillin
-  // SpillRemoteInternal(object_id,
-  //                    node_id,
-  //                    std::make_shared<ChunkObjectReader>(std::move(object_reader),
-  //                                                        config_.object_chunk_size));
+  /// RSTODO: Comment this code if you want to test spilling
+  SpillRemoteInternal(object_id,
+                     node_id,
+                     std::make_shared<ChunkObjectReader>(std::move(object_reader),
+                                                         config_.object_chunk_size));
 
-  /// RSTODO: Uncomment this code if you want to test spilling
-  std::string result(data_size, '\0');
-  object_reader->ReadFromDataSection(offset, data_size, &result[0]);
+  /// RSTODO: Original code but doesn't work with remote spill
+  // std::string result(data_size, '\0');
+  // RAY_LOG(INFO) << "test1";
+  // object_reader->ReadFromDataSection(offset, data_size, &result[0]);
 
-  rpc::SpillRemoteRequest spill_remote_request;
-  auto spill_id = UniqueID::FromRandom();
-  spill_remote_request.set_spill_id(spill_id.Binary());
-  spill_remote_request.set_object_id(object_id.Binary());
-  spill_remote_request.set_node_id(node_id.Binary());
-  spill_remote_request.set_allocated_owner_address(&owner_address);
-  spill_remote_request.set_chunk_index(0);
-  spill_remote_request.set_data_size(data_size);
-  spill_remote_request.set_metadata_size(metadata_size);
-  spill_remote_request.set_data(result);  
+  // RAY_LOG(INFO) << "test2";
 
-  rpc::ClientCallback<rpc::SpillRemoteReply> callback =
-      [] (const Status &status, const rpc::SpillRemoteReply &reply) {
-        std::cout << "hello";
-      };
+  // rpc::SpillRemoteRequest spill_remote_request;
+  // auto spill_id = UniqueID::FromRandom();
+  // spill_remote_request.set_spill_id(spill_id.Binary());
+  // spill_remote_request.set_object_id(object_id.Binary());
+  // spill_remote_request.set_node_id(node_id.Binary());
+  // spill_remote_request.set_allocated_owner_address(&owner_address);
+  // spill_remote_request.set_chunk_index(0);
+  // spill_remote_request.set_data_size(data_size);
+  // spill_remote_request.set_metadata_size(metadata_size);
+  // spill_remote_request.set_data(result);  
 
-  rpc_client->SpillRemote(spill_remote_request, callback);
+  // rpc::ClientCallback<rpc::SpillRemoteReply> callback =
+  //     [] (const Status &status, const rpc::SpillRemoteReply &reply) {
+  //       std::cout << "hello";
+  //     };
+
+  // RAY_LOG(INFO) << "test3";
+  // rpc_client->SpillRemote(spill_remote_request, callback);
+  // RAY_LOG(INFO) << "test4";
 }
 
 void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id) {
@@ -567,7 +579,6 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                  << ", number of chunks: " << chunk_reader->GetNumChunks()
                  << ", total data size: " << chunk_reader->GetObject().GetObjectSize();
 
-
   auto spill_id = UniqueID::FromRandom();
   push_manager_->StartPush(
       node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
@@ -670,6 +681,9 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
 
   num_bytes_pushed_from_plasma_ += spill_remote_request.data().length();
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Number of bytes pushed from plasma: " << num_bytes_pushed_from_plasma_;
+
   rpc::ClientCallback<rpc::SpillRemoteReply> callback =
       [] (const Status &status, const rpc::SpillRemoteReply &reply) {
         std::cout << "hello";
@@ -764,20 +778,23 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                                       rpc::SpillRemoteReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) {
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
-  // NodeID node_id = NodeID::FromBinary(request.node_id());
+  NodeID node_id = NodeID::FromBinary(request.node_id());
   uint64_t chunk_index = request.chunk_index();
   uint64_t data_size = request.data_size();
   uint64_t metadata_size = request.metadata_size();
   const std::string &data = request.data();
   const rpc::Address &owner_address = request.owner_address();
 
-  auto chunk_status = buffer_pool_.CreateChunk(
-    object_id, owner_address, data_size, metadata_size, chunk_index);
+  /// RSTODO: Comment out for now
+  // auto chunk_status = buffer_pool_.CreateChunk(
+  //   object_id, owner_address, data_size, metadata_size, chunk_index);
 
-  if (chunk_status.ok()) {
-    // Avoid handling this chunk if it's already being handled by another process.
-    buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
-  }
+  // if (chunk_status.ok()) {
+  //   // Avoid handling this chunk if it's already being handled by another process.
+  //   buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
+  // }
+
+  ReceiveObjectChunk(node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
@@ -794,6 +811,14 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                  << " of object " << object_id << " chunk index: " << chunk_index
                  << ", chunk data size: " << data.size()
                  << ", object size: " << data_size;
+
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
+                << " of object " << object_id << " chunk index: " << chunk_index
+                << ", chunk data size: " << data.size()
+                << ", object size: " << data_size;
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Total number of bytes received: " << num_bytes_received_total_;
 
   if (!pull_manager_->IsObjectActive(object_id)) {
     num_chunks_received_cancelled_++;
