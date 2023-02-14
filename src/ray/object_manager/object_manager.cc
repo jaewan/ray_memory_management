@@ -58,6 +58,7 @@ ObjectManager::ObjectManager(
     const NodeID &self_node_id,
     const ObjectManagerConfig &config,
     IObjectDirectory *object_directory,
+    /// RSCOMMENT: code that goes to LocalObjectManager to restore spilled objects. 
     RestoreSpilledObjectCallback restore_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
     SpillObjectsCallback spill_objects_callback,
@@ -270,11 +271,6 @@ void ObjectManager::CancelPull(uint64_t request_id) {
 }
 
 void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const bool from_remote) {
-  /// RSCODE: Add code to delete object entry from hash map if remote
-  if (from_remote) {
-    spilled_remote_objects_url_.erase(object_id);
-  }
-
   auto rpc_client = GetRpcClient(client_id);
   if (rpc_client) {
     // Try pulling from the client.
@@ -297,6 +293,10 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
               });
         },
         "ObjectManager.SendPull");
+    /// RSCODE: Add code to delete object entry from hash map if remote
+    if (from_remote) {
+      spilled_remote_objects_url_.erase(object_id);
+    }
   } else {
     RAY_LOG(ERROR) << "Couldn't send pull request from " << self_node_id_ << " to "
                    << client_id << " of object " << object_id
@@ -871,6 +871,7 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
   // If so, add functionality such as freeing the object in the remote node
   if (from_remote) {
     /// RSTODO: Free object here
+    /// Daniel: we might want to do the freeing in the callback of Push cuz RPCs might be async. 
   }
     
   send_reply_callback(Status::OK(), nullptr, nullptr);

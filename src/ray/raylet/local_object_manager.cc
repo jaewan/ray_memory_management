@@ -359,7 +359,7 @@ void LocalObjectManager::SpillObjectsInternal(
                 pinned_objects_.emplace(object_id, std::move(it->second));
                 objects_pending_spill_.erase(it);
               }
-
+              
               if (!status.ok()) {
                 RAY_LOG(ERROR) << "Failed to send object spilling request: "
                                << status.ToString();
@@ -452,6 +452,9 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
   RAY_CHECK(objects_pending_restore_.emplace(object_id).second)
       << "Object dedupe wasn't done properly. Please report if you see this issue.";
   num_bytes_pending_restore_ += object_size;
+  /// RSTODO: check for remote spill and restore.
+  /// NVM: keeping this here, but this comment is obsolete.  
+  
   io_worker_pool_.PopRestoreWorker([this, object_id, object_size, object_url, callback](
                                        std::shared_ptr<WorkerInterface> io_worker) {
     auto start_time = absl::GetCurrentTimeNanos();
