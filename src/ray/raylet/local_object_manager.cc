@@ -330,47 +330,46 @@ void LocalObjectManager::SpillObjectsInternal(
         }
         
         /// RSCODE: Simply call SpillRemote() function in object_manager
-        /// RSTODO: Have to determine node id
         for (const auto &object_id: requested_objects_to_spill) {
             spill_remote_(object_id);
         }
 
         /// RSTODO: Comment this out for now
-        // io_worker->rpc_client()->SpillObjects(
-        //     request,
-        //     [this, requested_objects_to_spill, callback, io_worker](
-        //         const ray::Status &status, const rpc::SpillObjectsReply &r) {
-        //       {
-        //         absl::MutexLock lock(&mutex_);
-        //         num_active_workers_ -= 1;
-        //       }
-        //       io_worker_pool_.PushSpillWorker(io_worker);
-        //       size_t num_objects_spilled = status.ok() ? r.spilled_objects_url_size() : 0;
-        //       // Object spilling is always done in the order of the request.
-        //       // For example, if an object succeeded, it'll guarentee that all objects
-        //       // before this will succeed.
-        //       RAY_CHECK(num_objects_spilled <= requested_objects_to_spill.size());
-        //       for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size();
-        //            ++i) {
-        //         const auto &object_id = requested_objects_to_spill[i];
-        //         auto it = objects_pending_spill_.find(object_id);
-        //         RAY_CHECK(it != objects_pending_spill_.end());
-        //         pinned_objects_size_ += it->second->GetSize();
-        //         num_bytes_pending_spill_ -= it->second->GetSize();
-        //         pinned_objects_.emplace(object_id, std::move(it->second));
-        //         objects_pending_spill_.erase(it);
-        //       }
-
-        //       if (!status.ok()) {
-        //         RAY_LOG(ERROR) << "Failed to send object spilling request: "
-        //                        << status.ToString();
-        //       } else {
-        //         OnObjectSpilled(requested_objects_to_spill, r);
-        //       }
-        //       if (callback) {
-        //         callback(status);
-        //       }
-        //     });
+        io_worker->rpc_client()->SpillObjects(
+            request,
+            [this, requested_objects_to_spill, callback, io_worker](
+                const ray::Status &status, const rpc::SpillObjectsReply &r) {
+              {
+                absl::MutexLock lock(&mutex_);
+                num_active_workers_ -= 1;
+              } 
+              io_worker_pool_.PushSpillWorker(io_worker);
+              size_t num_objects_spilled = status.ok() ? r.spilled_objects_url_size() : 0;
+              // Object spilling is always done in the order of the request.
+              // For example, if an object succeeded, it'll guarentee that all objects
+              // before this will succeed.
+              RAY_CHECK(num_objects_spilled <= requested_objects_to_spill.size());
+              for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size();
+                   ++i) {
+                const auto &object_id = requested_objects_to_spill[i];
+                auto it = objects_pending_spill_.find(object_id);
+                RAY_CHECK(it != objects_pending_spill_.end());
+                pinned_objects_size_ += it->second->GetSize();
+                num_bytes_pending_spill_ -= it->second->GetSize();
+                pinned_objects_.emplace(object_id, std::move(it->second));
+                objects_pending_spill_.erase(it);
+              }
+              
+              if (!status.ok()) {
+                RAY_LOG(ERROR) << "Failed to send object spilling request: "
+                               << status.ToString();
+              } else {
+                OnObjectSpilled(requested_objects_to_spill, r);
+              }
+              if (callback) {
+                callback(status);
+              }
+            });
       });
 
   // Deleting spilled objects can fall behind when there is a lot
@@ -453,6 +452,9 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
   RAY_CHECK(objects_pending_restore_.emplace(object_id).second)
       << "Object dedupe wasn't done properly. Please report if you see this issue.";
   num_bytes_pending_restore_ += object_size;
+  /// RSTODO: check for remote spill and restore.
+  /// NVM: keeping this here, but this comment is obsolete.  
+  
   io_worker_pool_.PopRestoreWorker([this, object_id, object_size, object_url, callback](
                                        std::shared_ptr<WorkerInterface> io_worker) {
     auto start_time = absl::GetCurrentTimeNanos();
