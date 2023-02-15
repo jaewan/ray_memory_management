@@ -364,6 +364,8 @@ class CoreWorkerDirectTaskSubmitter {
   // find the task spec of the priority
   absl::flat_hash_map<Priority, TaskSpecification> priority_to_task_spec_;
 
+  // For backpressure. Do not push tasks to workers if the priority of the task is lower than this value
+  ray::Priority block_requested_priority_;
   // Keep track of the active workers globally to check rooms for task alloc
   absl::flat_hash_set<rpc::WorkerAddress> active_workers_ =
       absl::flat_hash_set<rpc::WorkerAddress>();

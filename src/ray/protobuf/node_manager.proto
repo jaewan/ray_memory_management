@@ -91,6 +91,8 @@ message RequestWorkerLeaseReply {
   // The error message explaining why scheduling has failed.
   // Must be an empty string if failure_type is `NOT_FAILED`.
   string scheduling_failure_message = 10;
+  // Backpressure task priority. Core_worker shouldn't dispatch tasks with memory pressure
+  repeated int32 priority = 11;
 }
 
 message PrepareBundleResourcesRequest {

@@ -118,11 +118,11 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 		  task.GetTaskSpecification().TaskId() << " priority:" << task_priority
                      << " block requested is " << block_requested_priority_;
       if (task_priority >= block_requested_priority_) {
-		task_blocked_ = true;
+        task_blocked_ = true;
         RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks blocked task " << task_priority;
-		work_it++;
+        work_it++;
         continue;
-		//break;
+        //break;
       }
 	  task_blocked_ = false;
 
@@ -337,6 +337,7 @@ std::string ClusterTaskManager::DebugStr() const {
 
 void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
                                         const std::shared_ptr<internal::Work> &work) {
+  static const bool enable_blockTasks = RayConfig::instance().enable_BlockTasks();
   if (spillback_to == self_node_id_ && local_task_manager_) {
     local_task_manager_->QueueAndScheduleTask(work);
     return;
@@ -372,6 +373,13 @@ void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
       node_info_ptr->node_manager_address());
   reply->mutable_retry_at_raylet_address()->set_port(node_info_ptr->node_manager_port());
   reply->mutable_retry_at_raylet_address()->set_raylet_id(spillback_to.Binary());
+  if (enable_blockTasks){
+    auto p = reply->mutable_priority();
+    p->Clear();
+    for (auto &s : block_requested_priority_.score){
+      p->Add(s);
+    }
+  }
 
   send_reply_callback();
 }
@@ -520,6 +528,7 @@ void ClusterTaskManager::BlockTasks(Priority base_priority, instrumented_io_cont
   static const Priority init_priority;
   static const bool enable_blockTasks = RayConfig::instance().enable_BlockTasks();
   if(enable_blockTasks){
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] BlockTasks Called " << base_priority;
     block_requested_priority_ = base_priority;
     if(base_priority == init_priority && task_blocked_){
 	  io_service.post([this](){

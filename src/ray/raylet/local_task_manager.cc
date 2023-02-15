@@ -104,8 +104,14 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
   // tasks from being dispatched.
   for (auto shapes_it = tasks_to_dispatch_.begin();
        shapes_it != tasks_to_dispatch_.end();) {
-    auto &scheduling_class = shapes_it->first;
+    //auto &scheduling_class = shapes_it->first;
+    // DFS patch. When a task request comes at cluster_task_manager, 
+    // all of them are manged in a single queue of scheduling class 0
+    // So should not rely on what scheduling class queue it is on
     auto &dispatch_queue = shapes_it->second;
+    auto work_it = dispatch_queue.begin();
+    const std::shared_ptr<internal::Work> &work = *work_it;
+    auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
 
     if (info_by_sched_cls_.find(scheduling_class) == info_by_sched_cls_.end()) {
       // Initialize the class info.
@@ -121,7 +127,8 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
     /// pressure to limit the number of worker processes started in scenarios
     /// with nested tasks.
     bool is_infeasible = false;
-    for (auto work_it = dispatch_queue.begin(); work_it != dispatch_queue.end();) {
+    //for (auto work_it = dispatch_queue.begin(); work_it != dispatch_queue.end();) {
+    for (; work_it != dispatch_queue.end();) {
       auto &work = *work_it;
       const auto &task = work->task;
       const auto spec = task.GetTaskSpecification();
@@ -1018,6 +1025,7 @@ ResourceRequest LocalTaskManager::CalcNormalTaskResources() const {
 
 uint64_t LocalTaskManager::MaxRunningTasksPerSchedulingClass(
     SchedulingClass sched_cls_id) const {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] this is where GetSchedulingClassDescriptor is called";
   auto sched_cls = TaskSpecification::GetSchedulingClassDescriptor(sched_cls_id);
   double cpu_req = sched_cls.resource_set.GetNumCpusAsDouble();
   uint64_t total_cpus =
