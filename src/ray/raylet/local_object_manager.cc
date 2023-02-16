@@ -331,8 +331,10 @@ void LocalObjectManager::SpillObjectsInternal(
         
         /// RSCODE: Simply call SpillRemote() function in object_manager
         for (const auto &object_id: requested_objects_to_spill) {
-            spill_remote_(object_id);
+            object_manager_.FindNodeToSpill(object_id);
         }
+
+        /// RSTODO: Have to call OnObjectSpilled after spilling to remote?
 
         /// RSTODO: Comment this out for now
         io_worker->rpc_client()->SpillObjects(
@@ -452,8 +454,13 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
   RAY_CHECK(objects_pending_restore_.emplace(object_id).second)
       << "Object dedupe wasn't done properly. Please report if you see this issue.";
   num_bytes_pending_restore_ += object_size;
-  /// RSTODO: check for remote spill and restore.
+
+  /// RSCODE: check for remote spill and restore.
   /// NVM: keeping this here, but this comment is obsolete.  
+  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
+  if (spill_remote_mapping.count(object_id) == 1) {
+    object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
+  } 
   
   io_worker_pool_.PopRestoreWorker([this, object_id, object_size, object_url, callback](
                                        std::shared_ptr<WorkerInterface> io_worker) {

@@ -341,13 +341,16 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
   }
 }
 
+/// RSTODO: Refactor and delete this later
+void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_id) {
+  SendPullRequest(object_id, node_id, true);
+}
+
 /// RSCODE: Function to identify remote node with available memory
 void ObjectManager::FindNodeToSpill(const ObjectID &object_id) {
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
   /// RSTODO: Figure out how to exit this for loop once we find a node that can store data
   for (const auto &connection_info : remote_connections) {
-    /// RSTODO: Delete this later
-    RAY_LOG(INFO) << "remote connection has been made";
     const NodeID node_id = connection_info.node_id;
     SpillRemote(object_id, node_id);
   }
@@ -579,6 +582,7 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                  << ", number of chunks: " << chunk_reader->GetNumChunks()
                  << ", total data size: " << chunk_reader->GetObject().GetObjectSize();
 
+  /// RSTODO: Maybe have spill manager and StartSpillRemote?
   auto spill_id = UniqueID::FromRandom();
   push_manager_->StartPush(
       node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
@@ -794,6 +798,16 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   //   buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
   // }
 
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Total number of bytes received: " << num_bytes_received_total_;
+
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "SpillToRemote on " << self_node_id_ << " from " << node_id
+                << " of object " << object_id << " chunk index: " << chunk_index
+                << ", chunk data size: " << data.size()
+                << ", object size: " << data_size;
+
+  /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
@@ -807,18 +821,14 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        uint64_t chunk_index,
                                        const std::string &data) {
   num_bytes_received_total_ += data.size();
+  
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Hello";
+
   RAY_LOG(DEBUG) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
                  << " of object " << object_id << " chunk index: " << chunk_index
                  << ", chunk data size: " << data.size()
                  << ", object size: " << data_size;
-
-  /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
-                << " of object " << object_id << " chunk index: " << chunk_index
-                << ", chunk data size: " << data.size()
-                << ", object size: " << data_size;
-  /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "Total number of bytes received: " << num_bytes_received_total_;
 
   if (!pull_manager_->IsObjectActive(object_id)) {
     num_chunks_received_cancelled_++;

@@ -208,6 +208,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// \return Void.
   void FindNodeToSpill(const ObjectID &object_id);
 
+  /// RSTODO: Refactor and delete this later
+  /// \param object_id The object's object id.
+  /// \param node_id The remote node's id.
+  /// \return Void.
+  void TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_i);
+
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
   /// on the same object, the second one might be ignored).

@@ -28,6 +28,8 @@
 #include "ray/rpc/worker/core_worker_client_pool.h"
 #include "ray/util/util.h"
 #include "src/ray/protobuf/node_manager.pb.h"
+/// RSCODE: add in object manager
+#include "ray/object_manager/object_manager.h"
 
 namespace ray {
 
@@ -45,8 +47,8 @@ class LocalObjectManager {
       int64_t free_objects_period_ms,
       IOWorkerPoolInterface &io_worker_pool,
       rpc::CoreWorkerClientPool &owner_client_pool,
-      /// RSCODE: passing in SpillRemote() function to local object manager
-      std::function<void(const ray::ObjectID &)> spill_remote,
+      /// RSCODE: passing in object manager,
+      ObjectManager &object_manager,
       int max_io_workers,
       int64_t min_spilling_size,
       bool is_external_storage_type_fs,
@@ -63,7 +65,7 @@ class LocalObjectManager {
         io_worker_pool_(io_worker_pool),
         owner_client_pool_(owner_client_pool),
         /// RSCODE:
-        spill_remote_(spill_remote),
+        object_manager_(object_manager),
         on_objects_freed_(on_objects_freed),
         last_free_objects_at_ms_(current_time_ms()),
         min_spilling_size_(min_spilling_size),
@@ -221,8 +223,8 @@ class LocalObjectManager {
   rpc::CoreWorkerClientPool &owner_client_pool_;
 
   /// RSCODE:
-  // SpillRemote() function from object manager
-  std::function<void(const ray::ObjectID &)> spill_remote_;
+  /// The object manager, used to fetch required objects from remote nodes.
+  ObjectManager &object_manager_;
 
   /// A callback to call when an object has been freed.
   std::function<void(const std::vector<ObjectID> &)> on_objects_freed_;

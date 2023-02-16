@@ -310,10 +310,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
           RayConfig::instance().free_objects_period_milliseconds(),
           worker_pool_,
           worker_rpc_pool_,
-          /// RSCODE: Pass in object_manager_ spill remote function
-          [this](const ObjectID &object_id) {
-            object_manager_.FindNodeToSpill(object_id);
-          },
+          /// RSCODE: pass in object maanager
+          object_manager_,
           /*max_io_workers*/ config.max_io_workers,
           /*min_spilling_size*/ config.min_spilling_size,
           /*is_external_storage_type_fs*/
