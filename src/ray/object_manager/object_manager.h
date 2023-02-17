@@ -430,7 +430,8 @@ class ObjectManager : public ObjectManagerInterface,
                           uint64_t data_size,
                           uint64_t metadata_size,
                           uint64_t chunk_index,
-                          const std::string &data);
+                          const std::string &data,
+                          const bool from_remote = false);
 
   /// Send pull request RSCODE: modified adding from_remote param. 
   ///

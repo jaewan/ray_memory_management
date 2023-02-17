@@ -617,11 +617,11 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                         [this, node_id, object_id]() {
                           push_manager_->OnChunkComplete(node_id, object_id);
                         },
-                        "ObjectManager.Push");
+                        "ObjectManager.SpillRemote");
                   },
                   chunk_reader);
             },
-            "ObjectManager.Push");
+            "ObjectManager.SpillRemote");
       });      
 }
 
@@ -704,7 +704,7 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
 
   rpc::ClientCallback<rpc::SpillRemoteReply> callback =
       [] (const Status &status, const rpc::SpillRemoteReply &reply) {
-        std::cout << "hello";
+        RAY_LOG(INFO) << "Callback for SpillRemote RPC";
       };
 
   rpc_client->SpillRemote(spill_remote_request, callback);  
@@ -830,7 +830,9 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                 << ", object size: " << data_size;
 
   /// RSTODO: Tony -> potentially delete this later
-  ReceiveObjectChunk(node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data);
+  ReceiveObjectChunk(node_id, object_id, owner_address, 
+                     data_size, metadata_size, chunk_index, 
+                     data, true /* from_remote */);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
@@ -841,7 +843,8 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        uint64_t data_size,
                                        uint64_t metadata_size,
                                        uint64_t chunk_index,
-                                       const std::string &data) {
+                                       const std::string &data, 
+                                       const bool from_remote) {
   num_bytes_received_total_ += data.size();
 
   RAY_LOG(DEBUG) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
@@ -849,14 +852,18 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                  << ", chunk data size: " << data.size()
                  << ", object size: " << data_size;
 
-  if (!pull_manager_->IsObjectActive(object_id)) {
+  /// RSTODO: this might be reason why we don't spill but only call RPC
+  /// might have to fiddle around with pull manager. 
+  /// RSCODE: current solution: add default from_remote param so that
+  /// pull manager checking is not invoked. 
+  if (!from_remote && !pull_manager_->IsObjectActive(object_id)) {
     num_chunks_received_cancelled_++;
     // This object is no longer being actively pulled. Do not create the object.
     return false;
   }
   auto chunk_status = buffer_pool_.CreateChunk(
       object_id, owner_address, data_size, metadata_size, chunk_index);
-  if (!pull_manager_->IsObjectActive(object_id)) {
+  if (!from_remote && !pull_manager_->IsObjectActive(object_id)) {
     num_chunks_received_cancelled_++;
     // This object is no longer being actively pulled. Abort the object. We
     // have to check again here because the pull manager runs in a different
@@ -875,7 +882,7 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
   } else {
     num_chunks_received_failed_due_to_plasma_++;
     RAY_LOG(INFO) << "Error receiving chunk:" << chunk_status.message();
-    if (chunk_status.IsOutOfDisk()) {
+    if (!from_remote && chunk_status.IsOutOfDisk()) {
       pull_manager_->SetOutOfDisk(object_id);
     }
     return false;
