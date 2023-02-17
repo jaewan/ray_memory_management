@@ -221,7 +221,8 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param object_id The object's object id.
   /// \param node_id The remote node's id.
   /// \return Void.
-  void Push(const ObjectID &object_id, const NodeID &node_id);
+  /// RSTODO: Delete from_remote arg later
+  void Push(const ObjectID &object_id, const NodeID &node_id, const bool from_remote = false);
 
   /// Pull a bundle of objects. This will attempt to make all objects in the
   /// bundle local until the request is canceled with the returned ID.

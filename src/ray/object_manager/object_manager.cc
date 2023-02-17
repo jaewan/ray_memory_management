@@ -272,6 +272,12 @@ void ObjectManager::CancelPull(uint64_t request_id) {
 
 void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const bool from_remote) {
   auto rpc_client = GetRpcClient(client_id);
+
+  /// RSTODO: Delete this later
+  if (from_remote) {
+    RAY_LOG(INFO) << "We are pulling this object from remote: " << object_id;
+  }
+
   if (rpc_client) {
     // Try pulling from the client.
     rpc_service_.post(
@@ -443,9 +449,17 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   // RAY_LOG(INFO) << "test4";
 }
 
-void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id) {
+/// RSTODO: Delete from_remote arg later
+void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const bool from_remote) {
   RAY_LOG(DEBUG) << "Push on " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
+
+  /// RSTODO: Delete this later
+  if (from_remote) {
+    RAY_LOG(INFO) << "Push on " << self_node_id_ << " to " << node_id << " of object "
+                 << object_id;
+  }
+
   if (local_objects_.count(object_id) != 0) {
     return PushLocalObject(object_id, node_id);
   }
@@ -731,6 +745,11 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
     num_bytes_pushed_from_plasma_ += push_request.data().length();
   }
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Push on " << self_node_id_ << " to " << node_id << " of object "
+                 << object_id;
+  RAY_LOG(INFO) << "Total bytes pulled from remote: " << num_bytes_pushed_from_plasma_;
+
   // record the time cost between send chunk and receive reply
   rpc::ClientCallback<rpc::PushReply> callback =
       [this, start_time, object_id, node_id, chunk_index, on_complete](
@@ -762,6 +781,9 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
   uint64_t data_size = request.data_size();
   const rpc::Address &owner_address = request.owner_address();
   const std::string &data = request.data();
+
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Number bytes pulled from remote in push handler: " << request.data().length();
 
   bool success = ReceiveObjectChunk(
       node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data);
@@ -821,9 +843,6 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        uint64_t chunk_index,
                                        const std::string &data) {
   num_bytes_received_total_ += data.size();
-  
-  /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "Hello";
 
   RAY_LOG(DEBUG) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
                  << " of object " << object_id << " chunk index: " << chunk_index
@@ -873,8 +892,14 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
 
   RAY_LOG(DEBUG) << "Received pull request from node " << node_id << " for object ["
                  << object_id << "].";
+  
+  /// RSTODO: Delete this later
+  if (from_remote) {
+    RAY_LOG(INFO) << "Received pull request from node " << node_id << " for object ["
+                 << object_id << "].";
+  }
 
-  main_service_->post([this, object_id, node_id]() { Push(object_id, node_id); },
+  main_service_->post([this, object_id, node_id, from_remote]() { Push(object_id, node_id, from_remote); },
                       "ObjectManager.HandlePull");
 
   /// RSCODE: Check if request is for remote object

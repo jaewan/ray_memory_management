@@ -458,10 +458,15 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
   /// RSCODE: check for remote spill and restore.
   /// NVM: keeping this here, but this comment is obsolete.  
   absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Object restoration is happening";
   if (spill_remote_mapping.count(object_id) == 1) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Remote object has been found: " << object_id;
     object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
   } 
-  
+
+  /// RSTODO: Comment this out for now
   io_worker_pool_.PopRestoreWorker([this, object_id, object_size, object_url, callback](
                                        std::shared_ptr<WorkerInterface> io_worker) {
     auto start_time = absl::GetCurrentTimeNanos();
