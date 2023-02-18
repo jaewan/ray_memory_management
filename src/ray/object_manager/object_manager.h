@@ -276,6 +276,9 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE: add getter function for the flat_hash_map.
   absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteMapping() { return spilled_remote_objects_url_; }
 
+  /// RSCODE: add getter function for the flat_hash_map.
+  absl::flat_hash_map<ObjectID, NodeID> GetObjectsFromRemote() { return received_remote_objects_origin_; }
+
  private:
   friend class TestObjectManager;
 
@@ -479,6 +482,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE: Mapping from object ids to rpc node addresses for remotely spilled objects.
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
+
+  /// RSCODE: Mapping from object ids to rpc origin node addresses.
+  absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
 
   /// This is used as the callback identifier in Pull for
   /// SubscribeObjectLocations. We only need one identifier because we never need to

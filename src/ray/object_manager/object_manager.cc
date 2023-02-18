@@ -878,6 +878,9 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
   if (chunk_status.ok()) {
     // Avoid handling this chunk if it's already being handled by another process.
     buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
+    if (from_remote) {
+      RAY_LOG(INFO) << "Successfully called WriteChunk on remote object: " << object_id;
+    }
     return true;
   } else {
     num_chunks_received_failed_due_to_plasma_++;
