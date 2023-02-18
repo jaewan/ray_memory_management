@@ -828,6 +828,10 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                 << " of object " << object_id << " chunk index: " << chunk_index
                 << ", chunk data size: " << data.size()
                 << ", object size: " << data_size;
+  
+  // keep track of received objects. 
+  // doesn't care about fault tolerance. 
+  received_remote_objects_origin_.emplace(object_id, node_id);
 
   /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, 

@@ -406,6 +406,12 @@ void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids
 
     // Mark that the object is spilled and unpin the pending requests.
     spilled_objects_url_.emplace(object_id, object_url);
+    /// RSTODO:
+    RAY_LOG(INFO) << "Spilled Object URL (Local Disk): " << object_url;
+    // spilled_object_url.emplace(object_id, "remotelyspilled");
+    // lets try to find a way to trigger the Pull RPC with remote retrieval
+    // whenever we recognize that the url is exactly "remotelyspilled" or 
+    // some other URL that we choose. 
     RAY_LOG(DEBUG) << "Unpinning pending spill object " << object_id;
     auto it = objects_pending_spill_.find(object_id);
     RAY_CHECK(it != objects_pending_spill_.end());
