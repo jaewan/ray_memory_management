@@ -192,6 +192,10 @@ class LocalObjectManager {
   /// Release an object that has been freed by its owner.
   void ReleaseFreedObject(const ObjectID &object_id);
 
+
+  /// RSTODO:
+  void OnObjectRemoteSpilled(const std::vector<ObjectID> &object_ids);
+
   /// Do operations that are needed after spilling objects such as
   /// 1. Unpin the pending spilling object.
   /// 2. Update the spilled URL to the owner.

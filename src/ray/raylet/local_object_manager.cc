@@ -384,10 +384,10 @@ void LocalObjectManager::SpillObjectsInternal(
 }
 
 /// RSTODO: Code to free a remotely spilled object
-void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &object_ids,) {
+void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &object_ids) {
   for (size_t i = 0; i < object_ids.size(); ++i) {
     const ObjectID &object_id = object_ids[i];
-    const std::string &object_url = "remotelyspilled"
+    const std::string &object_url = "remotelyspilled";
     RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
 
     // Update the object_id -> url_ref_count to use it for deletion later.
@@ -408,7 +408,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     // spilled_objects_url_.emplace(object_id, object_url);
     /// RSTODO:
     RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
-    spilled_object_url.emplace(object_id, object_url);
+    spilled_objects_url_.emplace(object_id, object_url);
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
     // some other URL that we choose. 
