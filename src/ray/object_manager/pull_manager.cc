@@ -475,6 +475,8 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
     // Select an url from the object directory update
     UpdateRetryTimer(request, object_id);
     /// RSTODO: don't call restore_spilled_object, but restore from remote. 
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "About to call restore_spilled_object"
     restore_spilled_object_(object_id,
                             request.object_size,
                             direct_restore_url,
