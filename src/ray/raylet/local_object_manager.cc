@@ -334,6 +334,9 @@ void LocalObjectManager::SpillObjectsInternal(
             object_manager_.FindNodeToSpill(object_id);
         }
 
+        /// RSTODO: Not sure if we need this
+        io_worker_pool_.PushSpillWorker(io_worker);
+
         /// RSTODO: Have to call OnObjectSpilled after spilling to remote?
         OnObjectRemoteSpilled(requested_objects_to_spill);
 
