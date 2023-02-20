@@ -335,50 +335,101 @@ void LocalObjectManager::SpillObjectsInternal(
         }
 
         /// RSTODO: Have to call OnObjectSpilled after spilling to remote?
+        OnObjectRemoteSpilled(requested_objects_to_spill);
 
         /// RSTODO: Comment this out for now
-        io_worker->rpc_client()->SpillObjects(
-            request,
-            [this, requested_objects_to_spill, callback, io_worker](
-                const ray::Status &status, const rpc::SpillObjectsReply &r) {
-              {
-                absl::MutexLock lock(&mutex_);
-                num_active_workers_ -= 1;
-              } 
-              io_worker_pool_.PushSpillWorker(io_worker);
-              size_t num_objects_spilled = status.ok() ? r.spilled_objects_url_size() : 0;
-              // Object spilling is always done in the order of the request.
-              // For example, if an object succeeded, it'll guarentee that all objects
-              // before this will succeed.
-              RAY_CHECK(num_objects_spilled <= requested_objects_to_spill.size());
-              for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size();
-                   ++i) {
-                const auto &object_id = requested_objects_to_spill[i];
-                auto it = objects_pending_spill_.find(object_id);
-                RAY_CHECK(it != objects_pending_spill_.end());
-                pinned_objects_size_ += it->second->GetSize();
-                num_bytes_pending_spill_ -= it->second->GetSize();
-                pinned_objects_.emplace(object_id, std::move(it->second));
-                objects_pending_spill_.erase(it);
-              }
+        // io_worker->rpc_client()->SpillObjects(
+        //     request,
+        //     [this, requested_objects_to_spill, callback, io_worker](
+        //         const ray::Status &status, const rpc::SpillObjectsReply &r) {
+        //       {
+        //         absl::MutexLock lock(&mutex_);
+        //         num_active_workers_ -= 1;
+        //       } 
+        //       io_worker_pool_.PushSpillWorker(io_worker);
+        //       size_t num_objects_spilled = status.ok() ? r.spilled_objects_url_size() : 0;
+        //       // Object spilling is always done in the order of the request.
+        //       // For example, if an object succeeded, it'll guarentee that all objects
+        //       // before this will succeed.
+        //       RAY_CHECK(num_objects_spilled <= requested_objects_to_spill.size());
+        //       for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size();
+        //            ++i) {
+        //         const auto &object_id = requested_objects_to_spill[i];
+        //         auto it = objects_pending_spill_.find(object_id);
+        //         RAY_CHECK(it != objects_pending_spill_.end());
+        //         pinned_objects_size_ += it->second->GetSize();
+        //         num_bytes_pending_spill_ -= it->second->GetSize();
+        //         pinned_objects_.emplace(object_id, std::move(it->second));
+        //         objects_pending_spill_.erase(it);
+        //       }
               
-              if (!status.ok()) {
-                RAY_LOG(ERROR) << "Failed to send object spilling request: "
-                               << status.ToString();
-              } else {
-                OnObjectSpilled(requested_objects_to_spill, r);
-              }
-              if (callback) {
-                callback(status);
-              }
-            });
-      });
+        //       if (!status.ok()) {
+        //         RAY_LOG(ERROR) << "Failed to send object spilling request: "
+        //                        << status.ToString();
+        //       } else {
+        //         OnObjectSpilled(requested_objects_to_spill, r);
+        //       }
+        //       if (callback) {
+        //         callback(status);
+        //       }
+        //     });
+         });
 
   // Deleting spilled objects can fall behind when there is a lot
   // of concurrent spilling and object frees. Clear the queue here
   // if needed.
   if (spilled_object_pending_delete_.size() >= free_objects_batch_size_) {
     ProcessSpilledObjectsDeleteQueue(free_objects_batch_size_);
+  }
+}
+
+/// RSTODO: Code to free a remotely spilled object
+void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &object_ids,) {
+  for (size_t i = 0; i < object_ids.size(); ++i) {
+    const ObjectID &object_id = object_ids[i];
+    const std::string &object_url = "remotelyspilled"
+    RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
+
+    // Update the object_id -> url_ref_count to use it for deletion later.
+    // We need to track the references here because a single file can contain
+    // multiple objects, and we shouldn't delete the file until
+    // all the objects are gone out of scope.
+    // object_url is equivalent to url_with_offset.
+    // auto parsed_url = ParseURL(object_url);
+    // const auto base_url_it = parsed_url->find("url");
+    // RAY_CHECK(base_url_it != parsed_url->end());
+    // if (!url_ref_count_.contains(base_url_it->second)) {
+    //   url_ref_count_[base_url_it->second] = 1;
+    // } else {
+    //   url_ref_count_[base_url_it->second] += 1;
+    // }
+
+    // Mark that the object is spilled and unpin the pending requests.
+    // spilled_objects_url_.emplace(object_id, object_url);
+    /// RSTODO:
+    RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
+    spilled_object_url.emplace(object_id, object_url);
+    // lets try to find a way to trigger the Pull RPC with remote retrieval
+    // whenever we recognize that the url is exactly "remotelyspilled" or 
+    // some other URL that we choose. 
+    RAY_LOG(DEBUG) << "Unpinning pending spill object " << object_id;
+    auto it = objects_pending_spill_.find(object_id);
+    RAY_CHECK(it != objects_pending_spill_.end());
+    const auto object_size = it->second->GetSize();
+    num_bytes_pending_spill_ -= object_size;
+    objects_pending_spill_.erase(it);
+
+    // Asynchronously Update the spilled URL.
+    auto freed_it = local_objects_.find(object_id);
+    if (freed_it == local_objects_.end() || freed_it->second.second) {
+      RAY_LOG(DEBUG) << "Spilled object already freed, skipping send of spilled URL to "
+                        "object directory for object "
+                     << object_id;
+      continue;
+    }
+    const auto &worker_addr = freed_it->second.first;
+    object_directory_->ReportObjectSpilled(
+        object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
   }
 }
 
