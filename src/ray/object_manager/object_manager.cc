@@ -746,7 +746,11 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Push on " << self_node_id_ << " to " << node_id << " of object "
+  // Jaewon -> At some point "self_node_id" is the remote node and "node_id" is the head node (confirmed through logs)
+  // "num_bytes_pushed_from_plasma" also decreases when this happens
+  // "num_bytes_pushed_from_plasma" is the "total bytes pushed from head" in head node logs
+  // "num_bytes_pushed_from_plasma" is the 
+  RAY_LOG(INFO) << "Push from " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
   RAY_LOG(INFO) << "Total bytes pulled from remote: " << num_bytes_pushed_from_plasma_;
 
@@ -821,9 +825,11 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   // }
 
   /// RSTODO: Delete this later
+  // Jaewon -> num_bytes_received_total is increasing the remote node (confirmed through logs)
   RAY_LOG(INFO) << "Total number of bytes received: " << num_bytes_received_total_;
 
   /// RSTODO: Delete this later
+  // Jaewon -> "self_node_id" and "node_id" are the same, and "chunk index" is always 0
   RAY_LOG(INFO) << "SpillToRemote on " << self_node_id_ << " from " << node_id
                 << " of object " << object_id << " chunk index: " << chunk_index
                 << ", chunk data size: " << data.size()
