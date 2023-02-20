@@ -238,7 +238,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
                  const std::string &object_url,
                  std::function<void(const ray::Status &)> callback) {
             /// RSTODO: Delete later
-            RAY_LOG(INFO) << "AsyncRestoreSpilledObject is being called!"
+            RAY_LOG(INFO) << "AsyncRestoreSpilledObject is being called!";
             /// RSTODO: entering phase for spill restoration.
             GetLocalObjectManager().AsyncRestoreSpilledObject(
                 object_id, object_size, object_url, callback);
