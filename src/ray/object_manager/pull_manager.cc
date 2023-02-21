@@ -440,16 +440,19 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
 
 void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   // The object is already local; abort.
+  RAY_LOG(INFO) << "object local check 1";
   if (object_is_local_(object_id)) {
     return;
   }
 
   // The object is no longer needed; abort.
+  RAY_LOG(INFO) << "object no longer needed check 2";
   if (active_object_pull_requests_.count(object_id) == 0) {
     return;
   }
 
   // The object waiting for local pull retry; abort.
+  RAY_LOG(INFO) << "object waiting for local pull retry check 3";
   auto &request = map_find_or_die(object_pull_requests_, object_id);
   if (request.next_pull_time > get_time_seconds_()) {
     return;
@@ -457,6 +460,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
 
   // Try to pull the object from a remote node. If the object is spilled on the local
   // disk of the remote node, it will be restored by PushManager prior to pushing.
+  RAY_LOG(INFO) << "PullFromRandomLocation check 4";
   bool did_pull = PullFromRandomLocation(object_id);
   if (did_pull) {
     UpdateRetryTimer(request, object_id);
@@ -465,6 +469,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
 
   // check if we can restore the object directly in the current raylet.
   // first check local spilled objects
+  RAY_LOG(INFO) << "Does it get here? check 5";
   std::string direct_restore_url = get_locally_spilled_object_url_(object_id);
   if (direct_restore_url.empty()) {
     if (!request.spilled_url.empty() && request.spilled_node_id.IsNil()) {
