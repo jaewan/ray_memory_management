@@ -471,6 +471,10 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
       direct_restore_url = request.spilled_url;
     }
   }
+
+  /// RSTOOD: Delete this later
+  RAY_LOG(INFO) << "Checking if restoration is called";
+
   if (!direct_restore_url.empty()) {
     // Select an url from the object directory update
     UpdateRetryTimer(request, object_id);
