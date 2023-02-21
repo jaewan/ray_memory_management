@@ -444,16 +444,25 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
     return;
   }
 
+  /// RSTOOD: Delete this later
+  RAY_LOG(INFO) << "Checking if restoration is called 0";
+
   // The object is no longer needed; abort.
   if (active_object_pull_requests_.count(object_id) == 0) {
     return;
   }
+
+  /// RSTOOD: Delete this later
+  RAY_LOG(INFO) << "Checking if restoration is called 1";
 
   // The object waiting for local pull retry; abort.
   auto &request = map_find_or_die(object_pull_requests_, object_id);
   if (request.next_pull_time > get_time_seconds_()) {
     return;
   }
+
+  /// RSTOOD: Delete this later
+  RAY_LOG(INFO) << "Checking if restoration is called 2";
 
   // Try to pull the object from a remote node. If the object is spilled on the local
   // disk of the remote node, it will be restored by PushManager prior to pushing.
@@ -462,6 +471,9 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
     UpdateRetryTimer(request, object_id);
     return;
   }
+
+  /// RSTOOD: Delete this later
+  RAY_LOG(INFO) << "Checking if restoration is called 3";
 
   // check if we can restore the object directly in the current raylet.
   // first check local spilled objects
@@ -473,7 +485,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   }
 
   /// RSTOOD: Delete this later
-  RAY_LOG(INFO) << "Checking if restoration is called";
+  RAY_LOG(INFO) << "Checking if restoration is called 4";
 
   if (!direct_restore_url.empty()) {
     // Select an url from the object directory update
