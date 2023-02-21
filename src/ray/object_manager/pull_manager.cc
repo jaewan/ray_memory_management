@@ -27,6 +27,8 @@ PullManager::PullManager(
     const std::function<void(const ObjectID &)> cancel_pull_request,
     const std::function<void(const ObjectID &, rpc::ErrorType)> fail_pull_request,
     const RestoreSpilledObjectCallback restore_spilled_object,
+    /// RSCODE:
+    std::function<void(const ObjectID &)> restore_remote_spilled_object,
     const std::function<double()> get_time_seconds,
     int pull_timeout_ms,
     int64_t num_bytes_available,
@@ -37,6 +39,8 @@ PullManager::PullManager(
       send_pull_request_(send_pull_request),
       cancel_pull_request_(cancel_pull_request),
       restore_spilled_object_(restore_spilled_object),
+      /// RSCODE:
+      restore_remote_spilled_object_(restore_remote_spilled_object),
       get_time_seconds_(get_time_seconds),
       pull_timeout_ms_(pull_timeout_ms),
       num_bytes_available_(num_bytes_available),
@@ -439,30 +443,25 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
 }
 
 void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
+
+  /// RSTODO: Add lambda call here to fetch from remote
+  restore_remote_spilled_object_(object_id);
+
   // The object is already local; abort.
   if (object_is_local_(object_id)) {
     return;
   }
-
-  /// RSTOOD: Delete this later
-  RAY_LOG(INFO) << "Checking if restoration is called 0";
 
   // The object is no longer needed; abort.
   if (active_object_pull_requests_.count(object_id) == 0) {
     return;
   }
 
-  /// RSTOOD: Delete this later
-  RAY_LOG(INFO) << "Checking if restoration is called 1";
-
   // The object waiting for local pull retry; abort.
   auto &request = map_find_or_die(object_pull_requests_, object_id);
   if (request.next_pull_time > get_time_seconds_()) {
     return;
   }
-
-  /// RSTOOD: Delete this later
-  RAY_LOG(INFO) << "Checking if restoration is called 2";
 
   // Try to pull the object from a remote node. If the object is spilled on the local
   // disk of the remote node, it will be restored by PushManager prior to pushing.
@@ -471,9 +470,6 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
     UpdateRetryTimer(request, object_id);
     return;
   }
-
-  /// RSTOOD: Delete this later
-  RAY_LOG(INFO) << "Checking if restoration is called 3";
 
   // check if we can restore the object directly in the current raylet.
   // first check local spilled objects
@@ -484,15 +480,9 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
     }
   }
 
-  /// RSTOOD: Delete this later
-  RAY_LOG(INFO) << "Checking if restoration is called 4";
-
   if (!direct_restore_url.empty()) {
     // Select an url from the object directory update
     UpdateRetryTimer(request, object_id);
-    /// RSTODO: don't call restore_spilled_object, but restore from remote. 
-    /// RSTODO: Delete this later
-    RAY_LOG(INFO) << "About to call restore_spilled_object";
     restore_spilled_object_(object_id,
                             request.object_size,
                             direct_restore_url,

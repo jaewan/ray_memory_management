@@ -60,6 +60,8 @@ ObjectManager::ObjectManager(
     IObjectDirectory *object_directory,
     /// RSCOMMENT: code that goes to LocalObjectManager to restore spilled objects. 
     RestoreSpilledObjectCallback restore_spilled_object,
+    /// RSCODE:
+    std::function<void(const ObjectID &)> restore_remote_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
     SpillObjectsCallback spill_objects_callback,
     std::function<void()> object_store_full_callback,
@@ -109,6 +111,8 @@ ObjectManager::ObjectManager(
       object_manager_service_(rpc_service_, *this),
       client_call_manager_(main_service, config_.rpc_service_threads_number),
       restore_spilled_object_(restore_spilled_object),
+      /// RSCODE:
+      restore_remote_spilled_object_(restore_remote_spilled_object),
       get_spilled_object_url_(get_spilled_object_url),
       pull_retry_timer_(*main_service_,
                         boost::posix_time::milliseconds(config.timer_freq_ms)) {
@@ -144,6 +148,8 @@ ObjectManager::ObjectManager(
                                       cancel_pull_request,
                                       fail_pull_request,
                                       restore_spilled_object_,
+                                      /// RSCODE:
+                                      restore_remote_spilled_object_,
                                       get_time,
                                       config.pull_timeout_ms,
                                       available_memory,
@@ -281,6 +287,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
   if (rpc_client) {
     // Try pulling from the client.
     rpc_service_.post(
+        /// RSCODE:
         [this, object_id, client_id, from_remote, rpc_client]() {
           rpc::PullRequest pull_request;
           pull_request.set_object_id(object_id.Binary());
@@ -291,6 +298,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
 
           rpc_client->Pull(
               pull_request,
+              /// RSCODE:
               [object_id, client_id](const Status &status, const rpc::PullReply &reply) {
                 if (!status.ok()) {
                   RAY_LOG(WARNING) << "Send pull " << object_id << " request to client "
@@ -456,7 +464,7 @@ void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const
 
   /// RSTODO: Delete this later
   if (from_remote) {
-    RAY_LOG(INFO) << "Push on " << self_node_id_ << " to " << node_id << " of object "
+    RAY_LOG(INFO) << "Push from remote from " << self_node_id_ << " to " << node_id << " of object "
                  << object_id;
   }
 
@@ -925,8 +933,10 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
   /// RSCODE: Check if request is for remote object
   // If so, add functionality such as freeing the object in the remote node
   if (from_remote) {
-    /// RSTODO: Free object here
-    /// Daniel: we might want to do the freeing in the callback of Push cuz RPCs might be async. 
+    /// RSCODE: Free object here
+    std::vector<ObjectID> object_ids;
+    object_ids.push_back(object_id);
+    FreeObjects(object_ids, true);
   }
     
   send_reply_callback(Status::OK(), nullptr, nullptr);

@@ -177,6 +177,8 @@ class ObjectManager : public ObjectManagerInterface,
       const ObjectManagerConfig &config,
       IObjectDirectory *object_directory,
       RestoreSpilledObjectCallback restore_spilled_object,
+      /// RSCODE:
+      std::function<void(const ObjectID &)> restore_remote_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
       SpillObjectsCallback spill_objects_callback,
       std::function<void()> object_store_full_callback,
@@ -513,6 +515,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// Callback to trigger direct restoration of an object.
   const RestoreSpilledObjectCallback restore_spilled_object_;
+
+  /// RSCODE:
+  const std::function<void(const ObjectID &)> restore_remote_spilled_object_;
 
   /// Callback to get the URL of a locally spilled object.
   /// This returns the empty string if the object was not spilled locally.

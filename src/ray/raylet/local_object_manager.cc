@@ -460,8 +460,6 @@ void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids
 
     // Mark that the object is spilled and unpin the pending requests.
     spilled_objects_url_.emplace(object_id, object_url);
-    /// RSTODO:
-    RAY_LOG(INFO) << "Spilled Object URL (Local Disk): " << object_url;
     // spilled_object_url.emplace(object_id, "remotelyspilled");
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
@@ -501,6 +499,20 @@ std::string LocalObjectManager::GetLocalSpilledObjectURL(const ObjectID &object_
   }
 }
 
+void LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
+  /// RSCODE: check for remote spill and restore.
+  /// NVM: keeping this here, but this comment is obsolete.  
+  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Object restoration is happening";
+  RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spill_remote_mapping.size();
+  if (spill_remote_mapping.contains(object_id)) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Remote object has been found: " << object_id;
+    object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
+  } 
+}
+
 void LocalObjectManager::AsyncRestoreSpilledObject(
     const ObjectID &object_id,
     int64_t object_size,
@@ -515,18 +527,6 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
       << "Object dedupe wasn't done properly. Please report if you see this issue.";
   num_bytes_pending_restore_ += object_size;
 
-  /// RSCODE: check for remote spill and restore.
-  /// NVM: keeping this here, but this comment is obsolete.  
-  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
-  /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "Object restoration is happening";
-  if (spill_remote_mapping.count(object_id) == 1) {
-    /// RSTODO: Delete this later
-    RAY_LOG(INFO) << "Remote object has been found: " << object_id;
-    object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
-  } 
-
-  /// RSTODO: Comment this out for now
   io_worker_pool_.PopRestoreWorker([this, object_id, object_size, object_url, callback](
                                        std::shared_ptr<WorkerInterface> io_worker) {
     auto start_time = absl::GetCurrentTimeNanos();
