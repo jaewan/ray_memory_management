@@ -869,7 +869,10 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                  << " of object " << object_id << " chunk index: " << chunk_index
                  << ", chunk data size: " << data.size()
                  << ", object size: " << data_size;
-
+  
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "ReceiveObjectChunk on " << node_id
+                << " of object " << object_id;
   /// RSTODO: this might be reason why we don't spill but only call RPC
   /// might have to fiddle around with pull manager. 
   /// RSCODE: current solution: add default from_remote param so that
