@@ -1658,9 +1658,10 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
   } else {
     returned_refs = task_manager_->AddPendingTask(
         task_spec.CallerAddress(), task_spec, CurrentCallSite(), max_retries);
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] Submitting normal task " << task_spec.DebugString();
-    if(RayConfig::instance().enable_BlockTasksSpill())
-	  BuildObjectWorkingSet(task_spec);
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] Submitting normal task " << task_spec.DebugString();
+		if(RayConfig::instance().enable_BlockTasksSpill()){
+			BuildObjectWorkingSet(task_spec);
+		}
     io_service_.post(
         [this, task_spec]() {
           RAY_UNUSED(direct_task_submitter_->SubmitTask(task_spec));

@@ -81,6 +81,7 @@ void SchedulerResourceReporter::FillResourceUsage(
         break;
       }
 
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] here is another GetSchedulingClassDescriptor call";
       const auto &scheduling_class_descriptor =
           TaskSpecification::GetSchedulingClassDescriptor(scheduling_class);
       if ((scheduling_class_descriptor.scheduling_strategy.scheduling_strategy_case() ==
@@ -129,7 +130,13 @@ void SchedulerResourceReporter::FillResourceUsage(
   };
 
   auto transform_func = [](const auto &pair) {
-    return std::make_pair(pair.first, pair.second.size());
+    // DFS patch. When a task request comes at cluster_task_manager, 
+    // all of them are manged in a single queue of scheduling class 0
+    // So should not rely on what scheduling class queue it is on
+		auto work_it = pair.second.begin();
+    const std::shared_ptr<internal::Work> &work = *work_it;
+    auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
+    return std::make_pair(scheduling_class, pair.second.size());
   };
 
   fill_resource_usage_helper(

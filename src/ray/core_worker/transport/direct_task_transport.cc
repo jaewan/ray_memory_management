@@ -245,9 +245,9 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
 	// This is because the lease granted task has already been pushed as core_worker pushes
 	// tasks to workers regardless of granted task
-	if(!priority_to_task_spec_.contains(lease_granted_pri)){
+	if(!priority_to_task_spec_.contains(lease_granted_pri) || lease_granted_pri > block_requested_priority_){
 		RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle task with priority:"<<lease_granted_pri 
-			<< " does not exist, redirecting to general OnWorkerIdle";
+			<< " does not exist, redirecting to general OnWorkerIdle or blocked by backpressure";
 		OnWorkerIdle(addr,
 								 scheduling_key,
 								 /*error=*/was_error,
@@ -327,22 +327,22 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
+	const auto pri_it = current_queue.begin();
   if ((was_error || worker_exiting ||
        current_time_ms() > lease_entry.lease_expiration_time) ||
-      current_queue.empty()) {
+      current_queue.empty() || *pri_it > block_requested_priority_) {
     RAY_CHECK(active_workers_.size() >= 1);
 
     // Return the worker only if there are no tasks to do.
     if (!lease_entry.is_busy) {
       ReturnWorker(addr, was_error, worker_exiting);
     }else{
-	  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
-	}
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
+		}
   } else {
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
     while (!current_queue.empty() && !lease_entry.is_busy) {
-      const auto pri_it = current_queue.begin();
       const auto &task_spec = priority_to_task_spec_[*pri_it];
       lease_entry.is_busy = true;
 
@@ -468,6 +468,10 @@ void CoreWorkerDirectTaskSubmitter::ReportWorkerBacklogIfNeeded(
   }
 }
 
+void CoreWorkerDirectTaskSubmitter::SetBlockSpill(std::vector<int> block_score){
+	block_requested_priority_.Set(block_score);
+}
+
 void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     const SchedulingKey &scheduling_key, const rpc::Address *raylet_address) {
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
@@ -553,7 +557,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   // Subtract 1 so we don't double count the task we are requesting for.
   int64_t queue_size = priority_task_queues_.size() - 1;
 
-  static int JAE_DEBUG_COUNT = 0;
+	static const bool enable_BlockTasks = RayConfig::instance().enable_BlockTasks();
 
   lease_client->RequestWorkerLease(
       resource_spec.GetMessage(),
@@ -641,12 +645,14 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               rpc::WorkerAddress addr(reply.worker_address());
 							LogPlaceSeq("\t\tRequest Granted" , pri);
               RAY_LOG(DEBUG) << "Lease granted to task " << task_id << " with priority " 
-                << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id
-			  	<< " num leased:" << JAE_DEBUG_COUNT;
-			  JAE_DEBUG_COUNT++;
+                << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id;
 
               auto resources_copy = reply.resource_mapping();
-
+							if (enable_BlockTasks){
+								std::vector<int> block_score(reply.priority().data(), reply.priority().data() +
+									reply.priority().size());
+								SetBlockSpill(block_score);
+							}
               AddWorkerLeaseClient(
                   addr, std::move(lease_client), resources_copy, scheduling_key);
               RAY_CHECK(active_workers_.size() >= 1);

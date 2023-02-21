@@ -13,15 +13,15 @@ void Priority::extend(int64_t size) const {
 
 void Priority::shorten(int64_t size) const {
   if(size > 0)
-	score.resize(score.size() - size);
+		score.resize(score.size() - size);
 }
 
 void Priority::SetFromParentPriority(Priority &parent, int s){
   //param s id the last score to add
   if(parent.score.size() == 1 && parent.score[0] == INT_MAX){
-	score[0] = s;
+		score[0] = s;
   }else{
-	score = parent.score;
+		score = parent.score;
     score.push_back(s);
   }
 }

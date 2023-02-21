@@ -57,6 +57,10 @@ struct Priority {
 	return (int)score.size();
   }
 
+  void Set(const std::vector<int> &s){
+		score = s;
+  }
+
   //This is for ensemble serve patch. When setting task's current_task_priority_ (aggregator) 
   void Set(Priority &pri){
     size_t len = pri.GetDepth();

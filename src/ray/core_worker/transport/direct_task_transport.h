@@ -181,6 +181,9 @@ class CoreWorkerDirectTaskSubmitter {
   void CancelWorkerLeaseIfNeeded(const SchedulingKey &scheduling_key)
       EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
+	/// Set block_requested_priority_ for BackPressure
+	void SetBlockSpill(std::vector<int> block_score);
+
   /// Set up client state for newly granted worker lease.
   void AddWorkerLeaseClient(
       const rpc::WorkerAddress &addr,

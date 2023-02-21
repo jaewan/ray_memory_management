@@ -66,7 +66,8 @@ void ClusterTaskManager::QueueAndScheduleTask(
     rpc::RequestWorkerLeaseReply *reply,
     rpc::SendReplyCallback send_reply_callback) {
   RAY_LOG(DEBUG) << "Queuing and scheduling task "
-                 << task.GetTaskSpecification().TaskId();
+                 << task.GetTaskSpecification().TaskId()
+								 << " priority:" << task.GetTaskSpecification().GetPriority();
   auto work = std::make_shared<internal::Work>(
       task, grant_or_reject, is_selected_based_on_locality, reply, [send_reply_callback] {
         send_reply_callback(Status::OK(), nullptr, nullptr);
@@ -469,14 +470,14 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	    (const Status &status, const rpc::GetObjectWorkingSetReply &reply){
 	  int64_t gcable_size = free_memory;
 	  for(int i=0; i<reply.gcable_object_ids_size(); i++){
-		TaskID task_id = TaskID::FromBinary(reply.gcable_object_ids(i));
-		gcable_size += object_manager_->GetTaskObjectSize(task_id);
+			TaskID task_id = TaskID::FromBinary(reply.gcable_object_ids(i));
+			gcable_size += object_manager_->GetTaskObjectSize(task_id);
 	  }
 	  bool is_deadlock = false;
 	  if(first_pending_obj_size > gcable_size){
-		is_deadlock = true;
-		//TODO(Jae) Change this to turn off backpressure
-		BlockTasks(init_priority, io_service);
+			is_deadlock = true;
+			//TODO(Jae) Change this to turn off backpressure
+			BlockTasks(init_priority, io_service);
 	  }
 	  RAY_LOG(DEBUG)<<"["<< __func__<<"] RPC reply Deadlock: "<<is_deadlock<<" gcable size:"
 	  <<gcable_size << " first pending object size:" << first_pending_obj_size;
@@ -487,7 +488,7 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
 	    },"");
 	  }else{
 	    io_service.post([this, is_deadlock](){
-		  object_manager_->SetShouldSpill(is_deadlock);
+				object_manager_->SetShouldSpill(is_deadlock);
 	    },"");
 	  }
   });

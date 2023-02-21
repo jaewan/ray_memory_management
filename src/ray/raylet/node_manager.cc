@@ -271,43 +271,43 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 			if(RayConfig::instance().enable_BlockTasksSpill()){
 			  // Deadlock#1 when all workers are spinning
 			  if(num_spinning_workers && num_spinning_workers == worker_pool_.GetAllRegisteredWorkersNum()){
-                RAY_LOG(DEBUG) << "[" << __func__ << "] all workers are spinning: " << num_spinning_workers;
-                if(evict_tasks){
-                  if(cluster_task_manager_->EvictTasks(base_priority)){
-					if(delete_eager_spilled_objects){
+					RAY_LOG(DEBUG) << "[" << __func__ << "] all workers are spinning: " << num_spinning_workers;
+					if(evict_tasks){
+						if(cluster_task_manager_->EvictTasks(base_priority)){
+							if(delete_eager_spilled_objects){
 			          io_service_.post([this](){
 		                local_object_manager_.DeleteEagerSpilledObjects(true);
-				      },"");
-                      return GetLocalObjectManager().IsSpillingInProgress();
-					}else{
+								},"");
+								return GetLocalObjectManager().IsSpillingInProgress();
+							}else{
 			          io_service_.post([this](){
-					    object_manager_->SetShouldSpill(true);
-				      },"");
-					}
-                    return GetLocalObjectManager().IsSpillingInProgress();
+									object_manager_->SetShouldSpill(true);
+								},"");
+							}
+							return GetLocalObjectManager().IsSpillingInProgress();
 				     //return true;
 			      }else{
-                    RAY_LOG(DEBUG) << "[" << __func__ <<
-						"] EvictTasks destroyed workers num_workers now: "<<
-						worker_pool_.GetAllRegisteredWorkersNum();
-				  }
-                }else{
-				  if(delete_eager_spilled_objects){
+							RAY_LOG(DEBUG) << "[" << __func__ <<
+																"] EvictTasks destroyed workers num_workers now: "<<
+							worker_pool_.GetAllRegisteredWorkersNum();
+						}
+					}else{
+						if(delete_eager_spilled_objects){
 			        io_service_.post([this](){
 		              local_object_manager_.DeleteEagerSpilledObjects(true);
-				    },"");
-                    return GetLocalObjectManager().IsSpillingInProgress();
-				  }else{
+							},"");
+							return GetLocalObjectManager().IsSpillingInProgress();
+						}else{
 			        io_service_.post([this](){
 				      object_manager_->SetShouldSpill(true);
-				    },"");
-				  }
-                  return GetLocalObjectManager().IsSpillingInProgress();
-				  //return true;
-				}
+							},"");
+						}
+						return GetLocalObjectManager().IsSpillingInProgress();
+						//return true;
+					}
 			  }
 			}
-            if(block_spill){
+			if(block_spill){
 			  cluster_task_manager_->CheckDeadlock(num_spinning_workers, pending_size,
 					  local_object_manager_, io_service_, worker_rpc_pool_);
               return GetLocalObjectManager().IsSpillingInProgress();

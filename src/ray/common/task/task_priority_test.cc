@@ -155,18 +155,21 @@ TEST(TaskPriorityTest, TestDataStructures) {
 }
 
 TEST(TaskPriorityTest, TestBtree){
-  std::vector<int> single;
-  single.push_back(10);
-  Priority p10(single);
-  Priority p3_30({3,30});
+  std::vector<int> twentyone;
+  std::vector<int> twentytwo;
+  twentyone.push_back(21);
+  twentytwo.push_back(22);
+  Priority p21(twentyone);
+  Priority p22(twentytwo);
   absl::btree_set<TaskKey> set = absl::btree_set<TaskKey>();
-  TaskKey producer(p10, ObjectID::FromRandom().TaskId());
-  TaskKey consumer(p3_30, ObjectID::FromRandom().TaskId());
-  set.emplace(producer);
-  set.emplace(consumer);
+
+  TaskKey t21(p21, 'dc746dc61b2c1923ffffffffffffffffffffffff01000000');
+  TaskKey t22(p22, 'c76a79b2875a7251ffffffffffffffffffffffff01000000');
+
+  set.emplace(t21);
+  set.emplace(t22);
   auto it = set.begin();
-  ASSERT_EQ(it->first, p3_30);
-  std::cerr << it->first;
+  ASSERT_EQ(it->first, p21);
 }
 
 }  // namespace ray
