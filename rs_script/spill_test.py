@@ -1,6 +1,7 @@
 import ray
 import numpy as np
 import os
+import time
 from sys import getsizeof
 
 # os.environ["RAY_BACKEND_LOG_LEVEL"] = "debug"
@@ -24,7 +25,10 @@ future1 = huge.remote(True)
 future2 = huge.remote(False)
 result1 = ray.get(future1)
 print(f"result 1 passed")
+del future1 
+del result1
+time.sleep(5)
 result2 = ray.get(future2)
 print(f"result 2 passed")
-final_result = ray.get(add.remote(result1, result2))
-print(f"final_result passed")
+print(result2)
+
