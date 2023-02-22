@@ -67,7 +67,7 @@ class PullManager {
       const std::function<void(const ObjectID &, rpc::ErrorType)> fail_pull_request,
       const RestoreSpilledObjectCallback restore_spilled_object,
       /// RSCODE:
-      std::function<void(const ObjectID &)> restore_remote_spilled_object,
+      std::function<bool(const ObjectID &)> restore_remote_spilled_object,
       const std::function<double()> get_time_seconds,
       int pull_timeout_ms,
       int64_t num_bytes_available,
