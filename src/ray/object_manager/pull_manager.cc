@@ -28,7 +28,7 @@ PullManager::PullManager(
     const std::function<void(const ObjectID &, rpc::ErrorType)> fail_pull_request,
     const RestoreSpilledObjectCallback restore_spilled_object,
     /// RSCODE:
-    std::function<void(const ObjectID &)> restore_remote_spilled_object,
+    std::function<bool(const ObjectID &)> restore_remote_spilled_object,
     const std::function<double()> get_time_seconds,
     int pull_timeout_ms,
     int64_t num_bytes_available,
@@ -445,7 +445,11 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
 void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
 
   /// RSTODO: Add lambda call here to fetch from remote
-  restore_remote_spilled_object_(object_id);
+  bool success = restore_remote_spilled_object_(object_id);
+  if (success) {
+    RAY_LOG(INFO) << "Restored from Remote";
+    return;
+  }
 
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Try to make object local 0";

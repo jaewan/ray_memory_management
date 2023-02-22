@@ -61,7 +61,7 @@ ObjectManager::ObjectManager(
     /// RSCOMMENT: code that goes to LocalObjectManager to restore spilled objects. 
     RestoreSpilledObjectCallback restore_spilled_object,
     /// RSCODE:
-    std::function<void(const ObjectID &)> restore_remote_spilled_object,
+    std::function<bool(const ObjectID &)> restore_remote_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
     SpillObjectsCallback spill_objects_callback,
     std::function<void()> object_store_full_callback,
