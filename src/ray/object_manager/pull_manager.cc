@@ -447,15 +447,24 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   /// RSTODO: Add lambda call here to fetch from remote
   restore_remote_spilled_object_(object_id);
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Try to make object local 0";
+
   // The object is already local; abort.
   if (object_is_local_(object_id)) {
     return;
   }
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Try to make object local 1";
+
   // The object is no longer needed; abort.
   if (active_object_pull_requests_.count(object_id) == 0) {
     return;
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Try to make object local 2";
 
   // The object waiting for local pull retry; abort.
   auto &request = map_find_or_die(object_pull_requests_, object_id);
@@ -463,13 +472,17 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
     return;
   }
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Try to make object local 3";
+
   // Try to pull the object from a remote node. If the object is spilled on the local
   // disk of the remote node, it will be restored by PushManager prior to pushing.
-  bool did_pull = PullFromRandomLocation(object_id);
-  if (did_pull) {
-    UpdateRetryTimer(request, object_id);
-    return;
-  }
+  /// RSTODO: Comment for now
+  // bool did_pull = PullFromRandomLocation(object_id);
+  // if (did_pull) {
+  //   UpdateRetryTimer(request, object_id);
+  //   return;
+  // }
 
   // check if we can restore the object directly in the current raylet.
   // first check local spilled objects
@@ -480,9 +493,14 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
     }
   }
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Try to make object local 4";
+
   if (!direct_restore_url.empty()) {
     // Select an url from the object directory update
     UpdateRetryTimer(request, object_id);
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Restoring from disk";
     restore_spilled_object_(object_id,
                             request.object_size,
                             direct_restore_url,
@@ -494,6 +512,19 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
                             });
     return;
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Try to make object local 5";
+
+  /// RSTODO: Delete later
+  bool did_pull = PullFromRandomLocation(object_id);
+  if (did_pull) {
+    UpdateRetryTimer(request, object_id);
+    return;
+  }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Try to make object local 6";
 
   RAY_CHECK(!request.pending_object_creation);
   if (request.expiration_time_seconds == 0) {

@@ -373,6 +373,7 @@ void ObjectManager::FindNodeToSpill(const ObjectID &object_id) {
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
   /// RSCODE: Add code to add object id to node id mapping
+   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
 
   auto rpc_client = GetRpcClient(node_id);
@@ -612,6 +613,7 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
             [=]() {
               // Post to the multithreaded RPC event loop so that data is copied
               // off of the main thread.
+              /// RSTODO: Used to be "SpillObjectChunk"
               SpillObjectChunk(
                   spill_id,
                   object_id,
@@ -625,7 +627,7 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                         [this, node_id, object_id]() {
                           push_manager_->OnChunkComplete(node_id, object_id);
                         },
-                        "ObjectManager.SpillRemote");
+                        "ObjectManager.Push");
                   },
                   chunk_reader);
             },
