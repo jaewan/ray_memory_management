@@ -419,6 +419,9 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     // spilled_objects_url_.emplace(object_id, object_url);
     /// RSTODO:
     RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
+    /// RSCOMMENT: so here, we are placing a dummy value "remotelyspilled" 
+    /// on the hashmap. If we try to find from spill_objects_url_, its going
+    /// to error out immediately. 
     spilled_objects_url_.emplace(object_id, object_url);
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
@@ -439,6 +442,9 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
       continue;
     }
     const auto &worker_addr = freed_it->second.first;
+    /// RSCOMMENT: might want to not call ReportObjectSpilled
+    /// This updates bookkeeping based on Ownership, and idk if this
+    /// is supposed to help. 
     object_directory_->ReportObjectSpilled(
         object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
   }
@@ -507,7 +513,7 @@ std::string LocalObjectManager::GetLocalSpilledObjectURL(const ObjectID &object_
   }
 }
 
-void LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
+bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
   /// RSCODE: check for remote spill and restore.
   /// NVM: keeping this here, but this comment is obsolete.  
   absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
@@ -519,7 +525,9 @@ void LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
     /// RSTODO: Delete this later
     RAY_LOG(INFO) << "Remote object has been found: " << object_id;
     object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
-  } 
+    return true;
+  }
+  return false; 
 }
 
 void LocalObjectManager::AsyncRestoreSpilledObject(

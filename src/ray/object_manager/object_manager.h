@@ -517,7 +517,7 @@ class ObjectManager : public ObjectManagerInterface,
   const RestoreSpilledObjectCallback restore_spilled_object_;
 
   /// RSCODE:
-  const std::function<void(const ObjectID &)> restore_remote_spilled_object_;
+  const std::function<bool(const ObjectID &)> restore_remote_spilled_object_;
 
   /// Callback to get the URL of a locally spilled object.
   /// This returns the empty string if the object was not spilled locally.

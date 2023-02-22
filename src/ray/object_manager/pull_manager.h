@@ -401,7 +401,7 @@ class PullManager {
   const std::function<void(const ObjectID &, const NodeID &)> send_pull_request_;
   const std::function<void(const ObjectID &)> cancel_pull_request_;
   const RestoreSpilledObjectCallback restore_spilled_object_;
-  const std::function<void(const ObjectID &)> restore_remote_spilled_object_;
+  const std::function<bool(const ObjectID &)> restore_remote_spilled_object_;
   const std::function<double()> get_time_seconds_;
   uint64_t pull_timeout_ms_;
 
