@@ -330,11 +330,17 @@ void LocalObjectManager::SpillObjectsInternal(
         }
         
         /// RSCODE: Simply call SpillRemote() function in object_manager
-        for (const auto &object_id: requested_objects_to_spill) {
-            object_manager_.FindNodeToSpill(object_id);
-        }
+        // UNCOMMENT
+        // for (const auto &object_id: requested_objects_to_spill) {
+        //     object_manager_.FindNodeToSpill(object_id);
+        // }
+
+        /// RSTODO: Not sure if we need this
+        io_worker_pool_.PushSpillWorker(io_worker);
 
         /// RSTODO: Have to call OnObjectSpilled after spilling to remote?
+        // UNCOMMENT
+        // OnObjectRemoteSpilled(requested_objects_to_spill);
 
         /// RSTODO: Comment this out for now
         io_worker->rpc_client()->SpillObjects(
@@ -372,13 +378,63 @@ void LocalObjectManager::SpillObjectsInternal(
                 callback(status);
               }
             });
-      });
+         });
 
   // Deleting spilled objects can fall behind when there is a lot
   // of concurrent spilling and object frees. Clear the queue here
   // if needed.
   if (spilled_object_pending_delete_.size() >= free_objects_batch_size_) {
     ProcessSpilledObjectsDeleteQueue(free_objects_batch_size_);
+  }
+}
+
+/// RSTODO: Code to free a remotely spilled object
+void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &object_ids) {
+  for (size_t i = 0; i < object_ids.size(); ++i) {
+    const ObjectID &object_id = object_ids[i];
+    const std::string &object_url = "remotelyspilled";
+    RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
+
+    // Update the object_id -> url_ref_count to use it for deletion later.
+    // We need to track the references here because a single file can contain
+    // multiple objects, and we shouldn't delete the file until
+    // all the objects are gone out of scope.
+    // object_url is equivalent to url_with_offset.
+    // auto parsed_url = ParseURL(object_url);
+    // const auto base_url_it = parsed_url->find("url");
+    // RAY_CHECK(base_url_it != parsed_url->end());
+    // if (!url_ref_count_.contains(base_url_it->second)) {
+    //   url_ref_count_[base_url_it->second] = 1;
+    // } else {
+    //   url_ref_count_[base_url_it->second] += 1;
+    // }
+
+    // Mark that the object is spilled and unpin the pending requests.
+    // spilled_objects_url_.emplace(object_id, object_url);
+    /// RSTODO:
+    RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
+    spilled_objects_url_.emplace(object_id, object_url);
+    // lets try to find a way to trigger the Pull RPC with remote retrieval
+    // whenever we recognize that the url is exactly "remotelyspilled" or 
+    // some other URL that we choose. 
+    RAY_LOG(DEBUG) << "Unpinning pending spill object " << object_id;
+    auto it = objects_pending_spill_.find(object_id);
+    RAY_CHECK(it != objects_pending_spill_.end());
+    const auto object_size = it->second->GetSize();
+    num_bytes_pending_spill_ -= object_size;
+    objects_pending_spill_.erase(it);
+
+    // Asynchronously Update the spilled URL.
+    auto freed_it = local_objects_.find(object_id);
+    if (freed_it == local_objects_.end() || freed_it->second.second) {
+      RAY_LOG(DEBUG) << "Spilled object already freed, skipping send of spilled URL to "
+                        "object directory for object "
+                     << object_id;
+      continue;
+    }
+    const auto &worker_addr = freed_it->second.first;
+    object_directory_->ReportObjectSpilled(
+        object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
   }
 }
 
@@ -389,7 +445,7 @@ void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids
     const ObjectID &object_id = object_ids[i];
     const std::string &object_url = worker_reply.spilled_objects_url(i);
     RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
-
+    
     // Update the object_id -> url_ref_count to use it for deletion later.
     // We need to track the references here because a single file can contain
     // multiple objects, and we shouldn't delete the file until
@@ -406,8 +462,14 @@ void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids
 
     // Mark that the object is spilled and unpin the pending requests.
     spilled_objects_url_.emplace(object_id, object_url);
+<<<<<<< HEAD
+=======
     /// RSTODO:
-    RAY_LOG(INFO) << "RSLOG: Spilled Object URL (Local Disk): " << object_url;
+    /// RSTODO: Delete this line
+    RAY_LOG(INFO) << "OnObjectSpilled object id: " << object_id;
+
+    RAY_LOG(INFO) << "Spilled Object URL (Local Disk): " << object_url;
+>>>>>>> 63ab6cb6cf69dbdcfe3f8d592bfe9ef904200797
     // spilled_object_url.emplace(object_id, "remotelyspilled");
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
@@ -447,6 +509,20 @@ std::string LocalObjectManager::GetLocalSpilledObjectURL(const ObjectID &object_
   }
 }
 
+void LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
+  /// RSCODE: check for remote spill and restore.
+  /// NVM: keeping this here, but this comment is obsolete.  
+  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Object restoration is happening";
+  RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spill_remote_mapping.size();
+  if (spill_remote_mapping.contains(object_id)) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Remote object has been found: " << object_id;
+    object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
+  } 
+}
+
 void LocalObjectManager::AsyncRestoreSpilledObject(
     const ObjectID &object_id,
     int64_t object_size,
@@ -461,18 +537,6 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
       << "Object dedupe wasn't done properly. Please report if you see this issue.";
   num_bytes_pending_restore_ += object_size;
 
-  /// RSCODE: check for remote spill and restore.
-  /// NVM: keeping this here, but this comment is obsolete.  
-  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
-  /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "Object restoration is happening";
-  if (spill_remote_mapping.count(object_id) == 1) {
-    /// RSTODO: Delete this later
-    RAY_LOG(INFO) << "Remote object has been found: " << object_id;
-    object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
-  } 
-
-  /// RSTODO: Comment this out for now
   io_worker_pool_.PopRestoreWorker([this, object_id, object_size, object_url, callback](
                                        std::shared_ptr<WorkerInterface> io_worker) {
     auto start_time = absl::GetCurrentTimeNanos();
