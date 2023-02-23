@@ -345,6 +345,9 @@ void LocalObjectManager::SpillObjectsInternal(
 
         /// RSCODE: probably don't need since OnObjectRemoteSpilled should take care?
         object_manager_.FreeObjects(requested_objects_to_spill, true);
+        for (const auto &object_id: requested_objects_to_spill) {
+          ReleaseFreedObject(object_id);
+        }
 
         /// RSTODO: Comment this out for now
         // io_worker->rpc_client()->SpillObjects(
