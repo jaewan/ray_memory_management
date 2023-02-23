@@ -343,7 +343,7 @@ void LocalObjectManager::SpillObjectsInternal(
         /// RSTODO: Have to call OnObjectSpilled after spilling to remote?
         OnObjectRemoteSpilled(requested_objects_to_spill);
 
-        /// RSCODE: Free object here
+        /// RSCODE: probably don't need since OnObjectRemoteSpilled should take care?
         object_manager_.FreeObjects(requested_objects_to_spill, true);
 
         /// RSTODO: Comment this out for now
