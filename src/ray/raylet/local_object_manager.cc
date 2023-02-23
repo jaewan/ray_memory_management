@@ -99,6 +99,9 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
 }
 
 void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
+  /// RSTODO: Delete this later
+  RAY_LOG(DEBUG) << "Calling Released Freed Object on: " << object_id;
+
   // Only free the object if it is not already freed.
   auto it = local_objects_.find(object_id);
   if (it == local_objects_.end() || it->second.second) {
@@ -137,6 +140,9 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
 }
 
 void LocalObjectManager::FlushFreeObjects() {
+    /// RSTODO: Delete this later
+  RAY_LOG(DEBUG) << "Calling FlushFreeObjects";
+
   if (!objects_to_free_.empty()) {
     RAY_LOG(DEBUG) << "Freeing " << objects_to_free_.size() << " out-of-scope objects";
     on_objects_freed_(objects_to_free_);
@@ -344,10 +350,10 @@ void LocalObjectManager::SpillObjectsInternal(
         OnObjectRemoteSpilled(requested_objects_to_spill);
 
         /// RSCODE: probably don't need since OnObjectRemoteSpilled should take care?
-        object_manager_.FreeObjects(requested_objects_to_spill, true);
-        for (const auto &object_id: requested_objects_to_spill) {
-          ReleaseFreedObject(object_id);
-        }
+        // object_manager_.FreeObjects(requested_objects_to_spill, true);
+        // for (const auto &object_id: requested_objects_to_spill) {
+        //   ReleaseFreedObject(object_id);
+        // }
 
         /// RSTODO: Comment this out for now
         // io_worker->rpc_client()->SpillObjects(
@@ -597,6 +603,10 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
 }
 
 void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_size) {
+  
+  /// RSTODO: Delete later
+  RAY_LOG(DEBUG) << "Starting ProcessSpilledObjectsDeleteQueue";
+
   std::vector<std::string> object_urls_to_delete;
   // Process upto batch size of objects to delete.
   while (!spilled_object_pending_delete_.empty() &&
@@ -615,6 +625,10 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
     if (spilled_objects_url_it != spilled_objects_url_.end()) {
       // If the object was spilled, see if we can delete it. We should first check the
       // ref count.
+
+      /// RSTODO: Delete later
+      RAY_LOG(DEBUG) << "Checking if spilled object can be deleted: " << object_id;
+
       std::string &object_url = spilled_objects_url_it->second;
       // Note that here, we need to parse the object url to obtain the base_url.
       auto parsed_url = ParseURL(object_url);
@@ -628,6 +642,9 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
 
       // If there's no more refs, delete the object.
       if (url_ref_count_it->second == 0) {
+        /// RSTODO: Delete later
+        RAY_LOG(DEBUG) << "There are no more refs and the object can be deleted: " << object_id;
+
         url_ref_count_.erase(url_ref_count_it);
         RAY_LOG(DEBUG) << "The URL " << object_url
                        << " is deleted because the references are out of scope.";
@@ -637,12 +654,16 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
     } else {
       // If the object was not spilled, it gets pinned again. Unpin here to
       // prevent a memory leak.
+      /// RSTODO: Delete later
+      RAY_LOG(DEBUG) << "We are pinning the object again because it apparently wasn't spilled: " << object_id;
       pinned_objects_.erase(object_id);
     }
     local_objects_.erase(object_id);
     spilled_object_pending_delete_.pop();
   }
   if (object_urls_to_delete.size() > 0) {
+    /// RSTODO: Delete later
+    RAY_LOG(DEBUG) << "We are now deleting the object: " << object_id;
     DeleteSpilledObjects(object_urls_to_delete);
   }
 }
