@@ -682,12 +682,19 @@ Status PlasmaClient::Impl::Abort(const ObjectID &object_id) {
 Status PlasmaClient::Impl::Delete(const std::vector<ObjectID> &object_ids) {
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
+  /// RSTODO: Delete later
+  RAY_LOG(DEBUG) << "About to delete objects in client";
+
   std::vector<ObjectID> not_in_use_ids;
   for (auto &object_id : object_ids) {
     // If the object is in used, skip it.
     if (objects_in_use_.count(object_id) == 0) {
+      /// RSTODO: Delete later
+      RAY_LOG(DEBUG) << "Object is not in use in client";
       not_in_use_ids.push_back(object_id);
     } else {
+      /// RSTODO: Delete later
+      RAY_LOG(DEBUG) << "Object is in use in client";
       deletion_cache_.emplace(object_id);
     }
   }

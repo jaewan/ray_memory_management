@@ -350,7 +350,7 @@ void LocalObjectManager::SpillObjectsInternal(
         OnObjectRemoteSpilled(requested_objects_to_spill);
 
         /// RSCODE: probably don't need since OnObjectRemoteSpilled should take care?
-        // object_manager_.FreeObjects(requested_objects_to_spill, true);
+        object_manager_.FreeObjects(requested_objects_to_spill, true);
         // for (const auto &object_id: requested_objects_to_spill) {
         //   ReleaseFreedObject(object_id);
         // }
@@ -418,14 +418,14 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     // multiple objects, and we shouldn't delete the file until
     // all the objects are gone out of scope.
     // object_url is equivalent to url_with_offset.
-    auto parsed_url = ParseURL(object_url);
-    const auto base_url_it = parsed_url->find("url");
-    RAY_CHECK(base_url_it != parsed_url->end());
-    if (!url_ref_count_.contains(base_url_it->second)) {
-      url_ref_count_[base_url_it->second] = 1;
-    } else {
-      url_ref_count_[base_url_it->second] += 1;
-    }
+    // auto parsed_url = ParseURL(object_url);
+    // const auto base_url_it = parsed_url->find("url");
+    // RAY_CHECK(base_url_it != parsed_url->end());
+    // if (!url_ref_count_.contains(base_url_it->second)) {
+    //   url_ref_count_[base_url_it->second] = 1;
+    // } else {
+    //   url_ref_count_[base_url_it->second] += 1;
+    // }
 
     // Mark that the object is spilled and unpin the pending requests.
     // spilled_objects_url_.emplace(object_id, object_url);

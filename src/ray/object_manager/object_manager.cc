@@ -939,6 +939,7 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
   // If so, add functionality such as freeing the object in the remote node
   if (from_remote) {
     /// RSCODE: Free object here
+    /// RSTODO: Might need a different method of freeing
     std::vector<ObjectID> object_ids;
     object_ids.push_back(object_id);
     FreeObjects(object_ids, true);
@@ -960,6 +961,8 @@ void ObjectManager::HandleFreeObjects(const rpc::FreeObjectsRequest &request,
 
 void ObjectManager::FreeObjects(const std::vector<ObjectID> &object_ids,
                                 bool local_only) {
+  /// RSTODO: Delete this later
+  RAY_LOG(DEBUG) << "We are freeing objects in memory";
   buffer_pool_.FreeObjects(object_ids);
   if (!local_only) {
     const auto remote_connections = object_directory_->LookupAllRemoteConnections();
