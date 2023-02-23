@@ -373,7 +373,7 @@ void ObjectManager::FindNodeToSpill(const ObjectID &object_id) {
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
   /// RSCODE: Add code to add object id to node id mapping
-   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
+  RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
 
   auto rpc_client = GetRpcClient(node_id);
@@ -836,7 +836,7 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
 
   /// RSTODO: Delete this later
   // Jaewon -> num_bytes_received_total is increasing the remote node (confirmed through logs)
-  RAY_LOG(INFO) << "Total number of bytes received: " << num_bytes_received_total_;
+  RAY_LOG(INFO) << "ToTr of bytes received: " << num_bytes_received_total_;
 
   /// RSTODO: Delete this later
   // Jaewon -> "self_node_id" and "node_id" are the same, and "chunk index" is always 0

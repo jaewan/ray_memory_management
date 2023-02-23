@@ -335,13 +335,16 @@ void LocalObjectManager::SpillObjectsInternal(
         }
 
         /// RSTODO: Not sure if we need this
-        io_worker_pool_.PushSpillWorker(io_worker);
+        // io_worker_pool_.PushSpillWorker(io_worker);
 
         /// RSTODO: Delete this later
         RAY_LOG(INFO) << "Requested objects to spill size: " << requested_objects_to_spill.size();
 
         /// RSTODO: Have to call OnObjectSpilled after spilling to remote?
         OnObjectRemoteSpilled(requested_objects_to_spill);
+
+        /// RSCODE: Free object here
+        object_manager_.FreeObjects(requested_objects_to_spill, true);
 
         /// RSTODO: Comment this out for now
         // io_worker->rpc_client()->SpillObjects(
