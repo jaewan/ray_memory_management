@@ -203,12 +203,15 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void SpillRemote(const ObjectID &object_id, const NodeID &node_i);
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_id);
 
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
   void FindNodeToSpill(const ObjectID &object_id);
+
+  /// RSCODE:
+  void RemoteSpillDecrementRefCount(const ObjectID &object_id);
 
   /// RSTODO: Refactor and delete this later
   /// \param object_id The object's object id.

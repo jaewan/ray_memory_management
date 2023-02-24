@@ -141,16 +141,35 @@ bool ObjectLifecycleManager::AddReference(const ObjectID &object_id) {
 bool ObjectLifecycleManager::RemoveReference(const ObjectID &object_id) {
   auto entry = object_store_->GetObject(object_id);
   if (!entry || entry->ref_count == 0) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Object doesn't exist or ref count is already zero";
     RAY_LOG(ERROR)
         << object_id
         << " doesn't exist, or its ref count is already 0, remove reference failed.";
     return false;
   }
 
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Test";
+
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Ref Count before delete: " << entry->ref_count;
+
   entry->ref_count--;
+
+  /// RSTODO: Delete this later
+  // if (entry->ref_count == 1) {
+  //   entry->ref_count--;
+  // }
+
   stats_collector_.OnObjectRefDecreased(*entry);
 
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Ref Count: " << entry->ref_count;
+
   if (entry->ref_count > 0) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Test2";
     return true;
   }
 

@@ -145,6 +145,8 @@ class PlasmaClient::Impl : public std::enable_shared_from_this<PlasmaClient::Imp
              ObjectBuffer *object_buffers,
              bool is_from_worker);
 
+  void RemoteSpillDecreaseObjectCount(const ObjectID &object_id);
+
   Status Release(const ObjectID &object_id);
 
   Status Contains(const ObjectID &object_id, bool *has_object);
@@ -574,6 +576,23 @@ Status PlasmaClient::Impl::MarkObjectUnused(const ObjectID &object_id) {
   return Status::OK();
 }
 
+/// RSCODE: Decrease ref count
+void PlasmaClient::Impl::RemoteSpillDecreaseObjectCount(const ObjectID &object_id) {
+  auto elem = objects_in_use_.find(object_id);
+  ObjectInUseEntry *object_entry;
+  if (elem == objects_in_use_.end()) {
+    object_entry = objects_in_use_[object_id].get();
+  } else {
+    object_entry = elem->second.get();
+    RAY_CHECK(object_entry->count > 0);
+  }
+  //object_entry->count -= 1;
+  if(object_entry == nullptr){
+  }
+  auto l = Release(object_id);
+  RAY_LOG(DEBUG) << l;
+}
+
 Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
@@ -690,11 +709,11 @@ Status PlasmaClient::Impl::Delete(const std::vector<ObjectID> &object_ids) {
     // If the object is in used, skip it.
     if (objects_in_use_.count(object_id) == 0) {
       /// RSTODO: Delete later
-      RAY_LOG(DEBUG) << "Object is not in use in client";
+      RAY_LOG(DEBUG) << "Object is not in use in client: " << object_id;
       not_in_use_ids.push_back(object_id);
     } else {
       /// RSTODO: Delete later
-      RAY_LOG(DEBUG) << "Object is in use in client";
+      RAY_LOG(DEBUG) << "Object is in use in client: " << object_id;
       deletion_cache_.emplace(object_id);
     }
   }
@@ -826,6 +845,10 @@ Status PlasmaClient::Get(const std::vector<ObjectID> &object_ids,
                          std::vector<ObjectBuffer> *object_buffers,
                          bool is_from_worker) {
   return impl_->Get(object_ids, timeout_ms, object_buffers, is_from_worker);
+}
+
+void PlasmaClient::RemoteSpillDecreaseObjectCount(const ObjectID &object_id) {
+  return impl_->RemoteSpillDecreaseObjectCount(object_id);
 }
 
 Status PlasmaClient::Release(const ObjectID &object_id) {

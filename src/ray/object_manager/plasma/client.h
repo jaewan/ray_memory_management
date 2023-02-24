@@ -255,6 +255,9 @@ class PlasmaClient : public PlasmaClientInterface {
              std::vector<ObjectBuffer> *object_buffers,
              bool is_from_worker);
 
+  /// RSCODE:
+  void RemoteSpillDecreaseObjectCount(const ObjectID &object_id);
+
   /// Tell Plasma that the client no longer needs the object. This should be
   /// called after Get() or Create() when the client is done with the object.
   /// After this call, the buffer returned by Get() is no longer valid.
