@@ -370,6 +370,9 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
     return;
   }
 
+  /// RSTODO: Delete this
+  RAY_LOG(INFO) << "Testing";
+  
   const bool was_pullable_before = it->second.IsPullable();
   // Reset the list of clients that are now expected to have the object.
   // NOTE(swang): Since we are overwriting the previous list of clients,

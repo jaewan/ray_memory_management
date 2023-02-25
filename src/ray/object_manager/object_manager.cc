@@ -118,6 +118,11 @@ ObjectManager::ObjectManager(
                         boost::posix_time::milliseconds(config.timer_freq_ms)) {
   RAY_CHECK(config_.rpc_service_threads_number > 0);
 
+  /// RSCODE: Spill remote manager
+  spill_remote_manager_.reset(new SpillRemoteManager(/* max_chunks_in_flight= */ std::max(
+      static_cast<int64_t>(1L),
+      static_cast<int64_t>(config_.max_bytes_in_flight / config_.object_chunk_size))));
+
   push_manager_.reset(new PushManager(/* max_chunks_in_flight= */ std::max(
       static_cast<int64_t>(1L),
       static_cast<int64_t>(config_.max_bytes_in_flight / config_.object_chunk_size))));
@@ -475,12 +480,18 @@ void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const
   }
 
   if (local_objects_.count(object_id) != 0) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Pushing from local";
+
     return PushLocalObject(object_id, node_id);
   }
 
   // Push from spilled object directly if the object is on local disk.
   auto object_url = get_spilled_object_url_(object_id);
   if (!object_url.empty() && RayConfig::instance().is_external_storage_type_fs()) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Try to push from file system";
+
     return PushFromFilesystem(object_id, node_id, object_url);
   }
 
@@ -612,7 +623,7 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
 
   /// RSTODO: Maybe have spill manager and StartSpillRemote?
   auto spill_id = UniqueID::FromRandom();
-  push_manager_->StartPush(
+  spill_remote_manager_->StartSpillRemote(
       node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
         rpc_service_.post(
             [=]() {
@@ -624,15 +635,6 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                   node_id,
                   chunk_id,
                   rpc_client,
-                  [=](const Status &status) {
-                    // Post back to the main event loop because the
-                    // PushManager is thread-safe.
-                    main_service_->post(
-                        [this, node_id, object_id]() {
-                          push_manager_->OnChunkComplete(node_id, object_id);
-                        },
-                        "ObjectManager.Push");
-                  },
                   chunk_reader);
             },
             "ObjectManager.SpillRemote");
@@ -690,7 +692,6 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
                                     const NodeID &node_id,
                                     uint64_t chunk_index,
                                     std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
-                                    std::function<void(const Status &)> on_complete,
                                     std::shared_ptr<ChunkObjectReader> chunk_reader) {
   rpc::SpillRemoteRequest spill_remote_request;
   spill_remote_request.set_spill_id(spill_id.Binary());
@@ -706,7 +707,6 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   if (!optional_chunk.has_value()) {
     RAY_LOG(DEBUG) << "Read chunk " << chunk_index << " of object " << object_id
                    << " failed. It may have been evicted.";
-    on_complete(Status::IOError("Failed to read spilled object"));
     return;
   }
   spill_remote_request.set_data(std::move(optional_chunk.value()));
@@ -1044,6 +1044,8 @@ std::string ObjectManager::DebugString() const {
   result << "\n- num chunks received failed / plasma error: "
          << num_chunks_received_failed_due_to_plasma_;
   result << "\nEvent stats:" << rpc_service_.stats().StatsString();
+  /// RSCODE:
+  result << "\n" << spill_remote_manager_->DebugString();
   result << "\n" << push_manager_->DebugString();
   result << "\n" << object_directory_->DebugString();
   result << "\n" << buffer_pool_.DebugString();
