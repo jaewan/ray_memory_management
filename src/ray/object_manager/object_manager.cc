@@ -952,7 +952,7 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
     // std::vector<ObjectID> object_ids;
     // object_ids.push_back(object_id);
     // FreeObjects(object_ids, true);
-    buffer_pool_store_client_->RemoteSpillDecreaseObjectCount(object_id);
+    // buffer_pool_store_client_->RemoteSpillDecreaseObjectCount(object_id);
   }
     
   send_reply_callback(Status::OK(), nullptr, nullptr);
