@@ -445,7 +445,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     /// RSCOMMENT: so here, we are placing a dummy value "remotelyspilled" 
     /// on the hashmap. If we try to find from spill_objects_url_, its going
     /// to error out immediately. 
-    spilled_objects_url_.emplace(object_id, object_url);
+    // spilled_objects_url_.emplace(object_id, object_url);
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
     // some other URL that we choose. 

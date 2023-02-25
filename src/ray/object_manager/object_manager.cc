@@ -833,13 +833,13 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   const rpc::Address &owner_address = request.owner_address();
 
   /// RSTODO: Comment out for now
-  auto chunk_status = buffer_pool_.CreateChunk(
-    object_id, owner_address, data_size, metadata_size, chunk_index);
+  // auto chunk_status = buffer_pool_.CreateChunk(
+  //   object_id, owner_address, data_size, metadata_size, chunk_index);
 
-  if (chunk_status.ok()) {
-    // Avoid handling this chunk if it's already being handled by another process.
-    buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
-  }
+  // if (chunk_status.ok()) {
+  //   // Avoid handling this chunk if it's already being handled by another process.
+  //   buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
+  // }
 
   /// RSTODO: Delete this later
   // Jaewon -> num_bytes_received_total is increasing the remote node (confirmed through logs)
@@ -857,9 +857,9 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   received_remote_objects_origin_.emplace(object_id, node_id);
 
   /// RSTODO: Tony -> potentially delete this later
-  // ReceiveObjectChunk(node_id, object_id, owner_address, 
-  //                    data_size, metadata_size, chunk_index, 
-  //                    data, true /* from_remote */);
+  ReceiveObjectChunk(node_id, object_id, owner_address, 
+                     data_size, metadata_size, chunk_index, 
+                     data, true /* from_remote */);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
