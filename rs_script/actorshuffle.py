@@ -150,7 +150,7 @@ def render_progress_bar(tracker, input_num_partitions, output_num_partitions):
 
 @ray.remote
 class Shuffle:
-    def __init__(*, self,
+    def __init__(self,
         input_reader: Callable[[PartitionID], Iterable[InType]],
         input_num_partitions: int,
         output_num_partitions: int,
@@ -199,13 +199,15 @@ class Shuffle:
             for j in range(self.output_num_partitions)
         ]
 
+        """
         if self.tracker:
             self.tracker.register_objectrefs.remote(
                 [map_out[0] for map_out in shuffle_map_out], shuffle_reduce_out
             )
             render_progress_bar(self.tracker, self.input_num_partitions, self.output_num_partitions)
+        """
 
-        return ray.get(shuffle_reduce_out)
+        return shuffle_reduce_out # ray.get(shuffle_reduce_out)
 
 def build_cluster(num_nodes, num_cpus, object_store_memory):
     cluster = Cluster()
@@ -294,7 +296,8 @@ def run(
         object_store_writer=object_store_writer,
         tracker=tracker)
     # start shuffle task
-    output_sizes = shuffler.shuffle.remote()
+    future = shuffler.shuffle.remote()
+    output_sizes = ray.get(future)
     delta = time.time() - start
 
     time.sleep(0.5)
