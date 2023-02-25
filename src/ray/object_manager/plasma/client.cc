@@ -145,7 +145,11 @@ class PlasmaClient::Impl : public std::enable_shared_from_this<PlasmaClient::Imp
              ObjectBuffer *object_buffers,
              bool is_from_worker);
 
+  /// RSCODE:
   void RemoteSpillDecreaseObjectCount(const ObjectID &object_id);
+
+  /// RSCODE:
+  void RemoteSpillIncreaseObjectCount(const ObjectID &object_id);
 
   Status Release(const ObjectID &object_id);
 
@@ -593,6 +597,19 @@ void PlasmaClient::Impl::RemoteSpillDecreaseObjectCount(const ObjectID &object_i
   RAY_LOG(DEBUG) << l;
 }
 
+/// RSCODE: Increase ref count
+void PlasmaClient::Impl::RemoteSpillIncreaseObjectCount(const ObjectID &object_id) {
+  auto elem = objects_in_use_.find(object_id);
+  ObjectInUseEntry *object_entry;
+  if (elem == objects_in_use_.end()) {
+    object_entry = objects_in_use_[object_id].get();
+  } else {
+    object_entry = elem->second.get();
+    RAY_CHECK(object_entry->count > 0);
+  }
+  object_entry->count += 1;
+}
+
 Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
@@ -847,8 +864,14 @@ Status PlasmaClient::Get(const std::vector<ObjectID> &object_ids,
   return impl_->Get(object_ids, timeout_ms, object_buffers, is_from_worker);
 }
 
+/// RSCODE:
 void PlasmaClient::RemoteSpillDecreaseObjectCount(const ObjectID &object_id) {
   return impl_->RemoteSpillDecreaseObjectCount(object_id);
+}
+
+/// RSCODE:
+void PlasmaClient::RemoteSpillIncreaseObjectCount(const ObjectID &object_id) {
+  return impl_->RemoteSpillIncreaseObjectCount(object_id);
 }
 
 Status PlasmaClient::Release(const ObjectID &object_id) {

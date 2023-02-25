@@ -856,6 +856,8 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   // doesn't care about fault tolerance. 
   received_remote_objects_origin_.emplace(object_id, node_id);
 
+  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+
   /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, 
                      data_size, metadata_size, chunk_index, 
@@ -947,9 +949,10 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
   if (from_remote) {
     /// RSCODE: Free object here
     /// RSTODO: Might need a different method of freeing
-    std::vector<ObjectID> object_ids;
-    object_ids.push_back(object_id);
-    FreeObjects(object_ids, true);
+    // std::vector<ObjectID> object_ids;
+    // object_ids.push_back(object_id);
+    // FreeObjects(object_ids, true);
+    buffer_pool_store_client_->RemoteSpillDecreaseObjectCount(object_id);
   }
     
   send_reply_callback(Status::OK(), nullptr, nullptr);
