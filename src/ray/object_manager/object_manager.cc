@@ -856,12 +856,12 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   // doesn't care about fault tolerance. 
   received_remote_objects_origin_.emplace(object_id, node_id);
 
-  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-
   /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, 
                      data_size, metadata_size, chunk_index, 
                      data, true /* from_remote */);
+
+  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
