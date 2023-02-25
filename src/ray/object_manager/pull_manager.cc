@@ -370,6 +370,9 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
     return;
   }
 
+  /// RSTODO: Delete this
+  RAY_LOG(INFO) << "Testing";
+  
   const bool was_pullable_before = it->second.IsPullable();
   // Reset the list of clients that are now expected to have the object.
   // NOTE(swang): Since we are overwriting the previous list of clients,
@@ -482,11 +485,11 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   // Try to pull the object from a remote node. If the object is spilled on the local
   // disk of the remote node, it will be restored by PushManager prior to pushing.
   /// RSTODO: Comment for now
-  // bool did_pull = PullFromRandomLocation(object_id);
-  // if (did_pull) {
-  //   UpdateRetryTimer(request, object_id);
-  //   return;
-  // }
+  bool did_pull = PullFromRandomLocation(object_id);
+  if (did_pull) {
+    UpdateRetryTimer(request, object_id);
+    return;
+  }
 
   // check if we can restore the object directly in the current raylet.
   // first check local spilled objects
@@ -516,19 +519,6 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
                             });
     return;
   }
-
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Try to make object local 5";
-
-  /// RSTODO: Delete later
-  bool did_pull = PullFromRandomLocation(object_id);
-  if (did_pull) {
-    UpdateRetryTimer(request, object_id);
-    return;
-  }
-
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Try to make object local 6";
 
   RAY_CHECK(!request.pending_object_creation);
   if (request.expiration_time_seconds == 0) {

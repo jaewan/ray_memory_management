@@ -41,6 +41,7 @@
 #include "ray/object_manager/plasma/store_runner.h"
 #include "ray/object_manager/pull_manager.h"
 #include "ray/object_manager/push_manager.h"
+#include "ray/object_manager/spill_remote_manager.h"
 #include "ray/rpc/object_manager/object_manager_client.h"
 #include "ray/rpc/object_manager/object_manager_server.h"
 #include "src/ray/protobuf/common.pb.h"
@@ -203,12 +204,15 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void SpillRemote(const ObjectID &object_id, const NodeID &node_i);
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_id);
 
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
   void FindNodeToSpill(const ObjectID &object_id);
+
+  /// RSCODE:
+  void RemoteSpillDecrementRefCount(const ObjectID &object_id);
 
   /// RSTODO: Refactor and delete this later
   /// \param object_id The object's object id.
@@ -369,7 +373,6 @@ class ObjectManager : public ObjectManagerInterface,
                        const NodeID &node_id,
                        uint64_t chunk_index,
                        std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
-                       std::function<void(const Status &)> on_complete,
                        std::shared_ptr<ChunkObjectReader> chunk_reader);
 
   /// Handle starting, running, and stopping asio rpc_service.
@@ -525,6 +528,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// Pull manager retry timer .
   boost::asio::deadline_timer pull_retry_timer_;
+
+  /// RSCODE: Object spill remote manager.
+  std::unique_ptr<SpillRemoteManager> spill_remote_manager_;
 
   /// Object push manager.
   std::unique_ptr<PushManager> push_manager_;

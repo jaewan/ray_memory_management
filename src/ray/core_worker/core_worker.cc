@@ -1438,12 +1438,16 @@ void CoreWorker::SpillOwnedObject(const ObjectID &object_id,
       object_id,
       [object_id, callback](const Status &status,
                             const rpc::RequestObjectSpillageReply &reply) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Callback in core worker 1";
         if (!status.ok() || !reply.success()) {
           RAY_LOG(ERROR) << "Failed to spill object " << object_id
                          << ", raylet unreachable or object could not be spilled.";
         }
         // TODO(Clark): Provide spilled URL and spilled node ID to callback so it can
         // added them to the reference.
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Callback in core worker 2";
         callback();
       });
 }

@@ -692,7 +692,12 @@ void NodeManager::HandleRequestObjectSpillage(
   RAY_LOG(DEBUG) << "Received RequestObjectSpillage for object " << object_id;
   local_object_manager_.SpillObjects(
       {object_id}, [object_id, reply, send_reply_callback](const ray::Status &status) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Node manager callback test";
         if (status.ok()) {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "Node manager status ok test";
+
           RAY_LOG(DEBUG) << "Object " << object_id
                          << " has been spilled, replying to owner";
           reply->set_success(true);
