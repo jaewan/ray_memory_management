@@ -445,7 +445,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     /// RSCOMMENT: so here, we are placing a dummy value "remotelyspilled" 
     /// on the hashmap. If we try to find from spill_objects_url_, its going
     /// to error out immediately. 
-    // spilled_objects_url_.emplace(object_id, object_url);
+    spilled_objects_url_.emplace(object_id, object_url);
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
     // some other URL that we choose. 
@@ -640,26 +640,29 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       /// RSTODO: Delete later
       RAY_LOG(DEBUG) << "Checking if spilled object can be deleted: " << object_id;
 
-      std::string &object_url = spilled_objects_url_it->second;
-      // Note that here, we need to parse the object url to obtain the base_url.
-      auto parsed_url = ParseURL(object_url);
-      const auto base_url_it = parsed_url->find("url");
-      RAY_CHECK(base_url_it != parsed_url->end());
-      const auto &url_ref_count_it = url_ref_count_.find(base_url_it->second);
-      RAY_CHECK(url_ref_count_it != url_ref_count_.end())
-          << "url_ref_count_ should exist when spilled_objects_url_ exists. Please "
-             "submit a Github issue if you see this error.";
-      url_ref_count_it->second -= 1;
+      /// RSTODO: Have this trivial case for now but we have to add a check later to see if object was spilled to disk or remote
+      if (false) {
+        std::string &object_url = spilled_objects_url_it->second;
+        // Note that here, we need to parse the object url to obtain the base_url.
+        auto parsed_url = ParseURL(object_url);
+        const auto base_url_it = parsed_url->find("url");
+        RAY_CHECK(base_url_it != parsed_url->end());
+        const auto &url_ref_count_it = url_ref_count_.find(base_url_it->second);
+        RAY_CHECK(url_ref_count_it != url_ref_count_.end())
+            << "url_ref_count_ should exist when spilled_objects_url_ exists. Please "
+              "submit a Github issue if you see this error.";
+        url_ref_count_it->second -= 1;
 
-      // If there's no more refs, delete the object.
-      if (url_ref_count_it->second == 0) {
-        /// RSTODO: Delete later
-        RAY_LOG(DEBUG) << "There are no more refs and the object can be deleted: " << object_id;
+        // If there's no more refs, delete the object.
+        if (url_ref_count_it->second == 0) {
+          /// RSTODO: Delete later
+          RAY_LOG(DEBUG) << "There are no more refs and the object can be deleted: " << object_id;
 
-        url_ref_count_.erase(url_ref_count_it);
-        RAY_LOG(DEBUG) << "The URL " << object_url
-                       << " is deleted because the references are out of scope.";
-        object_urls_to_delete.emplace_back(object_url);
+          url_ref_count_.erase(url_ref_count_it);
+          RAY_LOG(DEBUG) << "The URL " << object_url
+                        << " is deleted because the references are out of scope.";
+          object_urls_to_delete.emplace_back(object_url);
+        }
       }
       spilled_objects_url_.erase(spilled_objects_url_it);
     } else {

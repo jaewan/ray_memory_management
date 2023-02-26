@@ -861,7 +861,7 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                      data_size, metadata_size, chunk_index, 
                      data, true /* from_remote */);
 
-  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  // buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
@@ -884,8 +884,6 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "ReceiveObjectChunk on " << node_id
                 << " of object " << object_id;
-  /// RSTODO: this might be reason why we don't spill but only call RPC
-  /// might have to fiddle around with pull manager. 
   /// RSCODE: current solution: add default from_remote param so that
   /// pull manager checking is not invoked. 
   if (!from_remote && !pull_manager_->IsObjectActive(object_id)) {
