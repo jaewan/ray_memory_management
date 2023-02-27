@@ -393,6 +393,7 @@ class CoreWorkerDirectTaskSubmitter {
 
   int64_t num_tasks_submitted_ = 0;
   int64_t num_leases_requested_ GUARDED_BY(mu_) = 0;
+  int64_t num_leases_on_flight_ GUARDED_BY(mu_) = 0;
 };
 
 }  // namespace core

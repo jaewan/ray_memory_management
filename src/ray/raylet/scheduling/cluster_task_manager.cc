@@ -67,7 +67,8 @@ void ClusterTaskManager::QueueAndScheduleTask(
     rpc::SendReplyCallback send_reply_callback) {
   RAY_LOG(DEBUG) << "Queuing and scheduling task "
                  << task.GetTaskSpecification().TaskId()
-								 << " priority:" << task.GetTaskSpecification().GetPriority();
+								 << " priority:" << task.GetTaskSpecification().GetPriority()
+								 << " JobId:" << task.GetTaskSpecification().JobId();
   auto work = std::make_shared<internal::Work>(
       task, grant_or_reject, is_selected_based_on_locality, reply, [send_reply_callback] {
         send_reply_callback(Status::OK(), nullptr, nullptr);

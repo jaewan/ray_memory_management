@@ -1901,6 +1901,7 @@ void NodeManager::HandleReportWorkerBacklog(
   for (const auto &backlog_report : request.backlog_reports()) {
     const TaskSpecification resource_spec(backlog_report.resource_spec());
     const SchedulingClass scheduling_class = resource_spec.GetSchedulingClass();
+    //const SchedulingClass scheduling_class = 0;
     RAY_CHECK(seen.find(scheduling_class) == seen.end());
     local_task_manager_->SetWorkerBacklog(
         scheduling_class, worker_id, backlog_report.backlog_size());

@@ -81,7 +81,7 @@ void SchedulerResourceReporter::FillResourceUsage(
         break;
       }
 
-			RAY_LOG(DEBUG) << "[JAE_DEBUG] here is another GetSchedulingClassDescriptor call";
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] here is another GetSchedulingClassDescriptor call: " << scheduling_class;
       const auto &scheduling_class_descriptor =
           TaskSpecification::GetSchedulingClassDescriptor(scheduling_class);
       if ((scheduling_class_descriptor.scheduling_strategy.scheduling_strategy_case() ==
@@ -136,6 +136,7 @@ void SchedulerResourceReporter::FillResourceUsage(
 		auto work_it = pair.second.begin();
     const std::shared_ptr<internal::Work> &work = *work_it;
     auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] scheduling_class is:" << scheduling_class;
     return std::make_pair(scheduling_class, pair.second.size());
   };
 

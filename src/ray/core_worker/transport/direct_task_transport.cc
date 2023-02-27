@@ -23,6 +23,15 @@
 namespace ray {
 namespace core {
 
+inline void LeaseGrant(const std::string &fnc_name, const Priority &pri, int request_num){
+  std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
+  std::ostringstream stream;
+  stream << fnc_name << " " << pri << " request_num: " << request_num << "\n";
+  std::string log_str = stream.str();
+  log_stream << log_str;
+  log_stream.close();
+}
+
 inline void LogPlaceSeq(const std::string &fnc_name, const Priority &pri){
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
@@ -33,17 +42,25 @@ inline void LogPlaceSeq(const std::string &fnc_name, const Priority &pri){
 }
 
 inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri){
+  static long long produced_obj = 0;
+  if (fnc_name.find("producer") != std::string::npos) {
+    produced_obj++;
+  }else{
+    produced_obj--;
+  }
+
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
   stream << task_id <<" " <<
-	fnc_name << " " << pri << "\n";
+	fnc_name << " " << pri << 
+	" obj:" << produced_obj << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
 }
 
 Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
-  RAY_LOG(DEBUG) << "Submit task " << task_spec.TaskId();
+  RAY_LOG(DEBUG) << "Submit task " << task_spec.TaskId() << " TaskSubmitter JobId:" << task_spec.JobId();
   num_tasks_submitted_++;
 
   resolver_.ResolveDependencies(task_spec, [this, task_spec](Status status) {
@@ -340,6 +357,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 			RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
 		}
   } else {
+		priority_task_queues_.erase(*pri_it);
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
     while (!current_queue.empty() && !lease_entry.is_busy) {
@@ -529,16 +547,23 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     // There are idle workers, so we don't need more.
     return;
   }
-  const auto priority_it = priority_task_queues_.begin();
-  Priority pri(priority_it->score);
-  auto resource_spec_msg = priority_to_task_spec_[pri].GetMutableMessage();
-  resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
-  TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
-  const TaskID task_id = resource_spec.TaskId();
-  resource_spec.SetPriority(pri);
-  priority_task_queues_.erase(priority_it);
+	if(num_leases_on_flight_ >= 32){
+		 RAY_LOG(DEBUG) << "Exceeding the pending request limit "
+                   << 32;
+		return;
+	}
+	const auto priority_it = priority_task_queues_.begin();
+	Priority pri(priority_it->score);
+	auto resource_spec_msg = priority_to_task_spec_[pri].GetMutableMessage();
+	resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
+	TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
+	const TaskID task_id = resource_spec.TaskId();
+	resource_spec.SetPriority(pri);
+	priority_task_queues_.erase(priority_it);
+  int64_t queue_size = priority_task_queues_.size() - 1;
 
-  num_leases_requested_++;
+	num_leases_on_flight_++;
+	num_leases_requested_++;
 
   rpc::Address best_node_address;
   const bool is_spillback = (raylet_address != nullptr);
@@ -553,11 +578,12 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   auto lease_client = GetOrConnectLeaseClient(raylet_address);
   RAY_LOG(DEBUG) << "Requesting lease from raylet "
                  << NodeID::FromBinary(raylet_address->raylet_id()) << " for task "
-                 << task_id << " priority:" << pri;
+                 << task_id << " priority:" << pri
+								 << " JobId:" << resource_spec.JobId();
   // Subtract 1 so we don't double count the task we are requesting for.
-  int64_t queue_size = priority_task_queues_.size() - 1;
 
 	static const bool enable_BlockTasks = RayConfig::instance().enable_BlockTasks();
+	static int request_num = 0;
 
   lease_client->RequestWorkerLease(
       resource_spec.GetMessage(),
@@ -570,6 +596,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
         rpc::ErrorType error_type = rpc::ErrorType::WORKER_DIED;
         {
           absl::MutexLock lock(&mu_);
+					num_leases_on_flight_--;
 
           auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
           auto lease_client = GetOrConnectLeaseClient(&raylet_address);
@@ -643,7 +670,8 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               // We got a lease for a worker. Add the lease client state and try to
               // assign work to the worker.
               rpc::WorkerAddress addr(reply.worker_address());
-							LogPlaceSeq("\t\tRequest Granted" , pri);
+							request_num++;
+							LeaseGrant("\t\tRequest Granted" , pri, request_num);
               RAY_LOG(DEBUG) << "Lease granted to task " << task_id << " with priority " 
                 << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id;
 
