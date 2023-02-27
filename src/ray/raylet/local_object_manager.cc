@@ -422,7 +422,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
 
     // Decrease ref count
-    object_manager_.RemoteSpillDecrementRefCount(object_id);
+    // object_manager_.RemoteSpillDecrementRefCount(object_id);
 
     // Update the object_id -> url_ref_count to use it for deletion later.
     // We need to track the references here because a single file can contain
@@ -445,6 +445,8 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     /// RSCOMMENT: so here, we are placing a dummy value "remotelyspilled" 
     /// on the hashmap. If we try to find from spill_objects_url_, its going
     /// to error out immediately. 
+    /// RSTODO: Might have to just delete this later because it messes up with bookkeeping but rn we need it to get past the check:
+    /// RAY_CHECK((pinned_objects_.count(object_id) > 0) || (spilled_objects_url_.count(object_id) > 0) || (objects_pending_spill_.count(object_id) > 0));
     spilled_objects_url_.emplace(object_id, object_url);
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
