@@ -117,9 +117,7 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
   // The object should be in one of these states: pinned, spilling, or spilled.
   RAY_CHECK((pinned_objects_.count(object_id) > 0) ||
             (spilled_objects_url_.count(object_id) > 0) ||
-            (objects_pending_spill_.count(object_id) > 0) ||
-            /// RSCODE:
-            (object_manager_.GetSpillRemoteMapping().count(object_id) > 0));
+            (objects_pending_spill_.count(object_id) > 0));
   if (pinned_objects_.count(object_id)) {
     pinned_objects_size_ -= pinned_objects_[object_id]->GetSize();
     pinned_objects_.erase(object_id);
@@ -449,7 +447,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     /// to error out immediately. 
     /// RSTODO: Might have to just delete this later because it messes up with bookkeeping but rn we need it to get past the check:
     /// RAY_CHECK((pinned_objects_.count(object_id) > 0) || (spilled_objects_url_.count(object_id) > 0) || (objects_pending_spill_.count(object_id) > 0));
-    // spilled_objects_url_.emplace(object_id, object_url);
+    spilled_objects_url_.emplace(object_id, object_url);
     // lets try to find a way to trigger the Pull RPC with remote retrieval
     // whenever we recognize that the url is exactly "remotelyspilled" or 
     // some other URL that we choose. 

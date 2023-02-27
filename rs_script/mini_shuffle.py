@@ -16,24 +16,24 @@ class HeadActor(object):
         print(getsizeof(x))
         return x
     
-    def consumer(self, obj):
+    def consumer(self, obj1, obj2):
         return True
 
 headActor = HeadActor.remote()
 obj1 = headActor.producer.remote()
 obj2 = headActor.producer.remote()
 
-res1 = headActor.consumer.remote(obj1)
+res1 = headActor.consumer.remote(obj1, obj2)
 print("Object 1 created")
 
 del res1
 
-res2 = headActor.consumer.remote(obj2)
+res2 = headActor.consumer.remote(obj1, obj2)
 print("Object 2 created and Object 1 spilled")
 
-del obj2 
-del res2
-time.sleep(5)
+# del obj2 
+# del res2
+# time.sleep(5)
 
-res1 = headActor.consumer.remote(obj1)
-print("Object 1 pulled!")
+# res1 = headActor.consumer.remote(obj1)
+# print("Object 1 pulled!")
