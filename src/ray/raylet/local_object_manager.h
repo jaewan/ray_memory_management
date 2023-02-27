@@ -212,6 +212,19 @@ class LocalObjectManager {
   /// \param urls_to_delete List of urls to delete from external storages.
   void DeleteSpilledObjects(std::vector<std::string> &urls_to_delete);
 
+  /// RSCODE:
+  // void DeleteRemoteSpilledObjects(std::vector<ObjectID> &spilled_objects_to_delete);
+
+  /// RSGRPC: (GRPC)
+  /// Handle delete remote spilled objects request
+  ///
+  /// \param request Delete Remote Spilled Objects request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  // void HandleDeleteRemoteSpilledObjects(const rpc::DeleteRemoteSpilledObjectsRequest &request,
+  //                        rpc::DeleteRemoteSpilledObjectsReply *reply,
+  //                        rpc::SendReplyCallback send_reply_callback) override; 
+
   const NodeID self_node_id_;
   const std::string self_node_address_;
   const int self_node_port_;

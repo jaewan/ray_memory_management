@@ -590,7 +590,7 @@ void PlasmaClient::Impl::RemoteSpillDecreaseObjectCount(const ObjectID &object_i
     object_entry = elem->second.get();
     RAY_CHECK(object_entry->count > 0);
   }
-  //object_entry->count -= 1;
+  object_entry->count -= 1;
   if(object_entry == nullptr){
   }
   auto l = Release(object_id);
@@ -624,6 +624,8 @@ Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
   RAY_CHECK(object_entry->second->count >= 0);
   // Check if the client is no longer using this object.
   if (object_entry->second->count == 0) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "object in release is no longer in use";
     // Tell the store that the client no longer needs the object.
     RAY_RETURN_NOT_OK(MarkObjectUnused(object_id));
     RAY_RETURN_NOT_OK(SendReleaseRequest(store_conn_, object_id));

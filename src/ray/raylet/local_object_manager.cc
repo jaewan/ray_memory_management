@@ -618,7 +618,14 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
   /// RSTODO: Delete later
   RAY_LOG(DEBUG) << "Starting ProcessSpilledObjectsDeleteQueue";
 
+  /// RSCODE: Fetch remote spill mapping
+  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
+  
   std::vector<std::string> object_urls_to_delete;
+
+  /// RSCODE:
+  std::vector<ObjectID> spilled_objects_to_delete;
+
   // Process upto batch size of objects to delete.
   while (!spilled_object_pending_delete_.empty() &&
          object_urls_to_delete.size() < max_batch_size) {
@@ -640,8 +647,10 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       /// RSTODO: Delete later
       RAY_LOG(DEBUG) << "Checking if spilled object can be deleted: " << object_id;
 
-      /// RSTODO: Have this trivial case for now but we have to add a check later to see if object was spilled to disk or remote
-      if (false) {
+      /// RSCODE: Check to see if object was remotely spilled
+      if (spill_remote_mapping.contains(object_id)) {
+        spilled_objects_to_delete.emplace_back(object_id);
+      } else {
         std::string &object_url = spilled_objects_url_it->second;
         // Note that here, we need to parse the object url to obtain the base_url.
         auto parsed_url = ParseURL(object_url);
@@ -677,9 +686,15 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
   }
   if (object_urls_to_delete.size() > 0) {
     /// RSTODO: Delete later
-    RAY_LOG(DEBUG) << "We are now deleting the object";
+    RAY_LOG(DEBUG) << "We are now deleting the object from disk";
     DeleteSpilledObjects(object_urls_to_delete);
   }
+  // /// RSCODE: Delete object from remote node
+  // if (spilled_objects_to_delete.size() > 0) {
+  //   /// RSTODO: Delete later
+  //   RAY_LOG(DEBUG) << "We are now deleting the object from remote node";
+  //   DeleteRemoteSpilledObjects(spilled_objects_to_delete);
+  // }
 }
 
 void LocalObjectManager::DeleteSpilledObjects(std::vector<std::string> &urls_to_delete) {
@@ -703,6 +718,35 @@ void LocalObjectManager::DeleteSpilledObjects(std::vector<std::string> &urls_to_
             });
       });
 }
+
+/// RSCODE:
+// void LocalObjectManager::DeleteRemoteSpilledObjects(std::vector<ObjectID> &spilled_objects_to_delete) {
+//   io_worker_pool_.PopDeleteWorker(
+//       [this, spilled_objects_to_delete](std::shared_ptr<WorkerInterface> io_worker) {
+//         RAY_LOG(DEBUG) << "Sending delete remote spilled object request. Length: "
+//                        << spilled_objects_to_delete.size();
+//         rpc::DeleteSpilledObjectsRequest request;
+//         for (const auto &object_id : spilled_objects_to_delete) {
+//           request.add_remote_spilled_object_id(object_id);
+//         }
+//         io_worker->rpc_client()->DeleteRemoteSpilledObjects(
+//             request,
+//             [this, io_worker](const ray::Status &status,
+//                               const rpc::DeleteSpilledObjectsReply &reply) {
+//               io_worker_pool_.PushDeleteWorker(io_worker);
+//               if (!status.ok()) {
+//                 RAY_LOG(ERROR) << "Failed to send delete remote spilled object request: "
+//                                << status.ToString();
+//               }
+//             });
+//       });
+// }
+
+/// RSGRPC:
+// void LocalObjectManager::HandleDeleteRemoteSpilledObjects(const rpc::DeleteRemoteSpilledObjectsRequest &request,
+//                                       rpc::DeleteRemoteSpilledObjectsReply *reply,
+//                                       rpc::SendReplyCallback send_reply_callback) {
+// }
 
 void LocalObjectManager::FillObjectSpillingStats(rpc::GetNodeStatsReply *reply) const {
   auto stats = reply->mutable_store_stats();
