@@ -590,7 +590,7 @@ void PlasmaClient::Impl::RemoteSpillDecreaseObjectCount(const ObjectID &object_i
     object_entry = elem->second.get();
     RAY_CHECK(object_entry->count > 0);
   }
-  object_entry->count -= 1;
+  // object_entry->count -= 1;
   if(object_entry == nullptr){
   }
   auto l = Release(object_id);
