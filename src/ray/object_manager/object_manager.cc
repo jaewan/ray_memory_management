@@ -639,9 +639,9 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                     // PushManager is thread-safe.
                     main_service_->post(
                         [this, node_id, object_id]() {
-                          push_manager_->OnChunkComplete(node_id, object_id);
+                          spill_remote_manager_->OnChunkComplete(node_id, object_id);
                         },
-                        "ObjectManager.Push");
+                        "ObjectManager.SpillRemote");
                   },
                   chunk_reader);
             },
