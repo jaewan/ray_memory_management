@@ -488,7 +488,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   bool did_pull = PullFromRandomLocation(object_id);
   if (did_pull) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Object pulled from random location (remote node)"
+    RAY_LOG(INFO) << "Object pulled from random location (remote node)";
     UpdateRetryTimer(request, object_id);
     return;
   }
