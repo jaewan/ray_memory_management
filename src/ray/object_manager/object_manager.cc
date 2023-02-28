@@ -861,7 +861,7 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                      data_size, metadata_size, chunk_index, 
                      data, true /* from_remote */);
 
-  // buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }

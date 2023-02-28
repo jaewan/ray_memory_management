@@ -422,7 +422,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> &obje
     RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
 
     // Decrease ref count
-    // object_manager_.RemoteSpillDecrementRefCount(object_id);
+    object_manager_.RemoteSpillDecrementRefCount(object_id);
 
     // Update the object_id -> url_ref_count to use it for deletion later.
     // We need to track the references here because a single file can contain
