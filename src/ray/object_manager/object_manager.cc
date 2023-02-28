@@ -861,8 +861,6 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                      data_size, metadata_size, chunk_index, 
                      data, true /* from_remote */);
 
-  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
@@ -910,6 +908,7 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
     buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
     if (from_remote) {
       RAY_LOG(INFO) << "Successfully called WriteChunk on remote object: " << object_id;
+      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
     }
     return true;
   } else {
