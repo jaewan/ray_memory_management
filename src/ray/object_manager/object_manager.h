@@ -373,6 +373,7 @@ class ObjectManager : public ObjectManagerInterface,
                        const NodeID &node_id,
                        uint64_t chunk_index,
                        std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
+                       std::function<void(const Status &)> on_complete,
                        std::shared_ptr<ChunkObjectReader> chunk_reader);
 
   /// Handle starting, running, and stopping asio rpc_service.

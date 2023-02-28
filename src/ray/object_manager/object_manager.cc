@@ -387,7 +387,7 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   spilled_remote_objects_url_.emplace(object_id, node_id);
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spilled_remote_objects_url_.size();
+  RAY_LOG(INFO) << "Spill Remote Mapping Info in SpillRemote: " << spilled_remote_objects_url_.size();
 
   auto rpc_client = GetRpcClient(node_id);
 
@@ -634,6 +634,15 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                   node_id,
                   chunk_id,
                   rpc_client,
+                  [=](const Status &status) {
+                    // Post back to the main event loop because the
+                    // PushManager is thread-safe.
+                    main_service_->post(
+                        [this, node_id, object_id]() {
+                          push_manager_->OnChunkComplete(node_id, object_id);
+                        },
+                        "ObjectManager.Push");
+                  },
                   chunk_reader);
             },
             "ObjectManager.SpillRemote");
@@ -691,7 +700,9 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
                                     const NodeID &node_id,
                                     uint64_t chunk_index,
                                     std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
+                                    std::function<void(const Status &)> on_complete,
                                     std::shared_ptr<ChunkObjectReader> chunk_reader) {
+  double start_time = absl::GetCurrentTimeNanos() / 1e9;
   rpc::SpillRemoteRequest spill_remote_request;
   spill_remote_request.set_spill_id(spill_id.Binary());
   spill_remote_request.set_object_id(object_id.Binary());
@@ -716,8 +727,24 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   RAY_LOG(INFO) << "Number of bytes pushed from plasma: " << num_bytes_pushed_from_plasma_;
 
   rpc::ClientCallback<rpc::SpillRemoteReply> callback =
-      [] (const Status &status, const rpc::SpillRemoteReply &reply) {
-        RAY_LOG(INFO) << "Callback for SpillRemote RPC";
+      [this, start_time, object_id, node_id, chunk_index, on_complete] (const Status &status, const rpc::SpillRemoteReply &reply) {
+        if (!status.ok()) {
+          RAY_LOG(WARNING) << "Send object " << object_id << " chunk to node " << node_id
+                           << " failed due to" << status.message()
+                           << ", chunk index: " << chunk_index;
+          
+          /// RSTODO: Delete this later
+          RAY_LOG(INFO) << "Spill to remote failed on object: " << object_id;
+        }
+        /// RSTODO: Delete this later
+        RAY_LOG(INFO) << "Successfully spilled to remote";
+
+        double end_time = absl::GetCurrentTimeNanos() / 1e9;
+        HandleSendFinished(object_id, node_id, chunk_index, start_time, end_time, status);
+        on_complete(status);
+
+        /// RSTODO: Delete this later
+        RAY_LOG(INFO) << "Finished calling on_complete";
       };
 
   rpc_client->SpillRemote(spill_remote_request, callback);  
