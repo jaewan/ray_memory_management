@@ -487,6 +487,8 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   /// RSTODO: Comment for now
   bool did_pull = PullFromRandomLocation(object_id);
   if (did_pull) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Object pulled from random location (remote node)"
     UpdateRetryTimer(request, object_id);
     return;
   }
@@ -504,6 +506,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   RAY_LOG(INFO) << "Try to make object local 4";
 
   /// Verify that direct_restore_url is not remotely spilled
+  /// RSTODO: Refactor this later
   if (direct_restore_url != "remotelyspilled") {
     if (!direct_restore_url.empty()) {
       // Select an url from the object directory update

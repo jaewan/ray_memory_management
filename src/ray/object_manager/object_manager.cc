@@ -386,13 +386,12 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spilled_remote_objects_url_.size();
+
   auto rpc_client = GetRpcClient(node_id);
 
   RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
-              << object_id;
-
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
               << object_id;
 
   const ObjectInfo &object_info = local_objects_[object_id].object_info;
