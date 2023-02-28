@@ -935,7 +935,7 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
   
   /// RSTODO: Delete this later
   if (from_remote) {
-    RAY_LOG(INFO) << "Received pull request from node " << node_id << " for object ["
+    RAY_LOG(INFO) << "Received remote pull request from node " << node_id << " for object ["
                  << object_id << "].";
   }
 

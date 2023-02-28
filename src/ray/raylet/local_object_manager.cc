@@ -649,8 +649,8 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       /// RSTODO: Delete later
       RAY_LOG(DEBUG) << "Checking if spilled object can be deleted: " << object_id;
 
-      /// RSCODE: Check to see if object was remotely spilled
-      if (!spill_remote_mapping.contains(object_id)) {
+      /// RSTODO: Have trivial case for now and then later figure out how to check if spilled remote or to disk
+      if (false) {
         std::string &object_url = spilled_objects_url_it->second;
         // Note that here, we need to parse the object url to obtain the base_url.
         auto parsed_url = ParseURL(object_url);
