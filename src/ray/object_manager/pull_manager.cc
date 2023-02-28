@@ -503,21 +503,24 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Try to make object local 4";
 
-  if (!direct_restore_url.empty()) {
-    // Select an url from the object directory update
-    UpdateRetryTimer(request, object_id);
-    /// RSTODO: Delete this later
-    RAY_LOG(INFO) << "Restoring from disk";
-    restore_spilled_object_(object_id,
-                            request.object_size,
-                            direct_restore_url,
-                            [object_id](const ray::Status &status) {
-                              if (!status.ok()) {
-                                RAY_LOG(ERROR) << "Object restore for " << object_id
-                                               << " failed, will retry later: " << status;
-                              }
-                            });
-    return;
+  /// Verify that direct_restore_url is not remotely spilled
+  if (direct_restore_url != "remotelyspilled") {
+    if (!direct_restore_url.empty()) {
+      // Select an url from the object directory update
+      UpdateRetryTimer(request, object_id);
+      /// RSTODO: Delete this later
+      RAY_LOG(INFO) << "Restoring from disk";
+      restore_spilled_object_(object_id,
+                              request.object_size,
+                              direct_restore_url,
+                              [object_id](const ray::Status &status) {
+                                if (!status.ok()) {
+                                  RAY_LOG(ERROR) << "Object restore for " << object_id
+                                                << " failed, will retry later: " << status;
+                                }
+                              });
+      return;
+    }
   }
 
   RAY_CHECK(!request.pending_object_creation);
