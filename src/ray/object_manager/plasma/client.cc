@@ -620,12 +620,23 @@ Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
   if (!store_conn_) {
     return Status::OK();
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Release test 1";
+
   auto object_entry = objects_in_use_.find(object_id);
   RAY_CHECK(object_entry != objects_in_use_.end());
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Release test 2";
 
   object_entry->second->count -= 1;
   RAY_CHECK(object_entry->second->count >= 0);
   // Check if the client is no longer using this object.
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Release test 3";
+
   if (object_entry->second->count == 0) {
     /// RSTODO: Delete this later
     RAY_LOG(INFO) << "object in release is no longer in use";
