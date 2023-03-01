@@ -426,6 +426,9 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   const std::string &object_url = "remotelyspilled";
   RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
 
+  // Decrease ref count
+  object_manager_.RemoteSpillDecrementRefCount(object_id);
+
   // Update the object_id -> url_ref_count to use it for deletion later.
   // We need to track the references here because a single file can contain
   // multiple objects, and we shouldn't delete the file until
@@ -473,9 +476,6 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   /// This updates bookkeeping based on Ownership, and idk if this
   /// is supposed to help. 
   object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
-
-  // Decrease ref count
-  // object_manager_.RemoteSpillDecrementRefCount(object_id);
 }
 
 void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids,
