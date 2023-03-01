@@ -338,7 +338,7 @@ void LocalObjectManager::SpillObjectsInternal(
         /// RSCODE: Simply call SpillRemote() function in object_manager
         for (const auto &object_id: requested_objects_to_spill) {
             object_manager_.FindNodeToSpill(object_id, 
-            [this, object_id]() {
+            [this, object_id, callback]() {
 
               /// RSTODO: Delete later
               RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
