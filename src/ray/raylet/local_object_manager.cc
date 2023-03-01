@@ -472,11 +472,10 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   /// RSCOMMENT: might want to not call ReportObjectSpilled
   /// This updates bookkeeping based on Ownership, and idk if this
   /// is supposed to help. 
-  object_directory_->ReportObjectSpilled(
-      object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
+  //object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
 
   // Decrease ref count
-  // object_manager_.RemoteSpillDecrementRefCount(object_id);
+  object_manager_.RemoteSpillDecrementRefCount(object_id);
 }
 
 void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids,
