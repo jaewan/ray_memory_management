@@ -933,7 +933,7 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
 
   /// RSCODE: Try incrementing object count before write chunk
   if (from_remote) {
-    // buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
   }
 
   if (chunk_status.ok()) {
