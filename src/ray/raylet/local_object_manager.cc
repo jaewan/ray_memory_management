@@ -475,7 +475,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
 
   // Decrease ref count
-  // object_manager_.RemoteSpillDecrementRefCount(object_id);
+  object_manager_.RemoteSpillDecrementRefCount(object_id);
 }
 
 void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids,
