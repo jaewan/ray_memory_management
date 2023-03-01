@@ -468,7 +468,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
                     << object_id;
     return;
   }
-  const auto &worker_addr = freed_it->second.first;
+  // const auto &worker_addr = freed_it->second.first;
   /// RSCOMMENT: might want to not call ReportObjectSpilled
   /// This updates bookkeeping based on Ownership, and idk if this
   /// is supposed to help. 
