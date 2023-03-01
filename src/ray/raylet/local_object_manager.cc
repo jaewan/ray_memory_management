@@ -344,6 +344,13 @@ void LocalObjectManager::SpillObjectsInternal(
               RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
 
               OnObjectRemoteSpilled(object_id);
+
+              /// RSTODO: Delete this later
+              RAY_LOG(INFO) << "Callback test";
+              /// RSCODE: Call callback here?
+              if (callback) {
+                callback(Status::OK());
+              }
           });
         }
 
@@ -411,13 +418,6 @@ void LocalObjectManager::SpillObjectsInternal(
   if (spilled_object_pending_delete_.size() >= free_objects_batch_size_) {
     ProcessSpilledObjectsDeleteQueue(free_objects_batch_size_);
   }
-
-  /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "Callback test";
-  /// RSCODE: Call callback here?
-  if (callback) {
-    callback(Status::OK());
-  }
 }
 
 /// RSTODO: Code to free a remotely spilled object
@@ -468,14 +468,14 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
                     << object_id;
     return;
   }
-  // const auto &worker_addr = freed_it->second.first;
+  const auto &worker_addr = freed_it->second.first;
   /// RSCOMMENT: might want to not call ReportObjectSpilled
   /// This updates bookkeeping based on Ownership, and idk if this
   /// is supposed to help. 
-  //object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
+  object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
 
   // Decrease ref count
-  object_manager_.RemoteSpillDecrementRefCount(object_id);
+  // object_manager_.RemoteSpillDecrementRefCount(object_id);
 }
 
 void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids,
