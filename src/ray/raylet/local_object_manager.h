@@ -197,7 +197,7 @@ class LocalObjectManager {
 
 
   /// RSTODO:
-  void OnObjectRemoteSpilled(const std::vector<ObjectID> &object_ids);
+  void OnObjectRemoteSpilled(const ObjectID &object_id);
 
   /// Do operations that are needed after spilling objects such as
   /// 1. Unpin the pending spilling object.

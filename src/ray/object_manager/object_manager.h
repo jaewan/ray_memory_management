@@ -204,12 +204,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void SpillRemote(const ObjectID &object_id, const NodeID &node_id);
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback);
 
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void FindNodeToSpill(const ObjectID &object_id);
+  void FindNodeToSpill(const ObjectID &object_id, const std::function<void()> callback);
 
   /// RSCODE:
   void RemoteSpillDecrementRefCount(const ObjectID &object_id);
@@ -319,7 +319,8 @@ class ObjectManager : public ObjectManagerInterface,
   /// Status::OK() if the read succeeded.
   void SpillRemoteInternal(const ObjectID &object_id,
                           const NodeID &node_id,
-                          std::shared_ptr<ChunkObjectReader> chunk_reader);
+                          std::shared_ptr<ChunkObjectReader> chunk_reader,
+                          const std::function<void()> callback);
 
 
   /// The internal implementation of pushing an object.

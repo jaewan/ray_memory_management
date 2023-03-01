@@ -366,12 +366,12 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 }
 
 /// RSCODE: Function to identify remote node with available memory
-void ObjectManager::FindNodeToSpill(const ObjectID &object_id) {
+void ObjectManager::FindNodeToSpill(const ObjectID &object_id, const std::function<void()> callback) {
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
   /// RSTODO: Figure out how to exit this for loop once we find a node that can store data
   for (const auto &connection_info : remote_connections) {
     const NodeID node_id = connection_info.node_id;
-    SpillRemote(object_id, node_id);
+    SpillRemote(object_id, node_id, callback);
   }
 }
 
@@ -381,7 +381,7 @@ void ObjectManager::RemoteSpillDecrementRefCount(const ObjectID &object_id) {
 }
 
 /// RSCODE: Implement spill function to spill object to remote memory
-void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id) {
+void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback) {
   /// RSCODE: Add code to add object id to node id mapping
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
@@ -437,7 +437,8 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   SpillRemoteInternal(object_id,
                      node_id,
                      std::make_shared<ChunkObjectReader>(std::move(object_reader),
-                                                         config_.object_chunk_size));
+                     config_.object_chunk_size),
+                     callback);
 
   /// RSTODO: Original code but doesn't work with remote spill
   // std::string result(data_size, '\0');
@@ -608,7 +609,8 @@ void ObjectManager::PushFromFilesystem(const ObjectID &object_id,
 /// RSCODE: SpillRemoteInternal function called from SpillRemote
 void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                                        const NodeID &node_id,
-                                       std::shared_ptr<ChunkObjectReader> chunk_reader) {
+                                       std::shared_ptr<ChunkObjectReader> chunk_reader,
+                                       const std::function<void()> callback) {
   auto rpc_client = GetRpcClient(node_id);
   if (!rpc_client) {
     RAY_LOG(INFO)
@@ -638,8 +640,8 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                     // Post back to the main event loop because the
                     // PushManager is thread-safe.
                     main_service_->post(
-                        [this, node_id, object_id]() {
-                          spill_remote_manager_->OnChunkComplete(node_id, object_id);
+                        [this, node_id, object_id, callback]() {
+                          spill_remote_manager_->OnChunkComplete(node_id, object_id, callback);
                         },
                         "ObjectManager.SpillRemote");
                   },

@@ -56,7 +56,7 @@ class SpillRemoteManager {
 
   /// Called every time a chunk completes to trigger additional sends.
   /// TODO(ekl) maybe we should cancel the entire push on error.
-  void OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id);
+  void OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id, const std::function<void()> callback);
 
   /// Return the number of chunks currently in flight. For testing only.
   int64_t NumChunksInFlight() const { return chunks_in_flight_; };

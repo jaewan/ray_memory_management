@@ -23,13 +23,15 @@ headActor = HeadActor.remote()
 obj1 = headActor.producer.remote()
 obj2 = headActor.producer.remote()
 
+# res1 = ray.get(obj1)
+# print("Object 1 created")
+
 res1 = headActor.consumer.remote(obj1, obj2)
-print("Object 1 created")
 
-del res1
+ray.get(res1)
 
-res2 = headActor.consumer.remote(obj1, obj2)
-print("Object 2 created and Object 1 spilled")
+# res2 = headActor.consumer.remote(obj1, obj2)
+
 
 # del obj2 
 # del res2

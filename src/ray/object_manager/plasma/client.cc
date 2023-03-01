@@ -593,6 +593,9 @@ void PlasmaClient::Impl::RemoteSpillDecreaseObjectCount(const ObjectID &object_i
   // object_entry->count -= 1;
   if(object_entry == nullptr){
   }
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "About to delete from remote spill dec object count";
+
   auto l = Release(object_id);
   RAY_LOG(DEBUG) << l;
 }
