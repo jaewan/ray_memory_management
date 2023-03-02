@@ -380,6 +380,11 @@ void ObjectManager::RemoteSpillDecrementRefCount(const ObjectID &object_id) {
   buffer_pool_store_client_->RemoteSpillDecreaseObjectCount(object_id);
 }
 
+/// RSTODO: Delete later
+void ObjectManager::RemoteSpillViewRefCount(const ObjectID &object_id) {
+  buffer_pool_store_client_->RemoteSpillViewObjectCount(object_id);
+}
+
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback) {
   /// RSCODE: Add code to add object id to node id mapping
