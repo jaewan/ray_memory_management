@@ -618,6 +618,8 @@ void PlasmaClient::Impl::RemoteSpillIncreaseObjectCount(const ObjectID &object_i
 
 /// RSTODO: (Delete later) View ref count
 void PlasmaClient::Impl::RemoteSpillViewObjectCount(const ObjectID &object_id) {
+  RAY_LOG(INFO) << "Calling RemoteSpillViewObjectCount";
+
   auto elem = objects_in_use_.find(object_id);
   ObjectInUseEntry *object_entry;
   if (elem == objects_in_use_.end()) {
@@ -627,7 +629,7 @@ void PlasmaClient::Impl::RemoteSpillViewObjectCount(const ObjectID &object_id) {
     RAY_CHECK(object_entry->count > 0);
   }
 
-  RAY_LOG(INFO) << object_entry->count;
+  RAY_LOG(INFO) << "Object current ref count: " << object_entry->count;
 }
 
 Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
