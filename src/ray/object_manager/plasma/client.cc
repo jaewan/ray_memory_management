@@ -621,11 +621,18 @@ void PlasmaClient::Impl::RemoteSpillViewObjectCount(const ObjectID &object_id) {
   RAY_LOG(INFO) << "Calling RemoteSpillViewObjectCount";
 
   auto elem = objects_in_use_.find(object_id);
+
+  RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 1";
+
   ObjectInUseEntry *object_entry;
   if (elem == objects_in_use_.end()) {
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 2";
     object_entry = objects_in_use_[object_id].get();
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 3";
   } else {
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 4";
     object_entry = elem->second.get();
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 5";
     RAY_CHECK(object_entry->count > 0);
   }
 
