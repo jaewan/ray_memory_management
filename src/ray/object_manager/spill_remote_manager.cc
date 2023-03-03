@@ -26,7 +26,7 @@ void SpillRemoteManager::StartSpillRemote(const NodeID &dest_id,
                             const ObjectID &obj_id,
                             int64_t num_chunks,
                             std::function<void(int64_t)> send_chunk_fn) {
-  auto spill_remote_id = obj_id;
+  auto spill_remote_id = std::make_pair(dest_id, obj_id);
   RAY_CHECK(num_chunks > 0);
   if (spill_remote_info_.contains(spill_remote_id)) {
     RAY_LOG(DEBUG) << "Duplicate spill remote request " << spill_remote_id.first << ", " << spill_remote_id.second
@@ -36,11 +36,11 @@ void SpillRemoteManager::StartSpillRemote(const NodeID &dest_id,
     chunks_remaining_ += num_chunks;
     spill_remote_info_[spill_remote_id].reset(new SpillRemoteState(num_chunks, send_chunk_fn));
   }
-  ScheduleRemainingPushes();
+  ScheduleRemainingSpills();
 }
 
 void SpillRemoteManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id, const std::function<void()> callback) {
-  auto spill_remote_id = obj_id;
+  auto spill_remote_id = std::make_pair(dest_id, obj_id);
   chunks_in_flight_ -= 1;
   chunks_remaining_ -= 1;
   spill_remote_info_[spill_remote_id]->OnChunkComplete();
@@ -52,10 +52,10 @@ void SpillRemoteManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &
     RAY_LOG(INFO) << "About to call callback in OnChunkComplete";
     callback();
   }
-  ScheduleRemainingPushes();
+  ScheduleRemainingSpills();
 }
 
-void SpillRemoteManager::ScheduleRemainingPushes() {
+void SpillRemoteManager::ScheduleRemainingSpills() {
   bool keep_looping = true;
   // Loop over all active pushes for approximate round-robin prioritization.
   // TODO(ekl) this isn't the best implementation of round robin, we should

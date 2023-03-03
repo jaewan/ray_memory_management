@@ -126,7 +126,7 @@ class SpillRemoteManager {
   };
 
   /// Called on completion events to trigger additional pushes.
-  void ScheduleRemainingPushes();
+  void ScheduleRemainingSpills();
 
   /// Pair of (destination, object_id).
   typedef std::pair<NodeID, ObjectID> SpillRemoteID;
