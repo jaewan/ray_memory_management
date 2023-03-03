@@ -244,6 +244,10 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
   if (num_bytes_available_ != num_bytes_available) {
     RAY_LOG(DEBUG) << "Updating pulls based on available memory: " << num_bytes_available;
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 1";
+
   num_bytes_available_ = num_bytes_available;
 
   std::vector<ObjectID> objects_to_pull;
@@ -255,6 +259,9 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
   // by canceling task args and wait requests.
   bool get_requests_remaining = !get_request_bundles_.inactive_requests.empty();
   while (get_requests_remaining) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 2";
+
     const int64_t margin_required = NextRequestBundleSize(get_request_bundles_);
     DeactivateUntilMarginAvailable("task args request",
                                    task_argument_bundles_,
@@ -276,6 +283,9 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
   // Do the same but for wait requests (medium priority).
   bool wait_requests_remaining = !wait_request_bundles_.inactive_requests.empty();
   while (wait_requests_remaining) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 3";
+
     const int64_t margin_required = NextRequestBundleSize(wait_request_bundles_);
     DeactivateUntilMarginAvailable("task args request",
                                    task_argument_bundles_,
@@ -310,6 +320,9 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
 
   // Call the cancellation callbacks outside of the lock.
   for (const auto &obj_id : object_ids_to_cancel) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 4";
+
     RAY_LOG(DEBUG) << "Not enough memory to create requested object " << obj_id
                    << ", aborting.";
     cancel_pull_request_(obj_id);
@@ -319,6 +332,9 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
     absl::MutexLock lock(&active_objects_mu_);
     for (const auto &obj_id : objects_to_pull) {
       if (object_ids_to_cancel.count(obj_id) == 0) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 5";
+        
         TryToMakeObjectLocal(obj_id);
       }
     }
