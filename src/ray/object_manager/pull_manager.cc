@@ -90,13 +90,25 @@ uint64_t PullManager::Pull(const std::vector<rpc::ObjectReference> &object_ref_b
   }
 
   if (prio == BundlePriority::GET_REQUEST) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Pull test 1";
+
     get_request_bundles_.AddBundlePullRequest(req_id, std::move(bundle_pull_request));
   } else if (prio == BundlePriority::WAIT_REQUEST) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Pull test 2";
+
     wait_request_bundles_.AddBundlePullRequest(req_id, std::move(bundle_pull_request));
   } else {
+    // RSTODO: Delete later
+    RAY_LOG(INFO) << "Pull test 3";
+
     RAY_CHECK(prio == BundlePriority::TASK_ARGS);
     task_argument_bundles_.AddBundlePullRequest(req_id, std::move(bundle_pull_request));
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Pull test 4";
 
   // We have a new request. Activate the new request, if the
   // current available memory allows it.
