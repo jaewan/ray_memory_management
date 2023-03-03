@@ -338,7 +338,13 @@ void LocalObjectManager::SpillObjectsInternal(
         /// RSCODE: Simply call SpillRemote() function in object_manager
         for (const auto &object_id: requested_objects_to_spill) {
             object_manager_.FindNodeToSpill(object_id, 
-            [this, object_id, callback]() {
+            [this, object_id, callback, io_worker]() {
+              {
+                absl::MutexLock lock(&mutex_);
+                num_active_workers_ -= 1;
+              } 
+
+              io_worker_pool_.PushSpillWorker(io_worker);
 
               /// RSTODO: Delete later
               RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
@@ -353,9 +359,6 @@ void LocalObjectManager::SpillObjectsInternal(
               }
           });
         }
-
-        /// RSTODO: Not sure if we need this
-        // io_worker_pool_.PushSpillWorker(io_worker);
 
         /// RSTODO: Delete this later
         RAY_LOG(INFO) << "Requested objects to spill size: " << requested_objects_to_spill.size();
