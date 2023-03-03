@@ -26,7 +26,7 @@ void SpillRemoteManager::StartSpillRemote(const NodeID &dest_id,
                             const ObjectID &obj_id,
                             int64_t num_chunks,
                             std::function<void(int64_t)> send_chunk_fn) {
-  auto spill_remote_id = std::make_pair(dest_id, obj_id);
+  auto spill_remote_id = obj_id;
   RAY_CHECK(num_chunks > 0);
   if (spill_remote_info_.contains(spill_remote_id)) {
     RAY_LOG(DEBUG) << "Duplicate spill remote request " << spill_remote_id.first << ", " << spill_remote_id.second
@@ -40,7 +40,7 @@ void SpillRemoteManager::StartSpillRemote(const NodeID &dest_id,
 }
 
 void SpillRemoteManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id, const std::function<void()> callback) {
-  auto spill_remote_id = std::make_pair(dest_id, obj_id);
+  auto spill_remote_id = obj_id;
   chunks_in_flight_ -= 1;
   chunks_remaining_ -= 1;
   spill_remote_info_[spill_remote_id]->OnChunkComplete();

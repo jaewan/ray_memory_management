@@ -286,7 +286,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
 
   /// RSTODO: Delete this later
   if (from_remote) {
-    RAY_LOG(INFO) << "We are pulling this object from remote: " << object_id;
+    RAY_LOG(INFO) << "g " << object_id;
   }
 
   if (rpc_client) {
