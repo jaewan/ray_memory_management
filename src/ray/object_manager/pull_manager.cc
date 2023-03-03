@@ -367,6 +367,8 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
   // Exit if the Pull request has already been fulfilled or canceled.
   auto it = object_pull_requests_.find(object_id);
   if (it == object_pull_requests_.end()) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Object has been pulled";
     return;
   }
 
