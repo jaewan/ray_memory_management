@@ -368,7 +368,7 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
   auto it = object_pull_requests_.find(object_id);
   if (it == object_pull_requests_.end()) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Object has been pulled";
+    RAY_LOG(INFO) << "Object has been pulled: " << object_id;
     return;
   }
 
