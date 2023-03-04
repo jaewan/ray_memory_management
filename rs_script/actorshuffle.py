@@ -96,7 +96,7 @@ def round_robin_partitioner(
         i %= num_partitions
 
 
-@ray.remote
+@ray.remote(num_cpus=8)
 class _StatusTracker:
     def __init__(self):
         self.num_map = 0
@@ -148,7 +148,7 @@ def render_progress_bar(tracker, input_num_partitions, output_num_partitions):
     map_bar.close()
     reduce_bar.close()
 
-@ray.remote
+@ray.remote(num_cpus=8)
 class Shuffle:
     def __init__(self,
         input_reader: Callable[[PartitionID], Iterable[InType]],

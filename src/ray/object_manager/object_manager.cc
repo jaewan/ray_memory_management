@@ -286,7 +286,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
 
   /// RSTODO: Delete this later
   if (from_remote) {
-    RAY_LOG(INFO) << "g " << object_id;
+    RAY_LOG(INFO) << "Sending pull request for: " << object_id;
   }
 
   if (rpc_client) {
@@ -731,7 +731,7 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   num_bytes_pushed_from_plasma_ += spill_remote_request.data().length();
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Number of bytes pushed from plasma: " << num_bytes_pushed_from_plasma_;
+  RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_;
 
   rpc::ClientCallback<rpc::SpillRemoteReply> callback =
       [this, start_time, object_id, node_id, chunk_index, on_complete] (const Status &status, const rpc::SpillRemoteReply &reply) {
