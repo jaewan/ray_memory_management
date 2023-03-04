@@ -18,6 +18,10 @@
 #include "ray/stats/metric_defs.h"
 #include "ray/util/util.h"
 
+/// RSTODO: Delete later
+#include <iostream>
+#include <vector>
+
 namespace ray {
 
 namespace raylet {
@@ -322,12 +326,12 @@ void LocalObjectManager::SpillObjectsInternal(
 
         /// RSTODO: Delete this later
         RAY_LOG(INFO) << "Callback test";
-    });
-  }
 
-  /// RSCODE: Call callback here?
-  if (callback) {
-    callback(Status::OK());
+        /// RSCODE: Call callback here?
+        if (callback) {
+          callback(Status::OK());
+        }
+    });
   }
 
   /// RSTODO: Comment this out for now
@@ -364,31 +368,6 @@ void LocalObjectManager::SpillObjectsInternal(
   //         io_worker_pool_.PushSpillWorker(io_worker);
   //         callback(Status::OK());
   //         return;
-  //       }
-        
-  //       /// RSCODE: Simply call SpillRemote() function in object_manager
-  //       for (const auto &object_id: requested_objects_to_spill) {
-  //           object_manager_.FindNodeToSpill(object_id, 
-  //           [this, object_id, callback, io_worker]() {
-  //             {
-  //               absl::MutexLock lock(&mutex_);
-  //               num_active_workers_ -= 1;
-  //             } 
-
-  //             io_worker_pool_.PushSpillWorker(io_worker);
-
-  //             /// RSTODO: Delete later
-  //             RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
-
-  //             OnObjectRemoteSpilled(object_id);
-
-  //             /// RSTODO: Delete this later
-  //             RAY_LOG(INFO) << "Callback test";
-  //             /// RSCODE: Call callback here?
-  //             if (callback) {
-  //               callback(Status::OK());
-  //             }
-  //         });
   //       }
 
   //       io_worker->rpc_client()->SpillObjects(
