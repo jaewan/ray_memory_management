@@ -322,11 +322,12 @@ void LocalObjectManager::SpillObjectsInternal(
 
         /// RSTODO: Delete this later
         RAY_LOG(INFO) << "Callback test";
-        /// RSCODE: Call callback here?
-        if (callback) {
-          callback(Status::OK());
-        }
     });
+  }
+
+  /// RSCODE: Call callback here?
+  if (callback) {
+    callback(Status::OK());
   }
 
   /// RSTODO: Comment this out for now
