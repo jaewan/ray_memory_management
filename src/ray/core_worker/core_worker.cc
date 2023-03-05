@@ -33,6 +33,8 @@
 #include "ray/util/event.h"
 #include "ray/util/util.h"
 
+#include <chrono>
+
 namespace ray {
 namespace core {
 namespace {
@@ -306,6 +308,11 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
       },
       push_error_callback,
       RayConfig::instance().max_lineage_bytes()));
+
+	// Timestamp coordiation with raylet for priority DFS
+	local_raylet_client_->TimeStampCoordination([this](const Status &status, 
+																				const rpc::TimeStampCoordinationReply &reply){
+			task_manager_->CoordinateTimeStamp(status, reply);});
 
   // Create an entry for the driver task in the task table. This task is
   // added immediately with status RUNNING. This allows us to push errors
@@ -1658,7 +1665,6 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
   } else {
     returned_refs = task_manager_->AddPendingTask(
         task_spec.CallerAddress(), task_spec, CurrentCallSite(), max_retries);
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] Submitting normal task " << task_spec.DebugString();
 		if(RayConfig::instance().enable_BlockTasksSpill()){
 			BuildObjectWorkingSet(task_spec);
 		}
@@ -2684,7 +2690,6 @@ void CoreWorker::HandleGetObjectWorkingSet(const rpc::GetObjectWorkingSetRequest
 	//TODO(Jae) This is wrong with TaskID implementation. If one obj is deleted, taskID is deleted
 	auto deleted_obj_ids = reference_counter_->GetDeletedObjects();
 	for(auto &obj : deleted_obj_ids){
-	  RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleGetObjectWorkingSet deleted objects:" << obj << " size "<<deleted_obj_ids.size();
 	  object_working_set_.erase(obj.TaskId());
 	  for(auto &working_set : object_working_set_){
 		working_set.second.erase(obj);
@@ -3197,7 +3202,6 @@ void CoreWorker::HandleLocalGC(const rpc::LocalGCRequest &request,
 void CoreWorker::HandleSpillObjects(const rpc::SpillObjectsRequest &request,
                                     rpc::SpillObjectsReply *reply,
                                     rpc::SendReplyCallback send_reply_callback) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleSpillObjects called";
   static const bool enable_eagerSpill = RayConfig::instance().enable_EagerSpill();
   if (options_.spill_objects != nullptr) {
     auto object_refs =
@@ -3208,9 +3212,7 @@ void CoreWorker::HandleSpillObjects(const rpc::SpillObjectsRequest &request,
 	    reference_counter_->EagerSpillIncreaseLocalReference(ObjectID::FromBinary(ref.object_id()));
 	  }
 	}
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling options_.spill_objects ";
     std::vector<std::string> object_urls = options_.spill_objects(object_refs);
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] options_.spill_objects called";
     for (size_t i = 0; i < object_urls.size(); i++) {
       reply->add_spilled_objects_url(std::move(object_urls[i]));
     }

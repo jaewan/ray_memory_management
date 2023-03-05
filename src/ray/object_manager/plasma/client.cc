@@ -231,7 +231,7 @@ class PlasmaClient::Impl : public std::enable_shared_from_this<PlasmaClient::Imp
   std::recursive_mutex client_mutex_;
 };
 
-PlasmaBuffer::~PlasmaBuffer() { RAY_LOG(DEBUG) << "[JAE_DEBUG] ~PlasmaBuffer call Release()"; RAY_UNUSED(client_->Release(object_id_)); }
+PlasmaBuffer::~PlasmaBuffer() { RAY_UNUSED(client_->Release(object_id_)); }
 
 PlasmaClient::Impl::Impl() : store_capacity_(0) {}
 

@@ -9,6 +9,8 @@
 #include "ray/common/id.h"
 #include "ray/util/logging.h"
 
+#define MAX_PRIORITY LONG_MAX
+
 namespace ray {
 
 struct Priority {
@@ -19,13 +21,13 @@ struct Priority {
     extend(depth + 1);
   }
 
-  Priority(const std::vector<int> &s) : score(s) {}
+  Priority(const std::vector<int64_t> &s) : score(s) {}
 
   void extend(int64_t size) const;
 
   void shorten(int64_t size) const;
 
-  void SetFromParentPriority(Priority &parent, int);
+  void SetFromParentPriority(Priority &parent, int64_t);
 
   bool operator==(const Priority &rhs) const {
 	if(score.size() != rhs.score.size())
@@ -48,7 +50,7 @@ struct Priority {
 
   bool operator>=(const Priority &rhs) const;
 
-  int GetScore(int64_t depth) const {
+  int64_t GetScore(int64_t depth) const {
     extend(depth + 1);
     return score[depth];
   }
@@ -57,7 +59,7 @@ struct Priority {
 	return (int)score.size();
   }
 
-  void Set(const std::vector<int> &s){
+  void Set(const std::vector<int64_t> &s){
 		score = s;
   }
 
@@ -70,7 +72,7 @@ struct Priority {
     }
   }
 
-  void SetScore(int64_t depth, int s) {
+  void SetScore(int64_t depth, int64_t s) {
     extend(depth + 1);
     RAY_CHECK(score[depth] >= s);
     score[depth] = s;
@@ -81,7 +83,7 @@ struct Priority {
     // Find the last non-null element in the vector.
     while (end_it != score.begin()) {
       end_it--;
-      if (*end_it != INT_MAX) {
+      if (*end_it != MAX_PRIORITY) {
         // Advance iterator so that the hash includes the last non-null
         // element.
         end_it++;
@@ -95,7 +97,7 @@ struct Priority {
     return seed;
   }
 
-  mutable std::vector<int> score = {};
+  mutable std::vector<int64_t> score = {};
 };
 
 using TaskKey = std::pair<Priority, TaskID>;

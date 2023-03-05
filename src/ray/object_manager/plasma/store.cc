@@ -200,11 +200,9 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
   	    for(i=0; i<size; i++){
           lowest_priority->SetScore(i, p.GetScore(i));
         }
-        RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] lowest_priority:" << *lowest_priority
-          << " P:" << p;
-        }
-        *block_tasks_required = true;
-        block_task_flag_ = true;
+			}
+			*block_tasks_required = true;
+			block_task_flag_ = true;
     }
   }
   if (evict_tasks_required != nullptr) {
@@ -316,7 +314,6 @@ int PlasmaStore::RemoveFromClientObjectIds(const ObjectID &object_id,
 
 void PlasmaStore::ReleaseObject(const ObjectID &object_id,
                                 const std::shared_ptr<Client> &client) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] ReleaseObject called on object:" << object_id;
   auto entry = object_lifecycle_mgr_.GetObject(object_id);
   RAY_CHECK(entry != nullptr);
   // Remove the client from the object's array of clients.
@@ -623,7 +620,6 @@ bool PlasmaStore::IsObjectEagerSpillable(const ObjectID &object_id) {
     // Object already evicted or deleted.
     return false;
   }
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] obj:" << object_id << " sealed:" << entry->Sealed() << " ref:" << entry->GetRefCount();
   //Eager spillable if driver holds a reference
   return entry->Sealed() && entry->GetRefCount() <= 2;
 }

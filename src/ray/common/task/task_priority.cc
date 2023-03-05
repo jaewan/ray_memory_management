@@ -6,7 +6,7 @@ void Priority::extend(int64_t size) const {
   int64_t diff = size -  static_cast<int64_t>(score.size());
   if (diff > 0) {
     for (int64_t i = 0; i < diff; i++) {
-      score.push_back(INT_MAX);
+      score.push_back(MAX_PRIORITY);
     }
   }
 }
@@ -16,9 +16,9 @@ void Priority::shorten(int64_t size) const {
 		score.resize(score.size() - size);
 }
 
-void Priority::SetFromParentPriority(Priority &parent, int s){
+void Priority::SetFromParentPriority(Priority &parent, int64_t s){
   //param s id the last score to add
-  if(parent.score.size() == 1 && parent.score[0] == INT_MAX){
+  if(parent.score.size() == 1 && parent.score[0] == MAX_PRIORITY){
 		score[0] = s;
   }else{
 		score = parent.score;

@@ -214,13 +214,13 @@ Status SendCreateRequest(const std::shared_ptr<StoreConn> &store_conn,
                                     fbb.CreateString(owner_address.ip_address()),
                                     owner_address.port(),
                                     fbb.CreateString(owner_address.worker_id()),
-									fbb.CreateVector(priority.score.data(),
-										priority.score.size()),
-                                    data_size,
-                                    metadata_size,
-                                    source,
-                                    device_num,
-                                    try_immediately);
+																		fbb.CreateVector(priority.score.data(),
+																		  priority.score.size()),
+																		data_size,
+																		metadata_size,
+																		source,
+																		device_num,
+																		try_immediately);
   return PlasmaSend(store_conn, MessageType::PlasmaCreateRequest, &fbb, message);
 }
 

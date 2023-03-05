@@ -103,6 +103,12 @@ class NodeManagerWorkerClient
                          grpc_client_,
                          /*method_timeout_ms*/ -1, )
 
+  /// Request a timestemp coordination for priority assignment.
+  VOID_RPC_CLIENT_METHOD(NodeManagerService,
+												 TimeStampCoordination,
+                         grpc_client_,
+                         /*method_timeout_ms*/ -1, )
+
   /// Request a worker lease.
   VOID_RPC_CLIENT_METHOD(NodeManagerService,
                          RequestWorkerLease,

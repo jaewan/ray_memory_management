@@ -265,9 +265,11 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 			  local_object_manager_.MapObjectIDPriority(object_id, base_priority);
 			  return true;
 			}
-            if(block_tasks){
-              cluster_task_manager_->BlockTasks(base_priority, io_service_);
-            }
+
+			if(block_tasks){
+				cluster_task_manager_->BlockTasks(base_priority, io_service_);
+			}
+
 			if(RayConfig::instance().enable_BlockTasksSpill()){
 			  // Deadlock#1 when all workers are spinning
 			  if(num_spinning_workers && num_spinning_workers == worker_pool_.GetAllRegisteredWorkersNum()){
@@ -1906,6 +1908,16 @@ void NodeManager::HandleReportWorkerBacklog(
     local_task_manager_->SetWorkerBacklog(
         scheduling_class, worker_id, backlog_report.backlog_size());
   }
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
+void NodeManager::HandleTimeStampCoordination(const rpc::TimeStampCoordinationRequest &request,
+																							rpc::TimeStampCoordinationReply *reply,
+																							rpc::SendReplyCallback send_reply_callback){
+	int64_t worker_timestamp = request.worker_timestamp();
+	static std::chrono::steady_clock::duration now = std::chrono::steady_clock::now().time_since_epoch();
+	int64_t coordination = (int64_t)now.count();
+	reply->set_coordination(coordination - worker_timestamp);
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 

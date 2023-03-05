@@ -364,12 +364,12 @@ class TaskSpecification : public MessageWrapper<rpc::TaskSpec> {
   bool PlacementGroupCaptureChildTasks() const;
 
   Priority GetPriority() const {
-    std::vector<int> p(message_->priority().data(), message_->priority().data() + message_->priority().size());
+    std::vector<int64_t> p(message_->priority().data(), message_->priority().data() + message_->priority().size());
     return Priority(p);
   }
 
   TaskKey GetTaskKey() const {
-    std::vector<int> p(message_->priority().data(), message_->priority().data() + message_->priority().size());
+    std::vector<int64_t> p(message_->priority().data(), message_->priority().data() + message_->priority().size());
     return std::make_pair<Priority, TaskID>(std::move(p), TaskId());
   }
 

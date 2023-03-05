@@ -41,7 +41,7 @@ inline void LogPlaceSeq(const std::string &fnc_name, const Priority &pri){
   log_stream.close();
 }
 
-inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri){
+inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri, size_t worker_size){
   static long long produced_obj = 0;
   if (fnc_name.find("producer") != std::string::npos) {
     produced_obj++;
@@ -53,7 +53,7 @@ inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, cons
   std::ostringstream stream;
   stream << task_id <<" " <<
 	fnc_name << " " << pri << 
-	" obj:" << produced_obj << "\n";
+	" obj:" << produced_obj << " active_workers:" << worker_size  << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
@@ -154,7 +154,11 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
         RAY_CHECK(ptts_inserted.second);
 
-				LogPlaceSeq("Placed", priority);
+				static bool consumer_came = false;
+				if (priority.score.size() > 1 && !consumer_came){
+					LogPlaceSeq("Placed", priority);
+					consumer_came = true;
+				}
         RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first
                        << " queue size is now " << scheduling_key_entry.task_priority_queue.size();
         scheduling_key_entry.resource_spec = task_spec;
@@ -298,7 +302,6 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const auto priority_it = priority_task_queues_not_pushed_.begin();
     Priority pri(lease_granted_pri.score);
     if(priority_it != priority_task_queues_not_pushed_.end()){
-			RAY_LOG(DEBUG) << "[JAE_DEBUG] lease granted pri "<<lease_granted_pri << " front "  << *priority_it << " = " << (lease_granted_pri > *priority_it);
       if(lease_granted_pri > *priority_it){
 					pri.Set(*priority_it);
           auto ptq_inserted = priority_task_queues_.emplace(lease_granted_pri);
@@ -486,7 +489,7 @@ void CoreWorkerDirectTaskSubmitter::ReportWorkerBacklogIfNeeded(
   }
 }
 
-void CoreWorkerDirectTaskSubmitter::SetBlockSpill(std::vector<int> block_score){
+void CoreWorkerDirectTaskSubmitter::SetBlockSpill(std::vector<int64_t> block_score){
 	block_requested_priority_.Set(block_score);
 }
 
@@ -579,7 +582,8 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   RAY_LOG(DEBUG) << "Requesting lease from raylet "
                  << NodeID::FromBinary(raylet_address->raylet_id()) << " for task "
                  << task_id << " priority:" << pri
-								 << " JobId:" << resource_spec.JobId();
+								 << " JobId:" << resource_spec.JobId() 
+								 << " num_leases_on_flight_:" << num_leases_on_flight_;
   // Subtract 1 so we don't double count the task we are requesting for.
 
 	static const bool enable_BlockTasks = RayConfig::instance().enable_BlockTasks();
@@ -677,7 +681,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 
               auto resources_copy = reply.resource_mapping();
 							if (enable_BlockTasks){
-								std::vector<int> block_score(reply.priority().data(), reply.priority().data() +
+								std::vector<int64_t> block_score(reply.priority().data(), reply.priority().data() +
 									reply.priority().size());
 								SetBlockSpill(block_score);
 							}
@@ -789,7 +793,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
   RAY_LOG(DEBUG) << "Pushing task " << task_spec.TaskId() << " to worker "
                  << addr.worker_id << " of raylet " << addr.raylet_id
                  << " with priority:" << task_spec.GetPriority();
-  LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), task_spec.GetPriority());
+  LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), task_spec.GetPriority(), active_workers_.size());
 
   auto task_id = task_spec.TaskId();
   auto request = std::make_unique<rpc::PushTaskRequest>();

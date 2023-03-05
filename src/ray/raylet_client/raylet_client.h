@@ -61,6 +61,8 @@ class PinObjectsInterface {
 /// Interface for leasing workers. Abstract for testing.
 class WorkerLeaseInterface {
  public:
+  virtual void TimeStampCoordination(
+		const rpc::ClientCallback<rpc::TimeStampCoordinationReply> &callback) = 0;
   /// Requests a worker from the raylet. The callback will be sent via gRPC.
   /// \param resource_spec Resources that should be allocated for the worker.
   /// \param grant_or_reject: True if we we should either grant or reject the request
@@ -395,6 +397,10 @@ class RayletClient : public RayletClientInterface {
       const rpc::ClientCallback<rpc::RequestObjectSpillageReply> &callback);
 
   std::shared_ptr<grpc::Channel> GetChannel() const override;
+
+  /// Implements TimeStampCoordinationInterface
+  void TimeStampCoordination(
+		const rpc::ClientCallback<rpc::TimeStampCoordinationReply> &callback) override;
 
   /// Implements WorkerLeaseInterface.
   void RequestWorkerLease(

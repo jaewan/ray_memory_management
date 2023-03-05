@@ -19,6 +19,8 @@
 #include "ray/common/constants.h"
 #include "ray/util/util.h"
 
+#include <chrono>
+
 namespace ray {
 namespace core {
 
@@ -28,27 +30,43 @@ const int64_t kTaskFailureThrottlingThreshold = 50;
 // Throttle task failure logs to once this interval.
 const int64_t kTaskFailureLoggingFrequencyMillis = 5000;
 
+void TaskManager::CoordinateTimeStamp(const Status &status,
+		const rpc::TimeStampCoordinationReply &reply){
+	timestamp_coordinator_ = reply.coordination();
+}
+
 //TODO(Jae) Delete object priority when a task is finished
 Priority TaskManager::GenerateTaskPriority(
 		TaskSpecification &spec, std::vector<ObjectID> &task_deps) {
+	/*
+  // Priority id to assign when a new task is invoked.
+  // Sequentially increase new_priority_s after assign this to a new priority
+  static int new_priority_s = 0;
+	*/
+
+	RAY_CHECK(timestamp_coordinator_ != 0) << "Jae handle when coordination rpc is slow";
   static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
-  RAY_LOG(DEBUG) << "Generating priority of task " << spec.TaskId()
-	  <<" num deps:" << task_deps.size();
+  RAY_LOG(DEBUG) << "Generating priority of task " << spec.TaskId();
+
   Priority dummy_pri = Priority();
   Priority &max_priority = dummy_pri;
   for (const ObjectID &argument_id : task_deps) {
     Priority &p = reference_counter_->GetObjectPriority(argument_id);
     if(max_priority > p){
       max_priority = p;
-	}
+		}
   }
 
   Priority pri;
+	std::chrono::steady_clock::duration now = std::chrono::steady_clock::now().time_since_epoch();
+	int64_t new_pri = now.count() + timestamp_coordinator_;
   //This is an ensemble serve patch for multi driver
-  if(ensemble_serving && max_priority == pri && task_deps.size() && reference_counter_->GetCurrentTaskPriority() != pri){
-    pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
+  if(ensemble_serving && max_priority == pri && task_deps.size() &&
+			reference_counter_->GetCurrentTaskPriority() != pri){
+    //pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
+    pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_pri);
   }else{
-    pri.SetFromParentPriority(max_priority, new_priority_s++);
+    pri.SetFromParentPriority(max_priority, new_pri);
   }
   spec.SetPriority(pri);
   return pri;

@@ -29,6 +29,7 @@ namespace rpc {
   RPC_SERVICE_HANDLER(NodeManagerService, RequestResourceReport, -1)  \
   RPC_SERVICE_HANDLER(NodeManagerService, GetResourceLoad, -1)        \
   RPC_SERVICE_HANDLER(NodeManagerService, NotifyGCSRestart, -1)       \
+  RPC_SERVICE_HANDLER(NodeManagerService, TimeStampCoordination, -1)     \
   RPC_SERVICE_HANDLER(NodeManagerService, RequestWorkerLease, -1)     \
   RPC_SERVICE_HANDLER(NodeManagerService, ReportWorkerBacklog, -1)    \
   RPC_SERVICE_HANDLER(NodeManagerService, ReturnWorker, -1)           \
@@ -79,6 +80,10 @@ class NodeManagerServiceHandler {
   virtual void HandleNotifyGCSRestart(const rpc::NotifyGCSRestartRequest &request,
                                       rpc::NotifyGCSRestartReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) = 0;
+
+  virtual void HandleTimeStampCoordination(const TimeStampCoordinationRequest &request,
+                                        TimeStampCoordinationReply *reply,
+                                        SendReplyCallback send_reply_callback) = 0;
 
   virtual void HandleRequestWorkerLease(const RequestWorkerLeaseRequest &request,
                                         RequestWorkerLeaseReply *reply,

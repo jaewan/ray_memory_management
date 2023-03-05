@@ -144,7 +144,9 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
           sched_cls_info.running_tasks.size() >= sched_cls_info.capacity &&
           work->GetState() == internal::WorkStatus::WAITING) {
         RAY_LOG(DEBUG) << "Hit cap! time=" << get_time_ms_()
-                       << " next update time=" << sched_cls_info.next_update_time;
+                       << " next update time=" << sched_cls_info.next_update_time
+                       << " scheduling_class:" << scheduling_class 
+											 << " capacity:" << sched_cls_info.capacity  << " running_tasks:" <<  sched_cls_info.running_tasks.size();
         if (get_time_ms_() < sched_cls_info.next_update_time) {
           // We're over capacity and it's not time to admit a new task yet.
           // Calculate the next time we should admit a new task.
@@ -1029,7 +1031,6 @@ ResourceRequest LocalTaskManager::CalcNormalTaskResources() const {
 
 uint64_t LocalTaskManager::MaxRunningTasksPerSchedulingClass(
     SchedulingClass sched_cls_id) const {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] this is where GetSchedulingClassDescriptor is called";
   auto sched_cls = TaskSpecification::GetSchedulingClassDescriptor(sched_cls_id);
   double cpu_req = sched_cls.resource_set.GetNumCpusAsDouble();
   uint64_t total_cpus =

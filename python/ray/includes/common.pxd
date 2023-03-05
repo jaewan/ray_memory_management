@@ -322,5 +322,5 @@ cdef extern from "ray/common/task/task_spec.h" nogil:
 cdef extern from "ray/common/task/task_priority.h" nogil:
     cdef cppclass CPriority "ray::Priority":
         CPriority()
-        CPriority(const c_vector[int] &score)
-        c_vector[int] score
+        CPriority(const c_vector[int64_t] &score)
+        c_vector[int64_t] score

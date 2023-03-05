@@ -827,7 +827,6 @@ int64_t ObjectManager::GetTaskObjectSize(const TaskID &task_id){
 }
 
 int64_t ObjectManager::GetObjectsInObjectStore(std::vector<const ObjectID*> *objs){
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] GetObjectsInObjectStore local_objects_ size:" << local_objects_.size();
   for(auto it = local_objects_.begin(); it != local_objects_.end(); it++)
     objs->push_back(&(it->first));
   return config_.object_store_memory - used_memory_;

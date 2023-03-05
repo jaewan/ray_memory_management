@@ -182,7 +182,7 @@ class CoreWorkerDirectTaskSubmitter {
       EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
 	/// Set block_requested_priority_ for BackPressure
-	void SetBlockSpill(std::vector<int> block_score);
+	void SetBlockSpill(std::vector<int64_t> block_score);
 
   /// Set up client state for newly granted worker lease.
   void AddWorkerLeaseClient(

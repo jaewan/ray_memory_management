@@ -549,6 +549,9 @@ class NodeManager : public rpc::NodeManagerServiceHandler,
                                    rpc::CancelResourceReserveReply *reply,
                                    rpc::SendReplyCallback send_reply_callback) override;
 
+  void HandleTimeStampCoordination(const rpc::TimeStampCoordinationRequest &request,
+                                        rpc::TimeStampCoordinationReply *reply,
+                                        rpc::SendReplyCallback send_reply_callback) override;
   /// Handle a `WorkerLease` request.
   void HandleRequestWorkerLease(const rpc::RequestWorkerLeaseRequest &request,
                                 rpc::RequestWorkerLeaseReply *reply,

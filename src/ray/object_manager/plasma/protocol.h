@@ -89,9 +89,9 @@ Status SendCreateRequest(const std::shared_ptr<StoreConn> &store_conn,
                          const ray::Priority &priority,
                          int64_t data_size,
                          int64_t metadata_size,
-						 flatbuf::ObjectSource source,
+												 flatbuf::ObjectSource source,
                          int device_num,
-						 bool try_immediately);
+												 bool try_immediately);
 
 void ReadCreateRequest(uint8_t *data,
                        size_t size,
