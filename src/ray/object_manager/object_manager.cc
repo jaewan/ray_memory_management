@@ -488,7 +488,8 @@ void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "Pushing from local";
 
-    return PushLocalObject(object_id, node_id);
+    /// RSCODE:
+    return PushLocalObject(object_id, node_id, from_remote);
   }
 
   // Push from spilled object directly if the object is on local disk.
@@ -531,7 +532,7 @@ void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const
   }
 }
 
-void ObjectManager::PushLocalObject(const ObjectID &object_id, const NodeID &node_id) {
+void ObjectManager::PushLocalObject(const ObjectID &object_id, const NodeID &node_id, bool from_remote) {
   const ObjectInfo &object_info = local_objects_[object_id].object_info;
   uint64_t data_size = static_cast<uint64_t>(object_info.data_size);
   uint64_t metadata_size = static_cast<uint64_t>(object_info.metadata_size);
@@ -572,7 +573,8 @@ void ObjectManager::PushLocalObject(const ObjectID &object_id, const NodeID &nod
                      node_id,
                      std::make_shared<ChunkObjectReader>(std::move(object_reader),
                                                          config_.object_chunk_size),
-                     /*from_disk=*/false);
+                     /*from_disk=*/false,
+                     from_remote);
 }
 
 void ObjectManager::PushFromFilesystem(const ObjectID &object_id,
@@ -659,7 +661,8 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
 void ObjectManager::PushObjectInternal(const ObjectID &object_id,
                                        const NodeID &node_id,
                                        std::shared_ptr<ChunkObjectReader> chunk_reader,
-                                       bool from_disk) {
+                                       bool from_disk,
+                                       bool from_remote) {
   auto rpc_client = GetRpcClient(node_id);
   if (!rpc_client) {
     // Push is best effort, so do nothing here.
@@ -695,7 +698,8 @@ void ObjectManager::PushObjectInternal(const ObjectID &object_id,
                         "ObjectManager.Push");
                   },
                   chunk_reader,
-                  from_disk);
+                  from_disk,
+                  from_remote);
             },
             "ObjectManager.Push");
       });
@@ -764,7 +768,8 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
                                     std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
                                     std::function<void(const Status &)> on_complete,
                                     std::shared_ptr<ChunkObjectReader> chunk_reader,
-                                    bool from_disk) {
+                                    bool from_disk,
+                                    bool from_remote) {
   double start_time = absl::GetCurrentTimeNanos() / 1e9;
   rpc::PushRequest push_request;
   // Set request header
@@ -776,6 +781,7 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
   push_request.set_data_size(chunk_reader->GetObject().GetObjectSize());
   push_request.set_metadata_size(chunk_reader->GetObject().GetMetadataSize());
   push_request.set_chunk_index(chunk_index);
+  push_request.set_from_remote(from_remote);
 
   // read a chunk into push_request and handle errors.
   auto optional_chunk = chunk_reader->GetChunk(chunk_index);
@@ -833,11 +839,14 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
   const rpc::Address &owner_address = request.owner_address();
   const std::string &data = request.data();
 
+  /// RSCODE:
+  bool from_remote = request.from_remote();
+
   /// RSTODO: Delete this later
   RAY_LOG(INFO) << "Number bytes pulled from remote in push handler: " << request.data().length();
 
   bool success = ReceiveObjectChunk(
-      node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data);
+      node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data, from_remote);
   num_chunks_received_total_++;
   if (!success) {
     num_chunks_received_total_failed_++;

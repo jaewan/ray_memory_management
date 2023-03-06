@@ -37,6 +37,8 @@ message PushRequest {
   uint64 metadata_size = 7;
   // The chunk data
   bytes data = 8;
+  /// RSGRPC:
+  bool from_remote = 9;
 }
 
 // RSGRPC: create same RPC as PushRequest above. (GRPC)

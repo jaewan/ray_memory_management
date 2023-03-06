@@ -303,7 +303,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param object_id The object's object id.
   /// \param node_id The remote node's id.
   /// \return Void.
-  void PushLocalObject(const ObjectID &object_id, const NodeID &node_id);
+  void PushLocalObject(const ObjectID &object_id, const NodeID &node_id, const bool from_remote = false);
 
   /// Pushing a known spilled object to a remote object manager.
   /// \param object_id The object's object id.
@@ -337,7 +337,8 @@ class ObjectManager : public ObjectManagerInterface,
   void PushObjectInternal(const ObjectID &object_id,
                           const NodeID &node_id,
                           std::shared_ptr<ChunkObjectReader> chunk_reader,
-                          bool from_disk);
+                          bool from_disk,
+                          const bool from_remote = false);
 
   /// Send one chunk of the object to remote object manager
   ///
@@ -359,7 +360,8 @@ class ObjectManager : public ObjectManagerInterface,
                        std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
                        std::function<void(const Status &)> on_complete,
                        std::shared_ptr<ChunkObjectReader> chunk_reader,
-                       bool from_disk);
+                       bool from_disk,
+                       const bool from_remote = false);
 
   /// RSCODE: Spill one chunk of the object to remote object manager
   ///
