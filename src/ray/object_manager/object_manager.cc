@@ -244,8 +244,7 @@ void ObjectManager::HandleObjectDeleted(const ObjectID &object_id) {
 uint64_t ObjectManager::Pull(const std::vector<rpc::ObjectReference> &object_refs,
                              BundlePriority prio) {
   std::vector<rpc::ObjectReference> objects_to_locate;
-  /// RSTODO: Revert later
-  // auto request_id = pull_manager_->Pull(object_refs, prio, &objects_to_locate);
+  auto request_id = pull_manager_->Pull(object_refs, prio, &objects_to_locate);
 
   const auto &callback = [this](const ObjectID &object_id,
                                 const std::unordered_set<NodeID> &client_ids,
@@ -271,10 +270,7 @@ uint64_t ObjectManager::Pull(const std::vector<rpc::ObjectReference> &object_ref
         object_directory_pull_callback_id_, object_id, ref.owner_address(), callback));
   }
 
-  /// RSTODO: Revert later
-  // return request_id;
-
-  return 0;
+  return request_id;
 }
 
 void ObjectManager::CancelPull(uint64_t request_id) {
