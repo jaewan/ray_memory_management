@@ -898,13 +898,10 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   // doesn't care about fault tolerance. 
   received_remote_objects_origin_.emplace(object_id, node_id);
 
-  /// RSCODE: Try incrementing object count before write chunk
-  // buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-
   /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, 
                      data_size, metadata_size, chunk_index, 
-                     data, true /* from_remote */);
+                     data, true /* from_remote */, true /* from remote spill */);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
@@ -916,7 +913,8 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                                        uint64_t metadata_size,
                                        uint64_t chunk_index,
                                        const std::string &data, 
-                                       const bool from_remote) {
+                                       const bool from_remote,
+                                       const bool from_remote_spill) {
   num_bytes_received_total_ += data.size();
 
   RAY_LOG(DEBUG) << "ReceiveObjectChunk on " << self_node_id_ << " from " << node_id
@@ -946,6 +944,11 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                   << object_id;
     buffer_pool_.AbortCreate(object_id);
     return false;
+  }
+
+  /// RSCODE: Try incrementing object count before write chunk
+  if (from_remote_spill) {
+    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
   }
 
   if (chunk_status.ok()) {
