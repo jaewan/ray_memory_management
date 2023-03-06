@@ -899,7 +899,7 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   received_remote_objects_origin_.emplace(object_id, node_id);
 
   /// RSCODE: Try incrementing object count before write chunk
-  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  // buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
 
   /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, 
