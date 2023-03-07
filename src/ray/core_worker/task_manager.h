@@ -105,7 +105,7 @@ class TaskManager : public TaskFinisherInterface, public TaskResubmissionInterfa
   }
 
 	void CoordinateTimeStamp(const Status &status, 
-																				const rpc::TimeStampCoordinationReply &reply);
+													 const rpc::TimeStampCoordinationReply &reply);
 
   Priority GenerateTaskPriority(TaskSpecification &spec, std::vector<ObjectID> &task_deps);
 

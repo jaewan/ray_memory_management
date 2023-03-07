@@ -312,7 +312,8 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
 	// Timestamp coordiation with raylet for priority DFS
 	local_raylet_client_->TimeStampCoordination([this](const Status &status, 
 																				const rpc::TimeStampCoordinationReply &reply){
-			task_manager_->CoordinateTimeStamp(status, reply);});
+			task_manager_->CoordinateTimeStamp(status, reply);
+      });
 
   // Create an entry for the driver task in the task table. This task is
   // added immediately with status RUNNING. This allows us to push errors
@@ -1574,12 +1575,15 @@ void CoreWorker::BuildCommonTaskSpec(
                             required_resources,
                             required_placement_resources,
                             debugger_breakpoint,
-							priority,
+                            priority,
                             depth,
                             override_runtime_env_info,
                             concurrency_group_name);
   // Set task arguments.
   for (const auto &arg : args) {
+    Priority pri = reference_counter_->GetObjectPriority(arg->GetObjectId());
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] builder.AddArg called on task:" << name
+                   << " task_id:" << task_id << " priority:" << pri;
     builder.AddArg(*arg);
   }
 }
@@ -1651,7 +1655,7 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
                       constrained_resources,
                       required_resources,
                       debugger_breakpoint,
-					  Priority(),
+                      Priority(),
                       depth,
                       task_options.serialized_runtime_env_info);
   builder.SetNormalTaskSpec(max_retries,
@@ -1962,7 +1966,7 @@ std::optional<std::vector<rpc::ObjectReference>> CoreWorker::SubmitActorTask(
                       task_options.resources,
                       required_resources,
                       "",    /* debugger_breakpoint */
-					  Priority(),
+                      Priority(),
                       depth, /*depth*/
                       "{}",  /* serialized_runtime_env_info */
                       task_options.concurrency_group_name);
@@ -2247,7 +2251,7 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
   if(ensemble_serving){
     if(task_spec.GetName().compare("aggregator()") == 0){
       reference_counter_->SetCurrentTaskPriority(task_spec.GetPriority());
-	}
+    }
   }
   task_queue_length_ -= 1;
   num_executed_tasks_ += 1;

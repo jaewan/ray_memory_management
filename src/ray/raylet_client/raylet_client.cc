@@ -324,8 +324,8 @@ Status raylet::RayletClient::FreeObjects(const std::vector<ObjectID> &object_ids
 void raylet::RayletClient::TimeStampCoordination(
 		const rpc::ClientCallback<rpc::TimeStampCoordinationReply> &callback){
 	rpc::TimeStampCoordinationRequest request;
-	std::chrono::steady_clock::duration now = std::chrono::steady_clock::now().time_since_epoch();
-	request.set_worker_timestamp((int64_t)now.count());
+  int64_t local_timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+	request.set_worker_timestamp(local_timestamp);
   grpc_client_->TimeStampCoordination(request, callback);
 }
 

@@ -59,7 +59,7 @@ Priority TaskManager::GenerateTaskPriority(
 
   Priority pri;
 	std::chrono::steady_clock::duration now = std::chrono::steady_clock::now().time_since_epoch();
-	int64_t new_pri = now.count() + timestamp_coordinator_;
+	int64_t new_pri = now.count() - timestamp_coordinator_;
   //This is an ensemble serve patch for multi driver
   if(ensemble_serving && max_priority == pri && task_deps.size() &&
 			reference_counter_->GetCurrentTaskPriority() != pri){

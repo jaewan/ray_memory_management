@@ -25,6 +25,7 @@ namespace ray {
 class TaskArg {
  public:
   virtual void ToProto(rpc::TaskArg *arg_proto) const = 0;
+  virtual const ObjectID& GetObjectId();
   virtual ~TaskArg(){};
 };
 
@@ -39,11 +40,24 @@ class TaskArgByReference : public TaskArg {
                      const std::string &call_site)
       : id_(object_id), owner_address_(owner_address), call_site_(call_site) {}
 
+  const ObjectID& GetObjectId(){
+    return id_;
+  }
+
   void ToProto(rpc::TaskArg *arg_proto) const {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] ToProto from TaskArgByReference Called";
     auto ref = arg_proto->mutable_object_ref();
     ref->set_object_id(id_.Binary());
     ref->mutable_owner_address()->CopyFrom(owner_address_);
     ref->set_call_site(call_site_);
+    /*
+    auto p = ref->mutable_priority();
+    Priority &priority = func(id_);
+    p->Clear();
+    for (auto &s : priority.score){
+      p->Add(s);
+    }
+    */
   }
 
  private:
@@ -59,11 +73,17 @@ class TaskArgByValue : public TaskArg {
   ///
   /// \param[in] value Value of the argument.
   /// \return The task argument.
-  explicit TaskArgByValue(const std::shared_ptr<RayObject> &value) : value_(value) {
+  explicit TaskArgByValue(const std::shared_ptr<RayObject> &value) : value_(value)  {
     RAY_CHECK(value) << "Value can't be null.";
   }
 
+  ObjectID id_;
+  const ObjectID& GetObjectId(){
+    return id_;
+  }
+
   void ToProto(rpc::TaskArg *arg_proto) const {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] ToProto from TaskArgByValue Called";
     if (value_->HasData()) {
       const auto &data = value_->GetData();
       arg_proto->set_data(data->Data(), data->Size());
@@ -181,6 +201,7 @@ class TaskSpecBuilder {
 
   /// Add an argument to the task.
   TaskSpecBuilder &AddArg(const TaskArg &arg) {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] AddArg called. Calling ToProto";
     auto ref = message_->add_args();
     arg.ToProto(ref);
     return *this;

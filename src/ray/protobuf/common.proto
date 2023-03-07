@@ -399,6 +399,8 @@ message ObjectReference {
   // Used to print debugging information if there is an error retrieving the
   // object.
   string call_site = 3;
+  // priority of the object
+  repeated int64 priority = 4;
 }
 
 message ObjectReferenceCount {
@@ -436,6 +438,8 @@ message TaskArg {
   bytes metadata = 3;
   // ObjectIDs that were nested in the inlined arguments of the data field.
   repeated ObjectReference nested_inlined_refs = 4;
+  // Priority of the object
+  repeated int64 priority = 30;
 }
 
 // Task spec of an actor creation task.

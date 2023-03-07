@@ -1914,10 +1914,13 @@ void NodeManager::HandleReportWorkerBacklog(
 void NodeManager::HandleTimeStampCoordination(const rpc::TimeStampCoordinationRequest &request,
 																							rpc::TimeStampCoordinationReply *reply,
 																							rpc::SendReplyCallback send_reply_callback){
+  // This is to reduce the size of timestamp. We can coordinate the workers to have the same timestamp
+  // as raylet. But to reduce the size, normalize the stamps when it is first called
+  const static int64_t initial_timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
 	int64_t worker_timestamp = request.worker_timestamp();
 	static std::chrono::steady_clock::duration now = std::chrono::steady_clock::now().time_since_epoch();
 	int64_t coordination = (int64_t)now.count();
-	reply->set_coordination(coordination - worker_timestamp);
+	reply->set_coordination(worker_timestamp - coordination + initial_timestamp);
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
