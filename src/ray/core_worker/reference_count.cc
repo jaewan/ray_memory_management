@@ -356,7 +356,7 @@ Priority& ReferenceCounter::GetObjectPriority(const ObjectID &object_id){
   static Priority temp_pri = Priority();
   if(it == task_id_priority_.end()){
     RAY_LOG(DEBUG) << "[JAE_DEBUG] GetObjectPriority object: " << object_id << " not found";
-	return temp_pri;
+		return temp_pri;
   }
   return it->second;
 }

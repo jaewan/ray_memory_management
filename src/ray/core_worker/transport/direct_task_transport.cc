@@ -792,7 +792,8 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   RAY_LOG(DEBUG) << "Pushing task " << task_spec.TaskId() << " to worker "
                  << addr.worker_id << " of raylet " << addr.raylet_id
-                 << " with priority:" << task_spec.GetPriority();
+                 << " with priority:" << task_spec.GetPriority() 
+								 << " with num_arg:" << task_spec.NumArgs();
   LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), task_spec.GetPriority(), active_workers_.size());
 
   auto task_id = task_spec.TaskId();

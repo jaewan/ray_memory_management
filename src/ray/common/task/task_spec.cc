@@ -225,6 +225,17 @@ bool TaskSpecification::ArgByRef(size_t arg_index) const {
   return message_->args(arg_index).has_object_ref();
 }
 
+Priority TaskSpecification::ArgPriority(size_t arg_index) const {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] it has object ref:" << message_->args(arg_index).has_object_ref();
+		if(ArgByRef(arg_index)){
+			std::vector<int64_t> p(message_->args(arg_index).object_ref().priority().data(), message_->args(arg_index).object_ref().priority().data() + message_->args(arg_index).object_ref().priority().size());
+			return Priority(p);
+		}else{
+			std::vector<int64_t> p(message_->args(arg_index).priority().data(), message_->args(arg_index).priority().data() + message_->args(arg_index).priority().size());
+			return Priority(p);
+		}
+}
+
 ObjectID TaskSpecification::ArgId(size_t arg_index) const {
   return ObjectID::FromBinary(message_->args(arg_index).object_ref().object_id());
 }

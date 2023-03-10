@@ -90,7 +90,8 @@ ObjectID LocalModeTaskSubmitter::Submit(InvocationSpec &invocation,
   }
   for (size_t i = 0; i < invocation.args.size(); i++) {
     RAY_CHECK(false) << "Jae this is called! handle this";
-    builder.AddArg(*invocation.args[i]);
+		static Priority pri;
+    builder.AddArg(*invocation.args[i], pri);
   }
   auto task_specification = builder.Build();
   ObjectID return_object_id = task_specification.ReturnId(0);

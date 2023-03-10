@@ -1580,11 +1580,10 @@ void CoreWorker::BuildCommonTaskSpec(
                             override_runtime_env_info,
                             concurrency_group_name);
   // Set task arguments.
+	const static ObjectID default_object_id;
   for (const auto &arg : args) {
-    Priority pri = reference_counter_->GetObjectPriority(arg->GetObjectId());
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] builder.AddArg called on task:" << name
-                   << " task_id:" << task_id << " priority:" << pri;
-    builder.AddArg(*arg);
+		Priority priority = reference_counter_->GetObjectPriority(arg->GetObjectId());
+    builder.AddArg(*arg, priority);
   }
 }
 
@@ -2248,6 +2247,10 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
   //reference_counter_->UpdateObjectPriority(task_spec.TaskId(), task_spec.GetPriority());
   RAY_LOG(DEBUG) << "Executing task, task info = " << task_spec.DebugString();
   //TODO(Jae) This is a patch to alleviate priority when tasks submit tasks.
+	size_t arg_size = task_spec.NumArgs();
+	for (size_t i=0; i < arg_size; i++){
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] arg priority: " << task_spec.ArgPriority(i);
+	}
   if(ensemble_serving){
     if(task_spec.GetName().compare("aggregator()") == 0){
       reference_counter_->SetCurrentTaskPriority(task_spec.GetPriority());

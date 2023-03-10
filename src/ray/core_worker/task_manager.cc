@@ -46,7 +46,8 @@ Priority TaskManager::GenerateTaskPriority(
 
 	RAY_CHECK(timestamp_coordinator_ != 0) << "Jae handle when coordination rpc is slow";
   static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
-  RAY_LOG(DEBUG) << "Generating priority of task " << spec.TaskId();
+  RAY_LOG(DEBUG) << "Generating priority of task " << spec.TaskId() 
+								 << " with num_dependencies:" << task_deps.size();
 
   Priority dummy_pri = Priority();
   Priority &max_priority = dummy_pri;

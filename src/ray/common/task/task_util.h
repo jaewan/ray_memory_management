@@ -24,8 +24,8 @@ namespace ray {
 /// Argument of a task.
 class TaskArg {
  public:
-  virtual void ToProto(rpc::TaskArg *arg_proto) const = 0;
-  virtual const ObjectID& GetObjectId();
+  virtual void ToProto(rpc::TaskArg *arg_proto, Priority &priority) const = 0;
+  virtual const ObjectID& GetObjectId() const = 0;
   virtual ~TaskArg(){};
 };
 
@@ -40,24 +40,25 @@ class TaskArgByReference : public TaskArg {
                      const std::string &call_site)
       : id_(object_id), owner_address_(owner_address), call_site_(call_site) {}
 
-  const ObjectID& GetObjectId(){
+  const ObjectID& GetObjectId() const {
     return id_;
   }
 
-  void ToProto(rpc::TaskArg *arg_proto) const {
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] ToProto from TaskArgByReference Called";
+  void ToProto(rpc::TaskArg *arg_proto, Priority &priority) const {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] ToProto from TaskArgByReference Called" << priority;
     auto ref = arg_proto->mutable_object_ref();
     ref->set_object_id(id_.Binary());
     ref->mutable_owner_address()->CopyFrom(owner_address_);
     ref->set_call_site(call_site_);
-    /*
-    auto p = ref->mutable_priority();
-    Priority &priority = func(id_);
-    p->Clear();
-    for (auto &s : priority.score){
-      p->Add(s);
-    }
-    */
+		static const Priority default_priority;
+		if (priority != default_priority) {
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] priority set to ref";
+			auto p = ref->mutable_priority();
+			p->Clear();
+			for (auto &s : priority.score){
+				p->Add(s);
+			}
+		}
   }
 
  private:
@@ -74,16 +75,17 @@ class TaskArgByValue : public TaskArg {
   /// \param[in] value Value of the argument.
   /// \return The task argument.
   explicit TaskArgByValue(const std::shared_ptr<RayObject> &value) : value_(value)  {
+		//id_ = ObjectID::FromBinary(value_
     RAY_CHECK(value) << "Value can't be null.";
   }
 
-  ObjectID id_;
-  const ObjectID& GetObjectId(){
+  const ObjectID id_;
+  const ObjectID& GetObjectId() const {
     return id_;
   }
 
-  void ToProto(rpc::TaskArg *arg_proto) const {
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] ToProto from TaskArgByValue Called";
+  void ToProto(rpc::TaskArg *arg_proto, Priority &priority) const {
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] ToProto from TaskArgByValue Called" << priority;
     if (value_->HasData()) {
       const auto &data = value_->GetData();
       arg_proto->set_data(data->Data(), data->Size());
@@ -95,6 +97,15 @@ class TaskArgByValue : public TaskArg {
     for (const auto &nested_ref : value_->GetNestedRefs()) {
       arg_proto->add_nested_inlined_refs()->CopyFrom(nested_ref);
     }
+		static const Priority default_priority;
+		if (priority != default_priority) {
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] priority set to ref";
+			auto p = arg_proto->mutable_priority();
+			p->Clear();
+			for (auto &s : priority.score){
+				p->Add(s);
+			}
+		}
   }
 
  private:
@@ -200,10 +211,9 @@ class TaskSpecBuilder {
   }
 
   /// Add an argument to the task.
-  TaskSpecBuilder &AddArg(const TaskArg &arg) {
-    RAY_LOG(DEBUG) << "[JAE_DEBUG] AddArg called. Calling ToProto";
+  TaskSpecBuilder &AddArg(const TaskArg &arg, Priority &priority) {
     auto ref = message_->add_args();
-    arg.ToProto(ref);
+    arg.ToProto(ref, priority);
     return *this;
   }
 
