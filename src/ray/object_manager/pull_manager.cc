@@ -51,7 +51,8 @@ PullManager::PullManager(
 
 uint64_t PullManager::Pull(const std::vector<rpc::ObjectReference> &object_ref_bundle,
                            BundlePriority prio,
-                           std::vector<rpc::ObjectReference> *objects_to_locate) {
+                           std::vector<rpc::ObjectReference> *objects_to_locate,
+                          absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping) {
   // To avoid edge cases dealing with duplicated object ids in the bundle,
   // canonicalize the set up-front by dropping all duplicates.
   absl::flat_hash_set<ObjectID> seen;
@@ -71,22 +72,26 @@ uint64_t PullManager::Pull(const std::vector<rpc::ObjectReference> &object_ref_b
 
   for (const auto &ref : deduplicated) {
     const auto obj_id = ObjectRefToId(ref);
-    auto it = object_pull_requests_.find(obj_id);
-    if (it == object_pull_requests_.end()) {
-      RAY_LOG(DEBUG) << "Pull of object " << obj_id;
-      // We don't have a pull for this object yet. Ask the caller to
-      // send us notifications about the object's location.
-      objects_to_locate->push_back(ref);
-      // The first pull request doesn't need to be special case. Instead we can just let
-      // the retry timer fire immediately.
-      it = object_pull_requests_.emplace(obj_id, ObjectPullRequest(get_time_seconds_()))
-               .first;
-    } else {
-      if (it->second.IsPullable()) {
-        bundle_pull_request.MarkObjectAsPullable(obj_id);
+
+    /// RSCODE:
+    if (!spill_remote_mapping.contains(obj_id)) {
+      auto it = object_pull_requests_.find(obj_id);
+      if (it == object_pull_requests_.end()) {
+        RAY_LOG(DEBUG) << "Pull of object " << obj_id;
+        // We don't have a pull for this object yet. Ask the caller to
+        // send us notifications about the object's location.
+        objects_to_locate->push_back(ref);
+        // The first pull request doesn't need to be special case. Instead we can just let
+        // the retry timer fire immediately.
+        it = object_pull_requests_.emplace(obj_id, ObjectPullRequest(get_time_seconds_()))
+                .first;
+      } else {
+        if (it->second.IsPullable()) {
+          bundle_pull_request.MarkObjectAsPullable(obj_id);
+       }
       }
+      it->second.bundle_request_ids.insert(req_id);
     }
-    it->second.bundle_request_ids.insert(req_id);
   }
 
   if (prio == BundlePriority::GET_REQUEST) {

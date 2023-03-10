@@ -87,7 +87,8 @@ class PullManager {
   /// \return A request ID that can be used to cancel the request.
   uint64_t Pull(const std::vector<rpc::ObjectReference> &object_ref_bundle,
                 BundlePriority prio,
-                std::vector<rpc::ObjectReference> *objects_to_locate);
+                std::vector<rpc::ObjectReference> *objects_to_locate,
+                absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping);
 
   /// Update the pull requests that are currently being pulled, according to
   /// the current capacity. The PullManager will choose the objects to pull by

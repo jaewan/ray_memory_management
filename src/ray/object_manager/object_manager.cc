@@ -244,7 +244,12 @@ void ObjectManager::HandleObjectDeleted(const ObjectID &object_id) {
 uint64_t ObjectManager::Pull(const std::vector<rpc::ObjectReference> &object_refs,
                              BundlePriority prio) {
   std::vector<rpc::ObjectReference> objects_to_locate;
-  auto request_id = pull_manager_->Pull(object_refs, prio, &objects_to_locate);
+
+  /// RSCODE:
+  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = GetSpillRemoteMapping();
+
+  /// RSTODO: Revert passing in spill remote mapping potentially
+  auto request_id = pull_manager_->Pull(object_refs, prio, &objects_to_locate, spill_remote_mapping);
 
   const auto &callback = [this](const ObjectID &object_id,
                                 const std::unordered_set<NodeID> &client_ids,
