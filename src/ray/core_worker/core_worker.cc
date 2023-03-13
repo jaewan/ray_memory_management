@@ -311,7 +311,7 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
 
 	// Timestamp coordiation with raylet for priority DFS
 	local_raylet_client_->TimeStampCoordination([this](const Status &status, 
-																				const rpc::TimeStampCoordinationReply &reply){
+													   const rpc::TimeStampCoordinationReply &reply){
 			task_manager_->CoordinateTimeStamp(status, reply);
       });
 

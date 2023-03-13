@@ -325,7 +325,7 @@ void raylet::RayletClient::TimeStampCoordination(
 		const rpc::ClientCallback<rpc::TimeStampCoordinationReply> &callback){
 	rpc::TimeStampCoordinationRequest request;
   int64_t local_timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
-	request.set_worker_timestamp(local_timestamp);
+  request.set_worker_timestamp(local_timestamp);
   grpc_client_->TimeStampCoordination(request, callback);
 }
 

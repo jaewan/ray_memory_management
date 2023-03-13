@@ -32,6 +32,7 @@ const int64_t kTaskFailureLoggingFrequencyMillis = 5000;
 
 void TaskManager::CoordinateTimeStamp(const Status &status,
 		const rpc::TimeStampCoordinationReply &reply){
+    RAY_LOG(DEBUG) << "[JAE_DEBUG] timestamp_coordinator_ set to:" << reply.coordination();
 	timestamp_coordinator_ = reply.coordination();
 }
 
