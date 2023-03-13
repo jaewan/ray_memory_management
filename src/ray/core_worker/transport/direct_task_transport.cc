@@ -154,11 +154,6 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
         RAY_CHECK(ptts_inserted.second);
 
-				static bool consumer_came = false;
-				if (priority.score.size() > 1 && !consumer_came){
-					LogPlaceSeq("Placed", priority);
-					consumer_came = true;
-				}
         RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first
                        << " queue size is now " << scheduling_key_entry.task_priority_queue.size();
         scheduling_key_entry.resource_spec = task_spec;
@@ -550,23 +545,23 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     // There are idle workers, so we don't need more.
     return;
   }
-	if(num_leases_on_flight_ >= 32){
-		 RAY_LOG(DEBUG) << "Exceeding the pending request limit "
-                   << 32;
-		return;
-	}
-	const auto priority_it = priority_task_queues_.begin();
-	Priority pri(priority_it->score);
-	auto resource_spec_msg = priority_to_task_spec_[pri].GetMutableMessage();
-	resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
-	TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
-	const TaskID task_id = resource_spec.TaskId();
-	resource_spec.SetPriority(pri);
-	priority_task_queues_.erase(priority_it);
+  if(num_leases_on_flight_ >= 32){
+	 RAY_LOG(DEBUG) << "Exceeding the pending request limit "
+                    << 32;
+     return;
+  }
+  const auto priority_it = priority_task_queues_.begin();
+  Priority pri(priority_it->score);
+  auto resource_spec_msg = priority_to_task_spec_[pri].GetMutableMessage();
+  resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
+  TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
+  const TaskID task_id = resource_spec.TaskId();
+  resource_spec.SetPriority(pri);
+  priority_task_queues_.erase(priority_it);
   int64_t queue_size = priority_task_queues_.size() - 1;
 
-	num_leases_on_flight_++;
-	num_leases_requested_++;
+  num_leases_on_flight_++;
+  num_leases_requested_++;
 
   rpc::Address best_node_address;
   const bool is_spillback = (raylet_address != nullptr);
@@ -583,7 +578,8 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                  << NodeID::FromBinary(raylet_address->raylet_id()) << " for task "
                  << task_id << " priority:" << pri
 								 << " JobId:" << resource_spec.JobId() 
-								 << " num_leases_on_flight_:" << num_leases_on_flight_;
+								 << " num_leases_on_flight_:" << num_leases_on_flight_
+								 << " is_spillback:" << is_spillback;
   // Subtract 1 so we don't double count the task we are requesting for.
 
 	static const bool enable_BlockTasks = RayConfig::instance().enable_BlockTasks();
@@ -628,6 +624,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                 // makes an implicit assumption that runtime_env failures are not
                 // transient -- we may consider adding some retries in the future.
                 RAY_CHECK(false) << "Jae you should handle worker lease failure"; // TODO(Jae) Handle this case for DFS patch
+				//priority_task_queues_.emplace(pri);
                 if (reply.failure_type() ==
                     rpc::RequestWorkerLeaseReply::
                         SCHEDULING_CANCELLED_RUNTIME_ENV_SETUP_FAILED) {
@@ -695,19 +692,22 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                            /*worker_exiting=*/false,
                            resources_copy);
             } else {
-              RAY_CHECK(false) << "Jae you should handle worker lease redirection"; // TODO(Jae) Handle this case for DFS patch
+              //RAY_CHECK(false) << "Jae you should handle worker lease redirection"; // TODO(Jae) Handle this case for DFS patch
               // The raylet redirected us to a different raylet to retry at.
               RAY_CHECK(!is_spillback);
               RAY_LOG(DEBUG) << "Redirect lease for task " << task_id << " from raylet "
                              << NodeID::FromBinary(raylet_address.raylet_id())
                              << " to raylet "
                              << NodeID::FromBinary(
-                                    reply.retry_at_raylet_address().raylet_id());
+                                    reply.retry_at_raylet_address().raylet_id())
+			  				<< " is_spillback:" << (&reply.retry_at_raylet_address() != nullptr);
+              priority_task_queues_.emplace(pri);
 
               RequestNewWorkerIfNeeded(scheduling_key, &reply.retry_at_raylet_address());
             }
           } else if (lease_client != local_lease_client_) {
             RAY_CHECK(false) << "Jae you should handle worker lease remote raylet failure"; // TODO(Jae) Handle this case for DFS patch
+            //priority_task_queues_.emplace(pri);
             // A lease request to a remote raylet failed. Retry locally if the lease is
             // still needed.
             // TODO(swang): Fail after some number of retries?
@@ -720,6 +720,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 
           } else {
             RAY_CHECK(false) << "Jae you should handle worker lease gRPC unavailable"; // TODO(Jae) Handle this case for DFS patch
+            //priority_task_queues_.emplace(pri);
             if (status.IsGrpcUnavailable()) {
               RAY_LOG(WARNING)
                   << "The worker failed to receive a response from the local "
