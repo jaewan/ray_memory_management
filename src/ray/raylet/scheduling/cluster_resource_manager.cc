@@ -165,8 +165,8 @@ bool ClusterResourceManager::SubtractNodeAvailableResources(
 
   NodeResources *resources = it->second.GetMutableLocalView();
 
-  resources->available -= resource_request;
-  resources->available.RemoveNegative();
+	resources->available -= resource_request;
+	resources->available.RemoveNegative();
 
   // TODO(swang): We should also subtract object store memory if the task has
   // arguments. Right now we do not modify object_pulls_queued in case of

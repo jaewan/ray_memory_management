@@ -119,23 +119,36 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
       RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks task " <<
 		  task.GetTaskSpecification().TaskId() << " priority:" << task_priority
                      << " block requested is " << block_requested_priority_;
+			scheduling::NodeID scheduling_node_id;
+			// TODO(Jae) Add redirect task req to the coreworker for multi-node backpressure
       if (task_priority >= block_requested_priority_) {
-        task_blocked_ = true;
-        RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks blocked task " << task_priority;
-        work_it++;
-        continue;
-        //break;
-      }
-	  task_blocked_ = false;
-
-      RAY_LOG(DEBUG) << "Scheduling pending task "
-                     << task.GetTaskSpecification().TaskId();
-      auto scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
+				/*
+				scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
           task.GetTaskSpecification(),
-          work->PrioritizeLocalNode(),
-          /*exclude_local_node*/ false,
-          /*requires_object_store_memory*/ false,
-          &is_infeasible);
+					false,
+					*/
+          /*exclude_local_node*/// true,
+          /*requires_object_store_memory*/// false,
+          //&is_infeasible);
+				if (scheduling_node_id.IsNil()) {
+					task_blocked_ = true;
+					RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks blocked task " << task_priority;
+					work_it++;
+					continue;
+					//break;
+				}
+      }else{
+				task_blocked_ = false;
+
+				RAY_LOG(DEBUG) << "Scheduling pending task "
+											 << task.GetTaskSpecification().TaskId();
+				scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
+						task.GetTaskSpecification(),
+						work->PrioritizeLocalNode(),
+						/*exclude_local_node*/ false,
+						/*requires_object_store_memory*/ false,
+						&is_infeasible);
+			}
 
       // There is no node that has available resources to run the request.
       // Move on to the next shape.
@@ -535,7 +548,7 @@ void ClusterTaskManager::BlockTasks(Priority base_priority, instrumented_io_cont
     if(base_priority == init_priority && task_blocked_){
 	  io_service.post([this](){
         ScheduleAndDispatchTasks();
-	  },"");
+			},"");
     }
   }
 }

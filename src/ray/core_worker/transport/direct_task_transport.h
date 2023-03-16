@@ -213,7 +213,6 @@ class CoreWorkerDirectTaskSubmitter {
                       rpc::CoreWorkerClientInterface &client,
                       const SchedulingKey &task_queue_key,
                       const TaskSpecification &task_spec,
-                      Priority priority,
                       const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry>
                           &assigned_resources);
 

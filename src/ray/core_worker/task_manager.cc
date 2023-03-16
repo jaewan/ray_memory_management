@@ -69,6 +69,7 @@ Priority TaskManager::GenerateTaskPriority(
     pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_pri);
   }else{
     pri.SetFromParentPriority(max_priority, new_pri);
+    //pri.SetFromParentPriority(max_priority, new_priority_s++);
   }
   spec.SetPriority(pri);
   return pri;

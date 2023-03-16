@@ -19,6 +19,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <atomic>
 
 namespace ray {
 namespace core {
@@ -252,6 +253,7 @@ void CoreWorkerDirectTaskSubmitter::ReturnWorker(const rpc::WorkerAddress addr,
   worker_to_lease_entry_.erase(addr);
 }
 
+// TODO(Jae) remove this function
 void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const rpc::WorkerAddress &addr,
     const SchedulingKey &scheduling_key,
@@ -315,7 +317,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       num_busy_workers_++;
 
       executing_tasks_.emplace(task_spec.TaskId(), addr);
-      PushNormalTask(addr, client, scheduling_key, task_spec, pri, assigned_resources);
+      PushNormalTask(addr, client, scheduling_key, task_spec, assigned_resources);
       //tasks_.erase(task_spec.TaskId());
     }
 
@@ -330,36 +332,41 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool was_error,
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
+  //static std::mutex priority_task_queues_not_pushed_lock;
   auto &lease_entry = worker_to_lease_entry_[addr];
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
 	             << (current_time_ms() > lease_entry.lease_expiration_time);
-  if (!lease_entry.lease_client) {
+  //priority_task_queues_not_pushed_lock.lock();
+  const auto pri_it = priority_task_queues_not_pushed_.begin();
+  if (!lease_entry.lease_client && pri_it == priority_task_queues_not_pushed_.end()) {
+    //priority_task_queues_not_pushed_lock.unlock();
     return;
   }
 
-  auto &current_queue = priority_task_queues_not_pushed_;
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
-	const auto pri_it = current_queue.begin();
   if ((was_error || worker_exiting ||
-       current_time_ms() > lease_entry.lease_expiration_time) ||
-      current_queue.empty() || *pri_it > block_requested_priority_) {
+       current_time_ms() > lease_entry.lease_expiration_time) || *pri_it > block_requested_priority_) {
+    //priority_task_queues_not_pushed_lock.unlock();
     RAY_CHECK(active_workers_.size() >= 1);
 
     // Return the worker only if there are no tasks to do.
     if (!lease_entry.is_busy) {
       ReturnWorker(addr, was_error, worker_exiting);
     }else{
-			RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
+	  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
 		}
   } else {
-		priority_task_queues_.erase(*pri_it);
+    const Priority pri(pri_it->score);
+		priority_task_queues_.erase(pri);
+    priority_task_queues_not_pushed_.erase(pri_it);
+    //priority_task_queues_not_pushed_lock.unlock();
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
-    while (!current_queue.empty() && !lease_entry.is_busy) {
-      const auto &task_spec = priority_to_task_spec_[*pri_it];
+    while (!lease_entry.is_busy) {
+      const auto &task_spec = priority_to_task_spec_[pri];
       lease_entry.is_busy = true;
 
       // Increment the total number of tasks in flight to any worker associated with the
@@ -370,9 +377,8 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 
       executing_tasks_.emplace(task_spec.TaskId(), addr);
       lease_entry.lease_expiration_time = current_time_ms() - 1;
-      PushNormalTask(addr, client, scheduling_key, task_spec, task_spec.GetPriority(), assigned_resources);
+      PushNormalTask(addr, client, scheduling_key, task_spec, assigned_resources);
       tasks_.erase(task_spec.TaskId());
-      current_queue.erase(pri_it);
     }
 
     CancelWorkerLeaseIfNeeded(scheduling_key);
@@ -550,11 +556,25 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                     << 32;
      return;
   }
-  const auto priority_it = priority_task_queues_.begin();
+  auto priority_it = priority_task_queues_.begin();
+  const bool is_spillback = (raylet_address != nullptr);
+  auto resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
+  TaskSpecification resource_spec;
+  do{
+    resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
+    resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
+    resource_spec = TaskSpecification(resource_spec_msg);
+    priority_it = std::next(priority_it);
+  }while(priority_it != priority_task_queues_.end() && resource_spec.JobId().IsNil());
+
+  if( resource_spec.JobId().IsNil() ){
+		RAY_CHECK(!is_spillback) << "Jae redirect request should be handled. Local raylet already calculated the remote resource";
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] JobId is nill ";
+    return;
+  }
+
+  priority_it = std::prev(priority_it);
   Priority pri(priority_it->score);
-  auto resource_spec_msg = priority_to_task_spec_[pri].GetMutableMessage();
-  resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
-  TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
   const TaskID task_id = resource_spec.TaskId();
   resource_spec.SetPriority(pri);
   priority_task_queues_.erase(priority_it);
@@ -564,7 +584,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   num_leases_requested_++;
 
   rpc::Address best_node_address;
-  const bool is_spillback = (raylet_address != nullptr);
   bool is_selected_based_on_locality = false;
   if (raylet_address == nullptr) {
     // If no raylet address is given, find the best worker for our next lease request.
@@ -577,9 +596,9 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   RAY_LOG(DEBUG) << "Requesting lease from raylet "
                  << NodeID::FromBinary(raylet_address->raylet_id()) << " for task "
                  << task_id << " priority:" << pri
-								 << " JobId:" << resource_spec.JobId() 
-								 << " num_leases_on_flight_:" << num_leases_on_flight_
-								 << " is_spillback:" << is_spillback;
+				 << " JobId:" << resource_spec.JobId() 
+				 << " num_leases_on_flight_:" << num_leases_on_flight_
+				 << " is_spillback:" << is_spillback;
   // Subtract 1 so we don't double count the task we are requesting for.
 
 	static const bool enable_BlockTasks = RayConfig::instance().enable_BlockTasks();
@@ -624,7 +643,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                 // makes an implicit assumption that runtime_env failures are not
                 // transient -- we may consider adding some retries in the future.
                 RAY_CHECK(false) << "Jae you should handle worker lease failure"; // TODO(Jae) Handle this case for DFS patch
-				//priority_task_queues_.emplace(pri);
+								//priority_task_queues_.emplace(pri);
                 if (reply.failure_type() ==
                     rpc::RequestWorkerLeaseReply::
                         SCHEDULING_CANCELLED_RUNTIME_ENV_SETUP_FAILED) {
@@ -685,9 +704,12 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               AddWorkerLeaseClient(
                   addr, std::move(lease_client), resources_copy, scheduling_key);
               RAY_CHECK(active_workers_.size() >= 1);
+							if(priority_task_queues_not_pushed_.contains(pri)){
+								priority_task_queues_.emplace(pri);
+							}
               OnWorkerIdle(addr,
                            scheduling_key,
-                           pri,
+                           //pri,
                            /*error=*/false,
                            /*worker_exiting=*/false,
                            resources_copy);
@@ -707,7 +729,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
             }
           } else if (lease_client != local_lease_client_) {
             RAY_CHECK(false) << "Jae you should handle worker lease remote raylet failure"; // TODO(Jae) Handle this case for DFS patch
-            //priority_task_queues_.emplace(pri);
+            priority_task_queues_.emplace(pri);
             // A lease request to a remote raylet failed. Retry locally if the lease is
             // still needed.
             // TODO(swang): Fail after some number of retries?
@@ -789,7 +811,6 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
     rpc::CoreWorkerClientInterface &client,
     const SchedulingKey &scheduling_key,
     const TaskSpecification &task_spec,
-    Priority priority,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   RAY_LOG(DEBUG) << "Pushing task " << task_spec.TaskId() << " to worker "
                  << addr.worker_id << " of raylet " << addr.raylet_id
@@ -808,10 +829,10 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
   request->mutable_task_spec()->CopyFrom(task_spec.GetMessage());
   auto msg_priority = request->mutable_task_spec()->mutable_priority();
   msg_priority->Clear();
-  for (auto &s : priority.score) {
+  Priority pri = task_spec.GetPriority();
+  for (auto &s : pri.score) {
     msg_priority->Add(s);
   }
-	priority_to_task_spec_.erase(priority);
 
   request->mutable_resource_mapping()->CopyFrom(assigned_resources);
   request->set_intended_worker_id(addr.worker_id.Binary());
@@ -819,7 +840,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
   client.PushNormalTask(
       std::move(request),
       [this,
-       task_spec,
+       pri,
        task_id,
        is_actor,
        is_actor_creation,
@@ -854,7 +875,6 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
         }
 
         if (!status.ok()) {
-					priority_to_task_spec_.emplace(task_spec.GetPriority(), task_spec);
           // TODO: It'd be nice to differentiate here between process vs node
           // failure (e.g., by contacting the raylet). If it was a process
           // failure, it may have been an application-level error and it may
@@ -864,10 +884,11 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
               is_actor ? rpc::ErrorType::ACTOR_DIED : rpc::ErrorType::WORKER_DIED,
               &status));
         } else {
-          if (!task_spec.GetMessage().retry_exceptions() || !reply.is_retryable_error() ||
+          if (!priority_to_task_spec_[pri].GetMessage().retry_exceptions() || !reply.is_retryable_error() ||
               !task_finisher_->RetryTaskIfPossible(task_id)) {
             task_finisher_->CompletePendingTask(task_id, reply, addr.ToProto());
           }
+		  		priority_to_task_spec_.erase(pri);
         }
       });
 }
