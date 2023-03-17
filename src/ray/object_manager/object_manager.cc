@@ -746,7 +746,7 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   num_bytes_pushed_from_plasma_ += spill_remote_request.data().length();
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_ " for current object: " << object_id;
+  RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_ << " for current object: " << object_id;
 
   rpc::ClientCallback<rpc::SpillRemoteReply> callback =
       [this, start_time, object_id, node_id, chunk_index, on_complete] (const Status &status, const rpc::SpillRemoteReply &reply) {
