@@ -307,31 +307,41 @@ void LocalObjectManager::SpillObjectsInternal(
 
   /// RSCODE: Simply call SpillRemote() function in object_manager
   for (const auto &object_id : objects_to_spill) {
-      auto it = objects_pending_spill_.find(object_id);
-      RAY_CHECK(it != objects_pending_spill_.end());
-      auto freed_it = local_objects_.find(object_id);
+    auto it = objects_pending_spill_.find(object_id);
+    RAY_CHECK(it != objects_pending_spill_.end());
+    auto freed_it = local_objects_.find(object_id);
 
-      if (freed_it == local_objects_.end() || freed_it->second.second) {
-        num_bytes_pending_spill_ -= it->second->GetSize();
-        objects_pending_spill_.erase(it);
-        continue;
+    if (freed_it == local_objects_.end() || freed_it->second.second) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "We are freeing object before calling FindNodeToSpill";
+
+      num_bytes_pending_spill_ -= it->second->GetSize();
+      objects_pending_spill_.erase(it);
+      continue;
+    }
+
+    // object_to_worker_address_.emplace(object_id, freed_it->second.first);
+
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "We are about to spill object: " << object_id;
+
+    // Increase ref count
+    // object_manager_.RemoteSpillIncrementRefCount(object_id);
+
+    object_manager_.FindNodeToSpill(object_id, 
+    [this, object_id, callback]() {
+      /// RSTODO: Delete this later
+      RAY_LOG(INFO) << "Callback test";
+
+      /// RSCODE: Call callback here?
+      if (callback) {
+        callback(Status::OK());
       }
-
-      object_manager_.FindNodeToSpill(object_id, 
-      [this, object_id, callback]() {
-        /// RSTODO: Delete later
-        RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
-
-        OnObjectRemoteSpilled(object_id);
-
-        /// RSTODO: Delete this later
-        RAY_LOG(INFO) << "Callback test";
-
-        /// RSCODE: Call callback here?
-        if (callback) {
-          callback(Status::OK());
-        }
     });
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
+    
+    OnObjectRemoteSpilled(object_id);
   }
 
   /// RSTODO: Comment this out for now
@@ -423,11 +433,8 @@ void LocalObjectManager::SpillObjectsInternal(
 /// RSTODO: Code to free a remotely spilled object
 void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   /// RSTODO: Delete later
-  const std::string &object_url = "remotelyspilled";
+  const std::string &object_url = "remotelyspilled" + std::to_string(rand());
   RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
-
-  // Decrease ref count
-  // object_manager_.RemoteSpillDecrementRefCount(object_id);
 
   // View ref count
   // object_manager_.RemoteSpillViewRefCount(object_id);
@@ -450,15 +457,11 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   // spilled_objects_url_.emplace(object_id, object_url);
   /// RSTODO:
   RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
-  /// RSCOMMENT: so here, we are placing a dummy value "remotelyspilled" 
-  /// on the hashmap. If we try to find from spill_objects_url_, its going
-  /// to error out immediately. 
+
   /// RSTODO: Might have to just delete this later because it messes up with bookkeeping but rn we need it to get past the check:
   /// RAY_CHECK((pinned_objects_.count(object_id) > 0) || (spilled_objects_url_.count(object_id) > 0) || (objects_pending_spill_.count(object_id) > 0));
   spilled_objects_url_.emplace(object_id, object_url);
-  // lets try to find a way to trigger the Pull RPC with remote retrieval
-  // whenever we recognize that the url is exactly "remotelyspilled" or 
-  // some other URL that we choose. 
+
   RAY_LOG(DEBUG) << "Unpinning pending spill object " << object_id;
   auto it = objects_pending_spill_.find(object_id);
   RAY_CHECK(it != objects_pending_spill_.end());
@@ -474,11 +477,19 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
                     << object_id;
     return;
   }
+  
+  // auto worker_it = object_to_worker_address_.find(object_id);
+  // if (worker_it == object_to_worker_address_.end()) {
+  //   RAY_LOG(DEBUG) << "Object doesn't exist in object to worker address map: " << object_id;
+  //   return;
+  // }
+
+  // const auto &worker_addr = worker_it->second;
   const auto &worker_addr = freed_it->second.first;
-  /// RSCOMMENT: might want to not call ReportObjectSpilled
-  /// This updates bookkeeping based on Ownership, and idk if this
-  /// is supposed to help. 
   object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
+
+  // Decrease ref count
+  // object_manager_.RemoteSpillDecrementRefCount(object_id);
 }
 
 void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids,
@@ -552,6 +563,14 @@ bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
   RAY_LOG(INFO) << "Object restoration is happening";
   RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spill_remote_mapping.size();
   RAY_LOG(INFO) << "Object we are trying to restore: " << object_id;
+
+  // if (objects_pending_restore_.count(object_id) > 0) {
+  //   // If the same object is restoring, we dedup here.
+  //   /// RSTODO: Delete later
+  //   RAY_LOG(INFO) << "We are dedupping in RestoreRemoteSpilledObject";
+  //   return true;
+  // }
+
   if (spill_remote_mapping.contains(object_id)) {
     /// RSTODO: Delete this later
     RAY_LOG(INFO) << "Remote object has been found: " << object_id;

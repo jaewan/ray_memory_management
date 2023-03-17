@@ -1600,14 +1600,24 @@ void NodeManager::ProcessDisconnectClientMessage(
 
 void NodeManager::ProcessFetchOrReconstructMessage(
     const std::shared_ptr<ClientConnection> &client, const uint8_t *message_data) {
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling ProcessFetchOrReconstructMessage";
+
   auto message = flatbuffers::GetRoot<protocol::FetchOrReconstruct>(message_data);
   const auto refs =
       FlatbufferToObjectReference(*message->object_ids(), *message->owner_addresses());
   // TODO(ekl) we should be able to remove the fetch only flag along with the legacy
   // non-direct call support.
   if (message->fetch_only()) {
+
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 1";
+
     std::shared_ptr<WorkerInterface> worker = worker_pool_.GetRegisteredWorker(client);
     if (!worker) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 2";
       worker = worker_pool_.GetRegisteredDriver(client);
     }
     // Fetch requests can get re-ordered after the worker finishes, so make sure to
@@ -1615,6 +1625,9 @@ void NodeManager::ProcessFetchOrReconstructMessage(
     if (worker && !worker->GetAssignedTaskId().IsNil()) {
       // This will start a fetch for the objects that gets canceled once the
       // objects are local, or if the worker dies.
+      
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 3";
       dependency_manager_.StartOrUpdateGetRequest(worker->WorkerId(), refs);
     }
   } else {
@@ -1622,6 +1635,9 @@ void NodeManager::ProcessFetchOrReconstructMessage(
     // subscribe to in the task dependency manager. These objects will be
     // pulled from remote node managers. If an object's owner dies, an error
     // will be stored as the object's value.
+    
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 4";
     const TaskID task_id = from_flatbuf<TaskID>(*message->task_id());
     AsyncResolveObjects(client,
                         refs,
@@ -2164,6 +2180,10 @@ void NodeManager::AsyncResolveObjects(
     bool ray_get,
     bool mark_worker_blocked) {
   std::shared_ptr<WorkerInterface> worker = worker_pool_.GetRegisteredWorker(client);
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling AsyncResolveObjects";
+
   if (!worker) {
     // The client is a driver. Drivers do not hold resources, so we simply mark
     // the task as blocked.

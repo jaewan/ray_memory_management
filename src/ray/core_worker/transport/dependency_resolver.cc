@@ -64,23 +64,38 @@ void LocalDependencyResolver::CancelDependencyResolution(const TaskID &task_id) 
 
 void LocalDependencyResolver::ResolveDependencies(
     TaskSpecification &task, std::function<void(Status)> on_dependencies_resolved) {
+
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "Calling ResolveDependencies for task:" << task.GetName();
+
   std::unordered_set<ObjectID> local_dependency_ids;
   std::unordered_set<ActorID> actor_dependency_ids;
   for (size_t i = 0; i < task.NumArgs(); i++) {
     if (task.ArgByRef(i)) {
+      /// RSTODO: Delete this later
+      RAY_LOG(INFO) << "ResolveDependencies test 1";
+
       local_dependency_ids.insert(task.ArgId(i));
     }
     for (const auto &in : task.ArgInlinedRefs(i)) {
       auto object_id = ObjectID::FromBinary(in.object_id());
       if (ObjectID::IsActorID(object_id)) {
+        /// RSTODO: Delete this later
+        RAY_LOG(INFO) << "ResolveDependencies test 2";
         auto actor_id = ObjectID::ToActorID(object_id);
         if (actor_creator_.IsActorInRegistering(actor_id)) {
+          /// RSTODO: Delete this later
+          RAY_LOG(INFO) << "ResolveDependencies test 3";
           actor_dependency_ids.insert(ObjectID::ToActorID(object_id));
         }
       }
     }
   }
   if (local_dependency_ids.empty() && actor_dependency_ids.empty()) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "ResolveDependencies test 4, local_depedency_ids empty:"
+    << local_dependency_ids.empty() << " actor dep ids empty:" << actor_dependency_ids.empty();
+    
     on_dependencies_resolved(Status::OK());
     return;
   }
@@ -97,6 +112,8 @@ void LocalDependencyResolver::ResolveDependencies(
   }
 
   for (const auto &obj_id : local_dependency_ids) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Calling GetAsync on object id: " << obj_id;
     in_memory_store_.GetAsync(
         obj_id, [this, task_id, obj_id](std::shared_ptr<RayObject> obj) {
           RAY_CHECK(obj != nullptr);
@@ -109,16 +126,22 @@ void LocalDependencyResolver::ResolveDependencies(
 
             auto it = pending_tasks_.find(task_id);
             if (it == pending_tasks_.end()) {
+              /// RSTODO: Delete this later
+              RAY_LOG(INFO) << "ResolveDependencies test 5";
               return;
             }
             auto &state = it->second;
             state->local_dependencies[obj_id] = std::move(obj);
             if (--state->obj_dependencies_remaining == 0) {
+              /// RSTODO: Delete this later
+              RAY_LOG(INFO) << "ResolveDependencies test 6";
               InlineDependencies(state->local_dependencies,
                                  state->task,
                                  &inlined_dependency_ids,
                                  &contained_ids);
               if (state->actor_dependencies_remaining == 0) {
+                /// RSTODO: Delete this later
+                RAY_LOG(INFO) << "ResolveDependencies test 7";
                 resolved_task_state = std::move(state);
                 pending_tasks_.erase(it);
               }
@@ -126,10 +149,14 @@ void LocalDependencyResolver::ResolveDependencies(
           }
 
           if (inlined_dependency_ids.size() > 0) {
+            /// RSTODO: Delete this later
+            RAY_LOG(INFO) << "ResolveDependencies test 8";
             task_finisher_.OnTaskDependenciesInlined(inlined_dependency_ids,
                                                      contained_ids);
           }
           if (resolved_task_state) {
+            /// RSTODO: Delete this later
+            RAY_LOG(INFO) << "ResolveDependencies test 9";
             resolved_task_state->on_dependencies_resolved(resolved_task_state->status);
           }
         });
@@ -144,21 +171,29 @@ void LocalDependencyResolver::ResolveDependencies(
             absl::MutexLock lock(&mu_);
             auto it = pending_tasks_.find(task_id);
             if (it == pending_tasks_.end()) {
+              /// RSTODO: Delete this later
+              RAY_LOG(INFO) << "ResolveDependencies test 10";
               return;
             }
 
             auto &state = it->second;
             if (!status.ok()) {
+              /// RSTODO: Delete this later
+              RAY_LOG(INFO) << "ResolveDependencies test 11";
               state->status = status;
             }
             if (--state->actor_dependencies_remaining == 0 &&
                 state->obj_dependencies_remaining == 0) {
+              /// RSTODO: Delete this later
+              RAY_LOG(INFO) << "ResolveDependencies test 12";
               resolved_task_state = std::move(state);
               pending_tasks_.erase(it);
             }
           }
 
           if (resolved_task_state) {
+            /// RSTODO: Delete this later
+            RAY_LOG(INFO) << "ResolveDependencies test 13";
             resolved_task_state->on_dependencies_resolved(resolved_task_state->status);
           }
         });

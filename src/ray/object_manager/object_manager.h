@@ -214,6 +214,9 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   void RemoteSpillDecrementRefCount(const ObjectID &object_id);
 
+  /// RSCODE:
+  void RemoteSpillIncrementRefCount(const ObjectID &object_id);
+
   /// RSTODO: Delete later
   void RemoteSpillViewRefCount(const ObjectID &object_id);
 

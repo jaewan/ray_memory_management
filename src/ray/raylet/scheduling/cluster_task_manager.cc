@@ -101,8 +101,11 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
           /*requires_object_store_memory*/ false,
           &is_infeasible);
 
+      /// RSTODO: Revert later
+      NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
       // There is no node that has available resources to run the request.
       // Move on to the next shape.
+      /// RSTODO: Revert later
       if (scheduling_node_id.IsNil()) {
         RAY_LOG(DEBUG) << "No node found to schedule a task "
                        << task.GetTaskSpecification().TaskId() << " is infeasible?"
@@ -127,7 +130,6 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
         break;
       }
 
-      NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
       ScheduleOnNode(node_id, work);
       work_it = work_queue.erase(work_it);
     }
@@ -303,7 +305,8 @@ std::string ClusterTaskManager::DebugStr() const {
 
 void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
                                         const std::shared_ptr<internal::Work> &work) {
-  if (spillback_to == self_node_id_ && local_task_manager_) {
+  //if (spillback_to == self_node_id_ && local_task_manager_) {
+  if(true){
     local_task_manager_->QueueAndScheduleTask(work);
     return;
   }

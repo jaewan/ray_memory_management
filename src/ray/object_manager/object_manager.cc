@@ -244,12 +244,7 @@ void ObjectManager::HandleObjectDeleted(const ObjectID &object_id) {
 uint64_t ObjectManager::Pull(const std::vector<rpc::ObjectReference> &object_refs,
                              BundlePriority prio) {
   std::vector<rpc::ObjectReference> objects_to_locate;
-
-  /// RSCODE:
-  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = GetSpillRemoteMapping();
-
-  /// RSTODO: Revert passing in spill remote mapping potentially
-  auto request_id = pull_manager_->Pull(object_refs, prio, &objects_to_locate, spill_remote_mapping);
+  auto request_id = pull_manager_->Pull(object_refs, prio, &objects_to_locate);
 
   const auto &callback = [this](const ObjectID &object_id,
                                 const std::unordered_set<NodeID> &client_ids,
@@ -270,7 +265,12 @@ uint64_t ObjectManager::Pull(const std::vector<rpc::ObjectReference> &object_ref
     // time the set of node IDs for the object changes. Notifications will also
     // be received if the list of locations is empty. The set of node IDs has
     // no ordering guarantee between notifications.
+
     auto object_id = ObjectRefToId(ref);
+
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "About to call SubscribeObjectLocations on object: " << object_id;
+
     RAY_CHECK_OK(object_directory_->SubscribeObjectLocations(
         object_directory_pull_callback_id_, object_id, ref.owner_address(), callback));
   }
@@ -355,9 +355,10 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
                                        double start_time,
                                        double end_time,
                                        ray::Status status) {
-  RAY_LOG(DEBUG) << "HandleSendFinished on " << self_node_id_ << " to " << node_id
-                 << " of object " << object_id << " chunk " << chunk_index
-                 << ", status: " << status.ToString();
+  /// RSTODO: Comment this out for now
+  // RAY_LOG(DEBUG) << "HandleSendFinished on " << self_node_id_ << " to " << node_id
+  //                << " of object " << object_id << " chunk " << chunk_index
+  //                << ", status: " << status.ToString();
   if (!status.ok()) {
     // TODO(rkn): What do we want to do if the send failed?
     RAY_LOG(DEBUG) << "Failed to send a push request for an object " << object_id
@@ -383,6 +384,11 @@ void ObjectManager::FindNodeToSpill(const ObjectID &object_id, const std::functi
 /// RSCODE: Decrement object ref count
 void ObjectManager::RemoteSpillDecrementRefCount(const ObjectID &object_id) {
   buffer_pool_store_client_->RemoteSpillDecreaseObjectCount(object_id);
+}
+
+/// RSCODE: Increment object ref count
+void ObjectManager::RemoteSpillIncrementRefCount(const ObjectID &object_id) {
+  buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
 }
 
 /// RSTODO: Delete later
@@ -740,7 +746,7 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   num_bytes_pushed_from_plasma_ += spill_remote_request.data().length();
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_;
+  RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_ " for current object: " << object_id;
 
   rpc::ClientCallback<rpc::SpillRemoteReply> callback =
       [this, start_time, object_id, node_id, chunk_index, on_complete] (const Status &status, const rpc::SpillRemoteReply &reply) {
@@ -753,14 +759,14 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
           RAY_LOG(INFO) << "Spill to remote failed on object: " << object_id;
         }
         /// RSTODO: Delete this later
-        RAY_LOG(INFO) << "Successfully spilled to remote";
+        RAY_LOG(INFO) << "Successfully spilled to remote for object: " << object_id;
 
         double end_time = absl::GetCurrentTimeNanos() / 1e9;
         HandleSendFinished(object_id, node_id, chunk_index, start_time, end_time, status);
         on_complete(status);
 
         /// RSTODO: Delete this later
-        RAY_LOG(INFO) << "Finished calling on_complete";
+        RAY_LOG(INFO) << "Finished calling on_complete for object: " << object_id;
       };
 
   rpc_client->SpillRemote(spill_remote_request, callback);  
@@ -952,9 +958,9 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
   }
 
   /// RSCODE: Try incrementing object count before write chunk
-  if (from_remote_spill) {
-    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  }
+  // if (from_remote_spill) {
+  //   buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  // }
 
   if (chunk_status.ok()) {
     // Avoid handling this chunk if it's already being handled by another process.

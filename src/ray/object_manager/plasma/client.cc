@@ -660,13 +660,13 @@ Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
   RAY_LOG(INFO) << "Release test 2";
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO)<< "Object ref count before release: " << object_entry->second->count;
+  RAY_LOG(INFO)<< "Object ref count before release: " << object_entry->second->count << "for object: " << object_id;
 
   object_entry->second->count -= 1;
   RAY_CHECK(object_entry->second->count >= 0);
   // Check if the client is no longer using this object.
 
-  RAY_LOG(INFO)<< "Object ref count after release: " << object_entry->second->count;
+  RAY_LOG(INFO)<< "Object ref count after release: " << object_entry->second->count << "for object: " << object_id;
 
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Release test 3";

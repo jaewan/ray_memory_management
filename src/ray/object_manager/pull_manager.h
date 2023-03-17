@@ -87,8 +87,7 @@ class PullManager {
   /// \return A request ID that can be used to cancel the request.
   uint64_t Pull(const std::vector<rpc::ObjectReference> &object_ref_bundle,
                 BundlePriority prio,
-                std::vector<rpc::ObjectReference> *objects_to_locate,
-                absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping);
+                std::vector<rpc::ObjectReference> *objects_to_locate);
 
   /// Update the pull requests that are currently being pulled, according to
   /// the current capacity. The PullManager will choose the objects to pull by
@@ -274,7 +273,13 @@ class PullManager {
     // state. The caller must explicitly activate it if needed.
     void AddBundlePullRequest(uint64_t request_id, BundlePullRequest request) {
       requests.emplace(request_id, request);
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "About to emplace in inactive requests";
+
       if (request.IsPullable()) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Emplacing in inactive requests";
+
         inactive_requests.emplace(request_id);
       }
     }
@@ -285,6 +290,9 @@ class PullManager {
     }
 
     void DeactivateBundlePullRequest(uint64_t request_id) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "About to emplace in inactive_requests in DeactivateBundlePullRequest";
+      
       RAY_CHECK_EQ(active_requests.erase(request_id), 1u);
       inactive_requests.emplace(request_id);
     }
