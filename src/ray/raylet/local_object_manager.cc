@@ -270,6 +270,9 @@ void LocalObjectManager::SpillObjectsInternal(
   std::vector<ObjectID> objects_to_spill;
   // Filter for the objects that can be spilled.
   for (const auto &id : object_ids) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "We are spilling object: " << id;
+
     // We should not spill an object that we are not the primary copy for, or
     // objects that are already being spilled.
     if (pinned_objects_.count(id) == 0 && objects_pending_spill_.count(id) == 0) {
