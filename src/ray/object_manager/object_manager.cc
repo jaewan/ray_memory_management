@@ -396,11 +396,58 @@ void ObjectManager::RemoteSpillViewRefCount(const ObjectID &object_id) {
   buffer_pool_store_client_->RemoteSpillViewObjectCount(object_id);
 }
 
+/// RSCODE:
+void ObjectManager::DeleteRemoteSpilledObject(const ObjectID &object_id) {
+  RAY_LOG(DEBUG) << "About to call DeleteRemoteSpilledObject RPC on object: " << object_id;
+  const auto it = spilled_remote_objects_to_free_.find(object_id);
+  if (it != spilled_remote_objects_to_free_.end()) {
+    NodeID node_id = it->second;
+    rpc_service_.post(
+    [this, object_id, node_id]() {
+      DeleteRemoteSpilledObjectRequest(object_id, node_id);
+    },
+    "ObjectManager.DeleteRemoteSpilledObject");
+  } else {
+    RAY_LOG(DEBUG) << "Remote object not in spilled_remote_objects_to_free_";
+  }
+}
+
+/// RSCODE:
+void ObjectManager::DeleteRemoteSpilledObjectRequest(const ObjectID &object_id, const NodeID &node_id) {
+  auto rpc_client = GetRpcClient(node_id);
+  rpc::DeleteRemoteSpilledObjectRequest delete_remote_spilled_object_request;
+  delete_remote_spilled_object_request.set_remote_spilled_object_id(object_id.Binary());
+
+  rpc::ClientCallback<rpc::DeleteRemoteSpilledObjectReply> callback =
+      [this, object_id, node_id] (const Status &status, const rpc::DeleteRemoteSpilledObjectReply &reply) {
+        if (status.ok()) {
+          RAY_LOG(INFO) << "Successfully freed " << object_id << " in remote node " << node_id;
+        }
+      };
+
+  rpc_client->DeleteRemoteSpilledObject(delete_remote_spilled_object_request, callback);  
+}
+
+/// RSGRPC:
+void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpilledObjectRequest &request,
+                                      rpc::DeleteRemoteSpilledObjectReply *reply,
+                                      rpc::SendReplyCallback send_reply_callback) {
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "About to free object in remote node";
+
+  ObjectID object_id = ObjectID::FromBinary(request.remote_spilled_object_id());
+
+  RemoteSpillDecrementRefCount(object_id);
+
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback) {
   /// RSCODE: Add code to add object id to node id mapping
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
+  spilled_remote_objects_to_free_.emplace(object_id, node_id);
 
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Spill Remote Mapping Info in SpillRemote: " << spilled_remote_objects_url_.size();

@@ -368,6 +368,8 @@ void LocalTaskManager::SpillWaitingTasks() {
 
 bool LocalTaskManager::TrySpillback(const std::shared_ptr<internal::Work> &work,
                                     bool &is_infeasible) {
+  /// RSTODO: Delete later
+  return false;
   auto scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
       work->task.GetTaskSpecification(),
       work->PrioritizeLocalNode(),

@@ -156,6 +156,16 @@ class ObjectManager : public ObjectManagerInterface,
   void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                          rpc::SpillRemoteReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
+
+  /// RSGRPC: (GRPC)
+  /// Handle delete remote object request
+  ///
+  /// \param request Delete remote object request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpilledObjectRequest &request,
+                         rpc::DeleteRemoteSpilledObjectReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;
   
   /// Get the port of the object manager rpc server.
   int GetServerPort() const { return object_manager_server_.GetPort(); }
@@ -219,6 +229,12 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSTODO: Delete later
   void RemoteSpillViewRefCount(const ObjectID &object_id);
+
+  /// RSCODE:
+  void DeleteRemoteSpilledObject(const ObjectID &object_id);
+
+  /// RSCODE: 
+  void DeleteRemoteSpilledObjectRequest(const ObjectID &object_id, const NodeID &node_id);
 
   /// RSTODO: Refactor and delete this later
   /// \param object_id The object's object id.
@@ -501,6 +517,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE: Mapping from object ids to rpc origin node addresses.
   absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
+
+  /// RSCODE: Mapping from object ids to rpc node addresses to free later
+  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_to_free_;
 
   /// This is used as the callback identifier in Pull for
   /// SubscribeObjectLocations. We only need one identifier because we never need to

@@ -40,7 +40,7 @@ class ObjectManagerClient {
   ObjectManagerClient(const std::string &address,
                       const int port,
                       ClientCallManager &client_call_manager,
-                      int num_connections = 5 /*RSCODE: original=4*/)
+                      int num_connections = 6 /*RSCODE: original=4*/)
       : num_connections_(num_connections) {
     push_rr_index_ = rand() % num_connections_;
     pull_rr_index_ = rand() % num_connections_;
@@ -49,6 +49,9 @@ class ObjectManagerClient {
     /// ALSO WE MIGHT WANT TO INCREASE NUM_CONNECTIONS_
     /// AS WE ARE ADDING ANOTHER RPC TO THE SERVER. 
     spillremote_rr_index_ = rand() % num_connections_;
+
+    /// RSGRPC:
+    delete_remote_spilled_object_rr_index_ = rand() % num_connections_;
     
     grpc_clients_.reserve(num_connections_);
     for (int i = 0; i < num_connections_; i++) {
@@ -93,6 +96,16 @@ class ObjectManagerClient {
                          SpillRemote,
                          grpc_clients_[spillremote_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )  
+                    
+  /// RSGRPC: (GRPC)
+  /// Tell remote object manager to accept deleting objects
+  ///
+  /// \param request The request message
+  /// \param callback  The callback function that handles reply
+  VOID_RPC_CLIENT_METHOD(ObjectManagerService,
+                         DeleteRemoteSpilledObject,
+                         grpc_clients_[delete_remote_spilled_object_rr_index_++ % num_connections_],
+                         /*method_timeout_ms*/ -1, )  
 
  private:
   /// To optimize object manager performance we create multiple concurrent
@@ -109,6 +122,10 @@ class ObjectManagerClient {
   /// RSGRPC: (GRPC)
   // Current connection index for `SpillRemote`.
   std::atomic<unsigned int> spillremote_rr_index_;
+
+  /// RSGRPC: (GRPC)
+  // Current connection index for `DeleteRemoteSpilledObject`.
+  std::atomic<unsigned int> delete_remote_spilled_object_rr_index_;
 
   /// The RPC clients.
   std::vector<std::unique_ptr<GrpcClient<ObjectManagerService>>> grpc_clients_;

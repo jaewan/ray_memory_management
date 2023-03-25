@@ -94,6 +94,15 @@ message PullReply {
 message FreeObjectsReply {
 }
 
+/// RSGRPC:
+message DeleteRemoteSpilledObjectRequest {
+  // The object id of spilled object.
+  bytes remote_spilled_object_id = 1;
+}
+
+/// RSGRPC:
+message DeleteRemoteSpilledObjectReply {}
+
 service ObjectManagerService {
   // Push service used to send object chunks
   rpc Push(PushRequest) returns (PushReply);
@@ -103,4 +112,6 @@ service ObjectManagerService {
   rpc FreeObjects(FreeObjectsRequest) returns (FreeObjectsReply);
   // RSGRPC: (GRPC)
   rpc SpillRemote(SpillRemoteRequest) returns (SpillRemoteReply);
+  // RSGRPC: (GRPC)
+  rpc DeleteRemoteSpilledObject(DeleteRemoteSpilledObjectRequest) returns (DeleteRemoteSpilledObjectReply);
 }

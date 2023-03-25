@@ -1,24 +1,41 @@
 import ray
+import time
 import numpy as np
 
-@ray.remote
-def producer():
-    return np.zeros(400_000_000)
-
-@ray.remote
-def consumer(obj1, obj2):
+def shuffle(object_size, npartitions, object_store_size):
+  @ray.remote
+  def map(npartitions, object_size):
+    size = object_size//8
+    data = np.random.rand(size)
+    size = size//npartitions
+    time.sleep(1)
+    return tuple(data[(i*size):((i+1)*size)] for i in range(npartitions))
+  @ray.remote
+  def reduce(*partitions):
+    #time.sleep(1)
     return True
+  shuffle_start = time.perf_counter()
+  # npartitions = (OBJECT_STORE_SIZE*WORKING_SET_RATIO)//OBJECT_SIZE
+  refs = [map.options(num_returns=npartitions).remote(npartitions, object_size)
+      for _ in range(npartitions)]
+  results = []
+  for j in range(npartitions):
+    results.append(reduce.remote(*[ref[j] for ref in refs]))
+  del refs
+  ray.get(results)
+  del results
+  shuffle_end = time.perf_counter()
+  return shuffle_end - shuffle_start
 
-ray.init()
+def main(args):
+    shuffle(args.object_size, args.npartitions, args.object_store_size)
 
-obj1 = producer.remote()
-obj2 = producer.remote()
-obj3 = producer.remote()
-obj4 = producer.remote()
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
 
-res = []
-res.append(consumer.remote(obj1, obj3))
-res.append(consumer.remote(obj2, obj4))
-
-for r in res:
-    ray.get(r)
+    parser.add_argument("--object-size", required=True, type=int)
+    parser.add_argument("--npartitions", required=True, type=int)
+    parser.add_argument("--object-store-size", type=int)
+    inputs = parser.parse_args()
+    main(inputs)

@@ -28,7 +28,8 @@ namespace rpc {
   RPC_SERVICE_HANDLER(ObjectManagerService, Pull, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, FreeObjects, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, SpillRemote, -1) \
-  /// RSGRPC: *create new GRPC for SpillRemote
+  RPC_SERVICE_HANDLER(ObjectManagerService, DeleteRemoteSpilledObject, -1) \
+  /// RSGRPC: *create new GRPC for SpillRemote and DeleteRemoteSpilledObject
   
 
 /// Implementations of the `ObjectManagerGrpcService`, check interface in
@@ -56,6 +57,10 @@ class ObjectManagerServiceHandler {
   /// RSGRPC: Handle a `SpillRemote` request (GRPC)
   virtual void HandleSpillRemote(const SpillRemoteRequest &request,
                                  SpillRemoteReply *reply,
+                                 SendReplyCallback send_reply_callback) = 0;
+  /// RSGRPC: Handle a `DeleteRemoteSpilledObject` request (GRPC)
+  virtual void HandleDeleteRemoteSpilledObject(const DeleteRemoteSpilledObjectRequest &request,
+                                 DeleteRemoteSpilledObjectReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
 };
 
