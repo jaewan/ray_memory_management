@@ -432,11 +432,11 @@ void ObjectManager::DeleteRemoteSpilledObjectRequest(const ObjectID &object_id, 
 void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpilledObjectRequest &request,
                                       rpc::DeleteRemoteSpilledObjectReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) {
-  /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "About to free object in remote node";
-
   ObjectID object_id = ObjectID::FromBinary(request.remote_spilled_object_id());
 
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "About to free object in remote node: " << object_id;
+  
   RemoteSpillDecrementRefCount(object_id);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
