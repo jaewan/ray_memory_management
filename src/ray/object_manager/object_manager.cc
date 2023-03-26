@@ -1004,13 +1004,6 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                 << " of object " << object_id << " chunk index: " << chunk_index
                 << ", chunk data size: " << data.size()
                 << ", object size: " << data_size;
-  
-  // keep track of received objects. 
-  // doesn't care about fault tolerance. 
-  if (!received_remote_objects_origin_.contains(object_id)) {
-    received_remote_objects_origin_.emplace(object_id, node_id);
-    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  }
 
   /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, 
@@ -1058,6 +1051,13 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                   << object_id;
     buffer_pool_.AbortCreate(object_id);
     return false;
+  }
+
+  // keep track of received objects. 
+  // doesn't care about fault tolerance. 
+  if (!received_remote_objects_origin_.contains(object_id)) {
+    received_remote_objects_origin_.emplace(object_id, node_id);
+    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
   }
 
   /// RSCODE: Try incrementing object count before write chunk
