@@ -442,6 +442,51 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
+/// RSCODE:
+void ObjectManager::IncrementRemoteObjectRefCount(const ObjectID &object_id) {
+  RAY_LOG(DEBUG) << "About to call IncrementRemoteObjectRefCount RPC on object: " << object_id;
+  const auto it = spilled_remote_objects_to_free_.find(object_id);
+  if (it != spilled_remote_objects_to_free_.end()) {
+    NodeID node_id = it->second;
+    rpc_service_.post(
+    [this, object_id, node_id]() {
+      IncrementRemoteObjectRefCountRequest(object_id, node_id);
+    },
+    "ObjectManager.DeleteRemoteSpilledObject");
+  } else {
+    RAY_LOG(DEBUG) << "Remote object not in spilled_remote_objects_to_free_";
+  }
+}
+
+/// RSCODE:
+void ObjectManager::IncrementRemoteObjectRefCountRequest(const ObjectID &object_id, const NodeID &node_id) {
+  auto rpc_client = GetRpcClient(node_id);
+  rpc::IncrementRemoteObjectRefCountRequest increment_remote_object_ref_count_request;
+  increment_remote_object_ref_count_request.set_increment_remote_object_ref_count_id(object_id.Binary());
+
+  rpc::ClientCallback<rpc::IncrementRemoteObjectRefCountReply> callback =
+      [this, object_id, node_id] (const Status &status, const rpc::IncrementRemoteObjectRefCountReply &reply) {
+        if (status.ok()) {
+          RAY_LOG(INFO) << "Successfully incremented ref count of object: " << object_id << " in remote node " << node_id;
+        }
+      };
+
+  rpc_client->IncrementRemoteObjectRefCount(increment_remote_object_ref_count_request, callback);  
+}
+
+/// RSGRPC:
+void ObjectManager::HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemoteObjectRefCountRequest &request,
+                                      rpc::IncrementRemoteObjectRefCountReply *reply,
+                                      rpc::SendReplyCallback send_reply_callback) {
+  ObjectID object_id = ObjectID::FromBinary(request.increment_remote_object_ref_count_id());
+
+  /// RSTODO: Delete this later
+  RAY_LOG(INFO) << "In remote node, about to increment ref count of object: " << object_id;
+
+  RemoteSpillIncrementRefCount(object_id);
+
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback) {
   /// RSCODE: Add code to add object id to node id mapping

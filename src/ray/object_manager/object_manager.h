@@ -166,6 +166,16 @@ class ObjectManager : public ObjectManagerInterface,
   void HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpilledObjectRequest &request,
                          rpc::DeleteRemoteSpilledObjectReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
+
+  /// RSGRPC: (GRPC)
+  /// Handle increment remote object ref countrequest
+  ///
+  /// \param request Increment remote object ref count request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleIncrementRemoteObjectRefCount(const rpc::HandleIncrementRemoteObjectRefCountRequest &request,
+                         rpc::HandleIncrementRemoteObjectRefCountReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;
   
   /// Get the port of the object manager rpc server.
   int GetServerPort() const { return object_manager_server_.GetPort(); }
@@ -235,6 +245,12 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE: 
   void DeleteRemoteSpilledObjectRequest(const ObjectID &object_id, const NodeID &node_id);
+
+  /// RSCODE:
+  void IncrementRemoteObjectRefCount(const ObjectID &object_id);
+
+  /// RSCODE: 
+  void IncrementRemoteObjectRefCountRequest(const ObjectID &object_id, const NodeID &node_id);
 
   /// RSTODO: Refactor and delete this later
   /// \param object_id The object's object id.

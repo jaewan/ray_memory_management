@@ -103,6 +103,15 @@ message DeleteRemoteSpilledObjectRequest {
 /// RSGRPC:
 message DeleteRemoteSpilledObjectReply {}
 
+/// RSGRPC:
+message IncrementRemoteObjectRefCountRequest {
+  // The object id of spilled object.
+  bytes remote_spilled_object_id = 1;
+}
+
+/// RSGRPC:
+message IncrementRemoteObjectRefCountReply {}
+
 service ObjectManagerService {
   // Push service used to send object chunks
   rpc Push(PushRequest) returns (PushReply);
@@ -114,4 +123,6 @@ service ObjectManagerService {
   rpc SpillRemote(SpillRemoteRequest) returns (SpillRemoteReply);
   // RSGRPC: (GRPC)
   rpc DeleteRemoteSpilledObject(DeleteRemoteSpilledObjectRequest) returns (DeleteRemoteSpilledObjectReply);
+  // RSGRPC: (GRPC)
+  rpc IncrementRemoteObjectRefCount(IncrementRemoteObjectRefCountRequest) returns (IncrementRemoteObjectRefCountReply);
 }

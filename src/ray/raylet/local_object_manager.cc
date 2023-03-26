@@ -338,6 +338,8 @@ void LocalObjectManager::SpillObjectsInternal(
 
       /// RSTODO: Delete later
       RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
+
+      object_manager_.IncrementRemoteObjectRefCount(object_id);
     
       OnObjectRemoteSpilled(object_id);
 
