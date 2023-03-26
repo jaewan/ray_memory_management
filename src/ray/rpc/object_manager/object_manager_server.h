@@ -64,8 +64,8 @@ class ObjectManagerServiceHandler {
                                  DeleteRemoteSpilledObjectReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
   /// RSGRPC: Handle a `HandleIncrementRemoteObjectRefCount` request (GRPC)
-  virtual void HandleIncrementRemoteObjectRefCount(const HandleIncrementRemoteObjectRefCountRequest &request,
-                                 HandleIncrementRemoteObjectRefCountReply *reply,
+  virtual void HandleIncrementRemoteObjectRefCount(const IncrementRemoteObjectRefCountRequest &request,
+                                 IncrementRemoteObjectRefCountReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
 };
 
