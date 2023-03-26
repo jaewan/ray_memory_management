@@ -202,6 +202,12 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   // Notify the object directory that the object has been added to this node.
   const ObjectID &object_id = object_info.object_id;
   RAY_LOG(DEBUG) << "Object added " << object_id;
+
+  /// RSCODE:
+  if (received_remote_objects_origin_.contains(object_id)) {
+    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  }
+
   RAY_CHECK(local_objects_.count(object_id) == 0);
   local_objects_[object_id].object_info = object_info;
   used_memory_ += object_info.data_size + object_info.metadata_size;
@@ -999,7 +1005,9 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   
   // keep track of received objects. 
   // doesn't care about fault tolerance. 
-  received_remote_objects_origin_.emplace(object_id, node_id);
+  if (!received_remote_objects_origin_.contains(object_id)) {
+    received_remote_objects_origin_.emplace(object_id, node_id);
+  }
 
   /// RSTODO: Tony -> potentially delete this later
   ReceiveObjectChunk(node_id, object_id, owner_address, 
