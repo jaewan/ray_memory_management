@@ -462,7 +462,7 @@ void ObjectManager::IncrementRemoteObjectRefCount(const ObjectID &object_id) {
 void ObjectManager::IncrementRemoteObjectRefCountRequest(const ObjectID &object_id, const NodeID &node_id) {
   auto rpc_client = GetRpcClient(node_id);
   rpc::IncrementRemoteObjectRefCountRequest increment_remote_object_ref_count_request;
-  increment_remote_object_ref_count_request.set_increment_remote_object_ref_count_id(object_id.Binary());
+  increment_remote_object_ref_count_request.set_remote_spilled_object_id(object_id.Binary());
 
   rpc::ClientCallback<rpc::IncrementRemoteObjectRefCountReply> callback =
       [this, object_id, node_id] (const Status &status, const rpc::IncrementRemoteObjectRefCountReply &reply) {
@@ -478,7 +478,7 @@ void ObjectManager::IncrementRemoteObjectRefCountRequest(const ObjectID &object_
 void ObjectManager::HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemoteObjectRefCountRequest &request,
                                       rpc::IncrementRemoteObjectRefCountReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) {
-  ObjectID object_id = ObjectID::FromBinary(request.increment_remote_object_ref_count_id());
+  ObjectID object_id = ObjectID::FromBinary(request.remote_spilled_object_id());
 
   /// RSTODO: Delete this later
   RAY_LOG(INFO) << "In remote node, about to increment ref count of object: " << object_id;
