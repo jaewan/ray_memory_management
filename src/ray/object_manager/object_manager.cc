@@ -445,6 +445,8 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
 
   RemoteSpillDecrementRefCount(object_id);
 
+  received_remote_objects_origin_.erase(object_id);
+
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 
