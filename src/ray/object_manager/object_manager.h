@@ -173,8 +173,8 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param request Increment remote object ref count request
   /// \param reply Reply
   /// \param send_reply_callback
-  void HandleIncrementRemoteObjectRefCount(const rpc::HandleIncrementRemoteObjectRefCountRequest &request,
-                         rpc::HandleIncrementRemoteObjectRefCountReply *reply,
+  void HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemoteObjectRefCountRequest &request,
+                         rpc::IncrementRemoteObjectRefCountReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
   
   /// Get the port of the object manager rpc server.
