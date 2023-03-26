@@ -204,9 +204,9 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   RAY_LOG(DEBUG) << "Object added " << object_id;
 
   /// RSCODE:
-  if (received_remote_objects_origin_.contains(object_id)) {
-    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  }
+  // if (received_remote_objects_origin_.contains(object_id)) {
+  //   buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  // }
 
   RAY_CHECK(local_objects_.count(object_id) == 0);
   local_objects_[object_id].object_info = object_info;
@@ -1009,6 +1009,7 @@ void ObjectManager::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   // doesn't care about fault tolerance. 
   if (!received_remote_objects_origin_.contains(object_id)) {
     received_remote_objects_origin_.emplace(object_id, node_id);
+    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
   }
 
   /// RSTODO: Tony -> potentially delete this later
