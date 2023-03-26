@@ -444,7 +444,7 @@ Status PlasmaStore::ProcessMessage(const std::shared_ptr<Client> &client,
   } break;
   case fb::MessageType::PlasmaSealRequest: {
     RAY_RETURN_NOT_OK(ReadSealRequest(input, input_size, &object_id));
-    p({object_id});
+    ({object_id});
     RAY_RETURN_NOT_OK(SendSealReply(client, object_id, PlasmaError::OK));
   } break;
   case fb::MessageType::PlasmaEvictRequest: {
