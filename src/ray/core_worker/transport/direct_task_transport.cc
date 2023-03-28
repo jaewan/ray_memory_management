@@ -263,9 +263,10 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
 	// This is because the lease granted task has already been pushed as core_worker pushes
 	// tasks to workers regardless of granted task
-	if(!priority_to_task_spec_.contains(lease_granted_pri) || lease_granted_pri > block_requested_priority_){
+	if(!priority_to_task_spec_.contains(lease_granted_pri) || lease_granted_pri > block_requested_priority_[addr.raylet_id]){
 		RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle task with priority:"<<lease_granted_pri 
-			<< " does not exist, redirecting to general OnWorkerIdle or blocked by backpressure";
+									 << " does not exist or lower than block_req_pri:" << block_requested_priority_[addr.raylet_id]
+									 << " , redirecting to general OnWorkerIdle or blocked by backpressure";
 		OnWorkerIdle(addr,
 								 scheduling_key,
 								 /*error=*/was_error,
@@ -334,11 +335,12 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   //static std::mutex priority_task_queues_not_pushed_lock;
   auto &lease_entry = worker_to_lease_entry_[addr];
+  const auto pri_it = priority_task_queues_not_pushed_.begin();
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
-	             << (current_time_ms() > lease_entry.lease_expiration_time);
+								 << (current_time_ms() > lease_entry.lease_expiration_time)
+							   << " should be blocked:" << (*pri_it > block_requested_priority_[addr.raylet_id]);
   //priority_task_queues_not_pushed_lock.lock();
-  const auto pri_it = priority_task_queues_not_pushed_.begin();
   if (!lease_entry.lease_client && pri_it == priority_task_queues_not_pushed_.end()) {
     //priority_task_queues_not_pushed_lock.unlock();
     return;
@@ -348,7 +350,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
   if ((was_error || worker_exiting ||
-       current_time_ms() > lease_entry.lease_expiration_time) || *pri_it > block_requested_priority_) {
+       current_time_ms() > lease_entry.lease_expiration_time) || *pri_it > block_requested_priority_[addr.raylet_id]) {
     //priority_task_queues_not_pushed_lock.unlock();
     RAY_CHECK(active_workers_.size() >= 1);
 
@@ -490,8 +492,15 @@ void CoreWorkerDirectTaskSubmitter::ReportWorkerBacklogIfNeeded(
   }
 }
 
-void CoreWorkerDirectTaskSubmitter::SetBlockSpill(std::vector<int64_t> block_score){
-	block_requested_priority_.Set(block_score);
+void CoreWorkerDirectTaskSubmitter::SetBlockSpill(const std::string &raylet_address,
+		const rpc::RequestWorkerLeaseReply &reply){
+	static const bool enable_BlockTasks = RayConfig::instance().enable_BlockTasks();
+	if (enable_BlockTasks){
+		std::vector<int64_t> block_score(reply.priority().data(), reply.priority().data() +
+			reply.priority().size());
+		block_requested_priority_[NodeID::FromBinary(raylet_address)].Set(block_score);
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] SetBlockSpill set from raylet: " << NodeID::FromBinary(raylet_address) << " to priority:" << block_score;
+	}
 }
 
 void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
@@ -601,7 +610,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 								 << " is_spillback:" << is_spillback;
   // Subtract 1 so we don't double count the task we are requesting for.
 
-	static const bool enable_BlockTasks = RayConfig::instance().enable_BlockTasks();
 	static int request_num = 0;
 
   lease_client->RequestWorkerLease(
@@ -696,11 +704,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                 << pri <<" from raylet " << addr.raylet_id << " with worker " << addr.worker_id;
 
               auto resources_copy = reply.resource_mapping();
-							if (enable_BlockTasks){
-								std::vector<int64_t> block_score(reply.priority().data(), reply.priority().data() +
-									reply.priority().size());
-								SetBlockSpill(block_score);
-							}
+							SetBlockSpill(raylet_address.raylet_id(), reply);
               AddWorkerLeaseClient(
                   addr, std::move(lease_client), resources_copy, scheduling_key);
               RAY_CHECK(active_workers_.size() >= 1);
