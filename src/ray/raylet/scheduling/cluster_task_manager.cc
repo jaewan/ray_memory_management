@@ -122,20 +122,21 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 			scheduling::NodeID scheduling_node_id;
 			// TODO(Jae) Add redirect task req to the coreworker for multi-node backpressure
       if (task_priority >= block_requested_priority_) {
-				/*
 				scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
           task.GetTaskSpecification(),
 					false,
-					*/
-          /*exclude_local_node*/// true,
-          /*requires_object_store_memory*/// false,
-          //&is_infeasible);
+          /*exclude_local_node*/ true,
+          /*requires_object_store_memory*/ false,
+          &is_infeasible);
 				if (scheduling_node_id.IsNil()) {
 					task_blocked_ = true;
 					RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks blocked task " << task_priority;
 					work_it++;
 					continue;
 					//break;
+				}else{
+					NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
+					RAY_LOG(DEBUG) << "[JAE_DEBUG] ScheduleAndDispatchTasks redirect to remote node:" << (node_id == self_node_id_);
 				}
       }else{
 				task_blocked_ = false;
