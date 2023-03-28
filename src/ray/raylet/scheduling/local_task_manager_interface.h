@@ -37,6 +37,8 @@ class ILocalTaskManager {
   // Schedule and dispatch tasks.
   virtual void ScheduleAndDispatchTasks() = 0;
 
+  virtual void SetBlockTaskPriority(Priority base_priority) = 0;
+
   /// Attempt to cancel an already queued task.
   ///
   /// \param task_id: The id of the task to remove.
@@ -88,6 +90,10 @@ class NoopLocalTaskManager : public ILocalTaskManager {
   // Schedule and dispatch tasks.
   void ScheduleAndDispatchTasks() override {}
 
+  void SetBlockTaskPriority(Priority base_priority) override {
+    RAY_CHECK(false)
+        << "This function should never be called by gcs' local task manager.";
+	}
   /// Attempt to cancel an already queued task.
   ///
   /// \param task_id: The id of the task to remove.

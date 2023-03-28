@@ -111,6 +111,8 @@ class LocalTaskManager : public ILocalTaskManager {
   /// \param task: Output parameter.
   void TaskFinished(std::shared_ptr<WorkerInterface> worker, RayTask *task);
 
+  void SetBlockTaskPriority(Priority base_priority) override;
+
   /// Attempt to cancel an already queued task.
   ///
   /// \param task_id: The id of the task to remove.
@@ -311,6 +313,8 @@ class LocalTaskManager : public ILocalTaskManager {
   /// is still queued.
   absl::flat_hash_map<SchedulingClass, std::deque<std::shared_ptr<internal::Work>>>
       tasks_to_dispatch_;
+
+  ray::Priority block_requested_priority_;
 
   /// Tasks waiting for arguments to be transferred locally.
   /// Tasks move from waiting -> dispatch.

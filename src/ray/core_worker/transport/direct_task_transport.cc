@@ -499,7 +499,8 @@ void CoreWorkerDirectTaskSubmitter::SetBlockSpill(const std::string &raylet_addr
 		std::vector<int64_t> block_score(reply.priority().data(), reply.priority().data() +
 			reply.priority().size());
 		block_requested_priority_[NodeID::FromBinary(raylet_address)].Set(block_score);
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] SetBlockSpill set from raylet: " << NodeID::FromBinary(raylet_address) << " to priority:" << block_score;
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] SetBlockSpill set from raylet: " 
+									 << NodeID::FromBinary(raylet_address) << " to priority:" << block_score;
 	}
 }
 

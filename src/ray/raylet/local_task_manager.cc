@@ -546,6 +546,7 @@ bool LocalTaskManager::PoppedWorkerHandler(
 
 void LocalTaskManager::Spillback(const NodeID &spillback_to,
                                  const std::shared_ptr<internal::Work> &work) {
+  static const bool enable_blockTasks = RayConfig::instance().enable_BlockTasks();
   auto send_reply_callback = work->callback;
 
   if (work->grant_or_reject) {
@@ -575,6 +576,13 @@ void LocalTaskManager::Spillback(const NodeID &spillback_to,
       node_info_ptr->node_manager_address());
   reply->mutable_retry_at_raylet_address()->set_port(node_info_ptr->node_manager_port());
   reply->mutable_retry_at_raylet_address()->set_raylet_id(spillback_to.Binary());
+  if (enable_blockTasks){
+    auto p = reply->mutable_priority();
+    p->Clear();
+    for (auto &s : block_requested_priority_.score){
+      p->Add(s);
+    }
+  }
 
   send_reply_callback();
 }
@@ -838,6 +846,10 @@ bool LocalTaskManager::AnyPendingTasksForResourceAcquisition(
   return *any_pending;
 }
 
+void LocalTaskManager::SetBlockTaskPriority(Priority base_priority){
+	block_requested_priority_ = base_priority;
+}
+
 void LocalTaskManager::Dispatch(
     std::shared_ptr<WorkerInterface> worker,
     absl::flat_hash_map<WorkerID, std::shared_ptr<WorkerInterface>> &leased_workers,
@@ -845,6 +857,7 @@ void LocalTaskManager::Dispatch(
     const RayTask &task,
     rpc::RequestWorkerLeaseReply *reply,
     std::function<void(void)> send_reply_callback) {
+  static const bool enable_blockTasks = RayConfig::instance().enable_BlockTasks();
   const auto &task_spec = task.GetTaskSpecification();
 
   worker->SetBundleId(task_spec.PlacementGroupBundleId());
@@ -864,6 +877,14 @@ void LocalTaskManager::Dispatch(
   reply->mutable_worker_address()->set_port(worker->Port());
   reply->mutable_worker_address()->set_worker_id(worker->WorkerId().Binary());
   reply->mutable_worker_address()->set_raylet_id(self_node_id_.Binary());
+	
+  if (enable_blockTasks){
+    auto p = reply->mutable_priority();
+    p->Clear();
+    for (auto &s : block_requested_priority_.score){
+      p->Add(s);
+    }
+  }
 
   RAY_CHECK(leased_workers.find(worker->WorkerId()) == leased_workers.end());
   leased_workers[worker->WorkerId()] = worker;
