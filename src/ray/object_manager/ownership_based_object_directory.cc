@@ -230,6 +230,8 @@ void OwnershipBasedObjectDirectory::SendObjectLocationUpdateBatchIfNeeded(
          batch_size < kMaxObjectReportBatchSize) {
     auto update = request.add_object_location_updates();
     const auto &object_id = *object_queue_it;
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Calling SendObjectLocationUpdateBatchIfNeeded on object: " << object_id;
     *update = std::move(object_map.at(object_id));
     object_map.erase(object_id);
     batch_size++;

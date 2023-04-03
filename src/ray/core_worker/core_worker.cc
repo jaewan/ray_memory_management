@@ -2833,12 +2833,20 @@ void CoreWorker::HandleUpdateObjectLocationBatch(
     const rpc::UpdateObjectLocationBatchRequest &request,
     rpc::UpdateObjectLocationBatchReply *reply,
     rpc::SendReplyCallback send_reply_callback) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 1";
+
   const auto &worker_id = request.intended_worker_id();
   if (HandleWrongRecipient(WorkerID::FromBinary(worker_id), send_reply_callback)) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 2";  
     return;
   }
   const auto &node_id = NodeID::FromBinary(request.node_id());
   const auto &object_location_updates = request.object_location_updates();
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 3";
 
   for (const auto &object_location_update : object_location_updates) {
     const auto &object_id = ObjectID::FromBinary(object_location_update.object_id());
@@ -2866,6 +2874,9 @@ void CoreWorker::HandleUpdateObjectLocationBatch(
       }
     }
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 4";
 
   send_reply_callback(Status::OK(),
                       /*success_callback_on_reply*/ nullptr,

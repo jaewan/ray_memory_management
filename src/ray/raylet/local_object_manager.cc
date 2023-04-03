@@ -336,11 +336,10 @@ void LocalObjectManager::SpillObjectsInternal(
       /// RSTODO: Delete this later
       RAY_LOG(INFO) << "Callback test";
 
-      /// RSTODO: Delete later
-      RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
-
       // object_manager_.IncrementRemoteObjectRefCount(object_id);
-    
+
+      // RSTODO: Delete later
+      RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
       OnObjectRemoteSpilled(object_id);
 
       /// RSCODE: Call callback here?
@@ -494,6 +493,8 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   const auto &worker_addr = freed_it->second.first;
   object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
 
+  RAY_LOG(INFO) << "Decrementing ref count after ReportObjectSpilled";
+
   // Decrease ref count
   // object_manager_.RemoteSpillDecrementRefCount(object_id);
 }
@@ -522,10 +523,6 @@ void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids
 
     // Mark that the object is spilled and unpin the pending requests.
     spilled_objects_url_.emplace(object_id, object_url);
-    // spilled_object_url.emplace(object_id, "remotelyspilled");
-    // lets try to find a way to trigger the Pull RPC with remote retrieval
-    // whenever we recognize that the url is exactly "remotelyspilled" or 
-    // some other URL that we choose. 
     RAY_LOG(DEBUG) << "Unpinning pending spill object " << object_id;
     auto it = objects_pending_spill_.find(object_id);
     RAY_CHECK(it != objects_pending_spill_.end());
@@ -570,16 +567,20 @@ bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
   RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spill_remote_mapping.size();
   RAY_LOG(INFO) << "Object we are trying to restore: " << object_id;
 
-  // if (objects_pending_restore_.count(object_id) > 0) {
-  //   // If the same object is restoring, we dedup here.
-  //   /// RSTODO: Delete later
-  //   RAY_LOG(INFO) << "We are dedupping in RestoreRemoteSpilledObject";
-  //   return true;
-  // }
+  if (objects_pending_restore_.count(object_id) > 0) {
+    // If the same object is restoring, we dedup here.
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "We are dedupping in RestoreRemoteSpilledObject";
+    return true;
+  }
 
   if (spill_remote_mapping.contains(object_id)) {
     /// RSTODO: Delete this later
     RAY_LOG(INFO) << "Remote object has been found: " << object_id;
+
+    RAY_CHECK(objects_pending_restore_.emplace(object_id).second)
+      << "Object dedupe wasn't done properly. Please report if you see this issue.";
+      
     object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
     return true;
   }

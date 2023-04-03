@@ -103,6 +103,10 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 
       /// RSTODO: Revert later
       NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Node id should be consistent: " << node_id;
+
       // There is no node that has available resources to run the request.
       // Move on to the next shape.
       /// RSTODO: Revert later
@@ -305,8 +309,9 @@ std::string ClusterTaskManager::DebugStr() const {
 
 void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
                                         const std::shared_ptr<internal::Work> &work) {
-  //if (spillback_to == self_node_id_ && local_task_manager_) {
-  if(true){
+  // if (spillback_to == self_node_id_ && local_task_manager_) {
+  /// RSTODO: Revert later
+  if (true){
     local_task_manager_->QueueAndScheduleTask(work);
     return;
   }

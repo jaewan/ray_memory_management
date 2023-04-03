@@ -1460,11 +1460,15 @@ void NodeManager::DisconnectClient(const std::shared_ptr<ClientConnection> &clie
   bool is_worker = false, is_driver = false;
   if (worker) {
     // The client is a worker.
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Client is a worker";
     is_worker = true;
   } else {
     worker = worker_pool_.GetRegisteredDriver(client);
     if (worker) {
       // The client is a driver.
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Client is a driver";
       is_driver = true;
     } else {
       RAY_LOG(INFO) << "Ignoring client disconnect because the client has already "
