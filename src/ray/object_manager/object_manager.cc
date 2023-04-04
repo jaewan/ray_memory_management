@@ -860,7 +860,7 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   rpc::ClientCallback<rpc::SpillRemoteReply> callback =
       [this, start_time, object_id, node_id, chunk_index, on_complete] (const Status &status, const rpc::SpillRemoteReply &reply) {
         if (!status.ok()) {
-          RAY_LOG(WARNING) << "Send object " << object_id << " chunk to node " << node_id
+          RAY_LOG(WARNING) << "Send object " << object_id << " g " << node_id
                            << " failed due to" << status.message()
                            << ", chunk index: " << chunk_index;
           
@@ -1064,12 +1064,12 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
 
   // keep track of received objects. 
   // doesn't care about fault tolerance. 
-  // if (from_remote_spill) {
-  //   if (!received_remote_objects_origin_.contains(object_id)) {
-  //     received_remote_objects_origin_.emplace(object_id, node_id);
-  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  //   }
-  // }
+  if (from_remote_spill) {
+    if (!received_remote_objects_origin_.contains(object_id)) {
+      received_remote_objects_origin_.emplace(object_id, node_id);
+      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    }
+  }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {

@@ -724,7 +724,7 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
     RAY_LOG(DEBUG) << "We are now deleting the object from disk";
     DeleteSpilledObjects(object_urls_to_delete);
   }
-  // /// RSCODE: Delete object from remote node
+  /// RSCODE: Delete object from remote node
   if (remote_spilled_objects_to_delete.size() > 0) {
     /// RSTODO: Delete later
     RAY_LOG(DEBUG) << "We are now deleting the object from remote node";
