@@ -19,7 +19,6 @@
 #include <string>
 #include <fstream>
 #include <iostream>
-#include <atomic>
 
 namespace ray {
 namespace core {
@@ -42,7 +41,7 @@ inline void LogPlaceSeq(const std::string &fnc_name, const Priority &pri){
   log_stream.close();
 }
 
-inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri, size_t worker_size){
+inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri, ray::NodeID raylet_id){
   static long long produced_obj = 0;
   if (fnc_name.find("producer") != std::string::npos) {
     produced_obj++;
@@ -54,7 +53,7 @@ inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, cons
   std::ostringstream stream;
   stream << task_id <<" " <<
 	fnc_name << " " << pri << 
-	" obj:" << produced_obj << " active_workers:" << worker_size  << "\n";
+	" obj:" << produced_obj << " raylet:" << raylet_id  << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
@@ -577,6 +576,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   }while(priority_it != priority_task_queues_.end() && resource_spec.JobId().IsNil());
 
   if ( resource_spec.JobId().IsNil() ){
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] ERROR Jae redirect request should be handled. Local raylet already calculated the remote resource";
 		RAY_CHECK(!is_spillback) << "Jae redirect request should be handled. Local raylet already calculated the remote resource";
     return;
   }
@@ -824,7 +824,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
                  << addr.worker_id << " of raylet " << addr.raylet_id
                  << " with priority:" << task_spec.GetPriority() 
 								 << " with num_arg:" << task_spec.NumArgs();
-  LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), task_spec.GetPriority(), active_workers_.size());
+  LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), task_spec.GetPriority(), addr.raylet_id);
 
   auto task_id = task_spec.TaskId();
   auto request = std::make_unique<rpc::PushTaskRequest>();

@@ -14,6 +14,9 @@
 
 #include "ray/object_manager/object_manager.h"
 
+#include <string>
+#include <fstream>
+#include <iostream>
 #include <chrono>
 
 #include "ray/common/common_protocol.h"
@@ -278,8 +281,16 @@ void ObjectManager::CancelPull(uint64_t request_id) {
   }
 }
 
+inline void MigrationCount(){
+	static uint64_t migration_count = 0;
+  std::ofstream log_stream("/tmp/ray/migration_count", std::ios_base::trunc);
+  log_stream << std::to_string(++migration_count);
+  log_stream.close();
+}
+
 void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id) {
   auto rpc_client = GetRpcClient(client_id);
+	MigrationCount();
   if (rpc_client) {
     // Try pulling from the client.
     rpc_service_.post(
@@ -481,6 +492,7 @@ void ObjectManager::PushObjectInternal(const ObjectID &object_id,
   RAY_LOG(DEBUG) << "Sending object chunks of " << object_id << " to node " << node_id
                  << ", number of chunks: " << chunk_reader->GetNumChunks()
                  << ", total data size: " << chunk_reader->GetObject().GetObjectSize();
+	MigrationCount();
 
   auto push_id = UniqueID::FromRandom();
   push_manager_->StartPush(
