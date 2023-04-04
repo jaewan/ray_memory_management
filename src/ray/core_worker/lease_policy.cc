@@ -19,6 +19,8 @@ namespace core {
 
 std::pair<rpc::Address, bool> LocalityAwareLeasePolicy::GetBestNodeForTask(
     const TaskSpecification &spec) {
+	// TODO(Jae) this is a patch to mandate all tasks to be pinned on head node
+  return std::make_pair(fallback_rpc_address_, false);
   if (spec.GetMessage().scheduling_strategy().scheduling_strategy_case() ==
       rpc::SchedulingStrategy::SchedulingStrategyCase::kSpreadSchedulingStrategy) {
     // The explicit spread scheduling strategy
