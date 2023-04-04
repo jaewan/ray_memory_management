@@ -537,6 +537,9 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE: Mapping from object ids to rpc node addresses to free later
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_to_free_;
 
+  /// RSCODE:
+  absl::flat_hash_map<ObjectID, NodeID> pulled_objects_from_remote_;
+
   /// This is used as the callback identifier in Pull for
   /// SubscribeObjectLocations. We only need one identifier because we never need to
   /// subscribe multiple times to the same object during Pull.

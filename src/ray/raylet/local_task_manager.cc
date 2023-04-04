@@ -93,7 +93,8 @@ void LocalTaskManager::ScheduleAndDispatchTasks() {
   // TODO(swang): Invoke ScheduleAndDispatchTasks() when we run out of memory
   // in the PullManager or periodically, to make sure that we spill waiting
   // tasks that are blocked.
-  SpillWaitingTasks();
+  /// RSTODO: Comment out for now
+  // SpillWaitingTasks();
 }
 
 void LocalTaskManager::DispatchScheduledTasksToWorkers() {
@@ -102,18 +103,32 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
   // blocking where a task which cannot be dispatched because
   // there are not enough available resources blocks other
   // tasks from being dispatched.
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 1";
+
   for (auto shapes_it = tasks_to_dispatch_.begin();
        shapes_it != tasks_to_dispatch_.end();) {
     auto &scheduling_class = shapes_it->first;
     auto &dispatch_queue = shapes_it->second;
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 2";
+
     if (info_by_sched_cls_.find(scheduling_class) == info_by_sched_cls_.end()) {
       // Initialize the class info.
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 3";
+
       info_by_sched_cls_.emplace(
           scheduling_class,
           SchedulingClassInfo(MaxRunningTasksPerSchedulingClass(scheduling_class)));
     }
     auto &sched_cls_info = info_by_sched_cls_.at(scheduling_class);
+
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 4";
 
     /// We cap the maximum running tasks of a scheduling class to avoid
     /// scheduling too many tasks of a single type/depth, when there are
@@ -131,12 +146,19 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
         continue;
       }
 
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 5";
+
       // Check if the scheduling class is at capacity now.
       if (sched_cls_cap_enabled_ &&
           sched_cls_info.running_tasks.size() >= sched_cls_info.capacity &&
           work->GetState() == internal::WorkStatus::WAITING) {
         RAY_LOG(DEBUG) << "Hit cap! time=" << get_time_ms_()
                        << " next update time=" << sched_cls_info.next_update_time;
+
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 6";
+
         if (get_time_ms_() < sched_cls_info.next_update_time) {
           // We're over capacity and it's not time to admit a new task yet.
           // Calculate the next time we should admit a new task.
@@ -150,12 +172,19 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
                                 "task. Worker process startup is being throttled.";
           }
 
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 7";
+
           int64_t target_time = get_time_ms_() + wait_time;
           sched_cls_info.next_update_time =
               std::min(target_time, sched_cls_info.next_update_time);
           break;
         }
       }
+
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 8";
 
       bool args_missing = false;
       bool success = PinTaskArgsIfMemoryAvailable(spec, &args_missing);
@@ -164,6 +193,9 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
       // for notifying us when the task is unblocked again.
       if (!success) {
         if (args_missing) {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 9";
+
           // Insert the task at the head of the waiting queue because we
           // prioritize spilling from the end of the queue.
           // TODO(scv119): where does pulling happen?
@@ -175,6 +207,10 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
           // The task's args cannot be pinned due to lack of memory. We should
           // retry dispatching the task once another task finishes and releases
           // its arguments.
+
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 10";
+
           RAY_LOG(DEBUG) << "Dispatching task " << task_id
                          << " would put this node over the max memory allowed for "
                             "arguments of executing tasks ("
@@ -194,12 +230,21 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
       const auto owner_worker_id = WorkerID::FromBinary(spec.CallerAddress().worker_id());
       const auto owner_node_id = NodeID::FromBinary(spec.CallerAddress().raylet_id());
 
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 11";
+
       // If the owner has died since this task was queued, cancel the task by
       // killing the worker (unless this task is for a detached actor).
       if (!spec.IsDetachedActor() && !is_owner_alive_(owner_worker_id, owner_node_id)) {
         RAY_LOG(WARNING) << "RayTask: " << task.GetTaskSpecification().TaskId()
                          << "'s caller is no longer running. Cancelling task.";
+
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 12";
+              
         if (!spec.GetDependencies().empty()) {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 13";
           task_dependency_manager_.RemoveTaskDependencies(task_id);
         }
         ReleaseTaskArgs(task_id);
@@ -215,26 +260,42 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
               .AllocateLocalTaskResources(spec.GetRequiredResources().GetResourceMap(),
                                           allocated_instances);
 
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 14";
+
       if (!schedulable) {
         ReleaseTaskArgs(task_id);
         // The local node currently does not have the resources to run the task, so we
         // should try spilling to another node.
         bool did_spill = TrySpillback(work, is_infeasible);
+
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 15";
+
         if (!did_spill) {
           // There must not be any other available nodes in the cluster, so the task
           // should stay on this node. We can skip the rest of the shape because the
           // scheduler will make the same decision.
+          
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 16";
+
           work->SetStateWaiting(
               internal::UnscheduledWorkCause::WAITING_FOR_RESOURCES_AVAILABLE);
           break;
         }
         num_unschedulable_task_spilled_++;
         if (!spec.GetDependencies().empty()) {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 17";
+
           task_dependency_manager_.RemoveTaskDependencies(
               task.GetTaskSpecification().TaskId());
         }
         work_it = dispatch_queue.erase(work_it);
       } else {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 18";
         // Force us to recalculate the next update time the next time a task
         // comes through this queue. We should only do this when we're
         // confident we're ready to dispatch the task after all checks have
@@ -259,6 +320,8 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
                 const std::shared_ptr<WorkerInterface> worker,
                 PopWorkerStatus status,
                 const std::string &runtime_env_setup_error_message) -> bool {
+              /// RSTODO: Delete later
+              RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 19";
               return PoppedWorkerHandler(worker,
                                          status,
                                          task_id,
@@ -278,17 +341,35 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
     // to `running_tasks` so we can remove the map entry
     // for that scheduling_class to prevent memory leaks.
     if (sched_cls_info.running_tasks.size() == 0) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 20";
       info_by_sched_cls_.erase(scheduling_class);
     }
     if (is_infeasible) {
       // TODO(scv119): fail the request.
       // Call CancelTask
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 21";
+
       tasks_to_dispatch_.erase(shapes_it++);
     } else if (dispatch_queue.empty()) {
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 22";
+
       tasks_to_dispatch_.erase(shapes_it++);
     } else {
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 23";
+
       shapes_it++;
     }
+
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "DispatchScheduledTasksToWorkers test 24";
+
   }
 }
 
@@ -305,6 +386,10 @@ void LocalTaskManager::SpillWaitingTasks() {
   // is earlier in the queue could have been scheduled to a remote node.
   // TODO(scv119): this looks very aggressive: we will try to spillback
   // all the tasks in the waiting queue regardless of the wait time.
+
+  /// RSTODO:
+  RAY_LOG(INFO) << "Tasks are being spilled";
+
   auto it = waiting_task_queue_.end();
   while (it != waiting_task_queue_.begin()) {
     it--;

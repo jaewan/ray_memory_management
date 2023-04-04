@@ -325,6 +325,8 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
         "ObjectManager.SendPull");
     /// RSCODE: Add code to delete object entry from hash map if remote
     if (from_remote) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Erasing from spilled_remote_objects_url_ after pull";
       spilled_remote_objects_url_.erase(object_id);
     }
   } else {
@@ -501,6 +503,10 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
   spilled_remote_objects_to_free_.emplace(object_id, node_id);
+
+  if (pulled_objects_from_remote_.contains(object_id)) {
+    pulled_objects_from_remote_.erase(object_id );
+  }
 
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Spill Remote Mapping Info in SpillRemote: " << spilled_remote_objects_url_.size();
@@ -739,6 +745,9 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
   RAY_LOG(DEBUG) << "Sending object chunks of " << object_id << " to node " << node_id
                  << ", number of chunks: " << chunk_reader->GetNumChunks()
                  << ", total data size: " << chunk_reader->GetObject().GetObjectSize();
+
+  /// RSCODE: Temporarily increment ref count
+  // buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
 
   /// RSTODO: Maybe have spill manager and StartSpillRemote?
   auto spill_id = UniqueID::FromRandom();
@@ -1055,12 +1064,12 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
 
   // keep track of received objects. 
   // doesn't care about fault tolerance. 
-  if (from_remote_spill) {
-    if (!received_remote_objects_origin_.contains(object_id)) {
-      received_remote_objects_origin_.emplace(object_id, node_id);
-      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    }
-  }
+  // if (from_remote_spill) {
+  //   if (!received_remote_objects_origin_.contains(object_id)) {
+  //     received_remote_objects_origin_.emplace(object_id, node_id);
+  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  //   }
+  // }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {
@@ -1073,6 +1082,16 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
     if (from_remote) {
       RAY_LOG(INFO) << "Successfully called WriteChunk on remote object: " << object_id;
     }
+
+    // if (from_remote && !from_remote_spill) {
+    //   /// RSTODO: Refector this to only increase ref count once
+    //   RAY_LOG(INFO) << "About to inc ref count of pulled object test 1";
+    //   if (!pulled_objects_from_remote_.contains(object_id)) {
+    //     pulled_objects_from_remote_.emplace(object_id, node_id);
+    //     RAY_LOG(INFO) << "About to inc ref count of pulled object test 2";
+    //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    //   }
+    // }
     return true;
   } else {
     num_chunks_received_failed_due_to_plasma_++;
