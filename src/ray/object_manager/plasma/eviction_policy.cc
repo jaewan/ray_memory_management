@@ -25,6 +25,7 @@
 namespace plasma {
 
 void LRUCache::Add(const ObjectID &key, int64_t size) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Add is called on object:" << key;
   auto it = item_map_.find(key);
   RAY_CHECK(it == item_map_.end());
   // Note that it is important to use a list so the iterators stay valid.
@@ -34,6 +35,7 @@ void LRUCache::Add(const ObjectID &key, int64_t size) {
 }
 
 int64_t LRUCache::Remove(const ObjectID &key) {
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] Remove is called on object:" << key;
   auto it = item_map_.find(key);
   if (it == item_map_.end()) {
     return -1;

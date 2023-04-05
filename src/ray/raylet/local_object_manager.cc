@@ -77,15 +77,22 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
       RAY_CHECK(msg.has_worker_object_eviction_message());
       const auto object_eviction_msg = msg.worker_object_eviction_message();
       const auto object_id = ObjectID::FromBinary(object_eviction_msg.object_id());
-      ReleaseFreedObject(object_id);
-      core_worker_subscriber_->Unsubscribe(
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Calling ReleaseFreedObject in subscription_callback on object: " << object_id;
+      /// RSTODO: Revert later
+      bool success = ReleaseFreedObject(object_id);
+      if (success) {
+        core_worker_subscriber_->Unsubscribe(
           rpc::ChannelType::WORKER_OBJECT_EVICTION, owner_address, object_id.Binary());
+      }
     };
 
     // Callback that is invoked when the owner of the object id is dead.
     auto owner_dead_callback = [this, owner_address](const std::string &object_id_binary,
                                                      const Status &) {
       const auto object_id = ObjectID::FromBinary(object_id_binary);
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Owner has died, calling ReleaseFreedObject on object: " << object_id;
       ReleaseFreedObject(object_id);
     };
 
@@ -102,14 +109,22 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
   }
 }
 
-void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
+bool LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
   /// RSTODO: Delete this later
   RAY_LOG(DEBUG) << "Calling Released Freed Object on: " << object_id;
+
+  /// RSCODE: Only free object if it's not spilling to remote
+  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
+  if (objects_pending_spill_.count(object_id) > 0 && spill_remote_mapping.count(object_id) > 0) {
+    RAY_LOG(INFO) << "We are preventing freeing because it is currently spilling to remote";
+    return false;
+  }
 
   // Only free the object if it is not already freed.
   auto it = local_objects_.find(object_id);
   if (it == local_objects_.end() || it->second.second) {
-    return;
+    /// RSTODO: Revert later
+    return false;
   }
   // Mark the object as freed. NOTE(swang): We have to mark this instead of
   // deleting the entry immediately in case the object is currently being
@@ -141,6 +156,8 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
       free_objects_period_ms_ == 0) {
     FlushFreeObjects();
   }
+  /// RSTODO: Delete later
+  return true;
 }
 
 void LocalObjectManager::FlushFreeObjects() {
@@ -336,9 +353,9 @@ void LocalObjectManager::SpillObjectsInternal(
       /// RSTODO: Delete this later
       RAY_LOG(INFO) << "Callback test";
 
-      // object_manager_.IncrementRemoteObjectRefCount(object_id);
-
-      // RSTODO: Delete later
+      // object_manager_.RemoteSpillIncrementRefCount(object_id);
+      
+      /// RSTODO: Delete later
       RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
       OnObjectRemoteSpilled(object_id);
 
@@ -349,7 +366,7 @@ void LocalObjectManager::SpillObjectsInternal(
     });
   }
 
-  /// RSTODO: Comment this out for now
+  // /// RSTODO: Comment this out for now
   // {
   //   absl::MutexLock lock(&mutex_);
   //   num_active_workers_ += 1;
@@ -452,11 +469,12 @@ void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
   // auto parsed_url = ParseURL(object_url);
   // const auto base_url_it = parsed_url->find("url");
   // RAY_CHECK(base_url_it != parsed_url->end());
-  // if (!url_ref_count_.contains(base_url_it->second)) {
-  //   url_ref_count_[base_url_it->second] = 1;
-  // } else {
-  //   url_ref_count_[base_url_it->second] += 1;
-  // }
+  /// RSTODO: Maybe comment out / delete later
+  if (!url_ref_count_.contains(object_url)) {
+    url_ref_count_[object_url] = 1;
+  } else {
+    url_ref_count_[object_url] += 1;
+  }
 
   // Mark that the object is spilled and unpin the pending requests.
   // spilled_objects_url_.emplace(object_id, object_url);
@@ -707,6 +725,10 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       } else {
         RAY_LOG(DEBUG) << "Emplacing object into remote_spilled_objects_to_delete";
         remote_spilled_objects_to_delete.emplace_back(object_id);
+
+        /// RSTODO: Maybe comment out / delete later
+        std::string &object_url = spilled_objects_url_it->second;
+        url_ref_count_.erase(object_url);
       }
       spilled_objects_url_.erase(spilled_objects_url_it);
     } else {

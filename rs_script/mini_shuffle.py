@@ -45,7 +45,7 @@ import ray
 import time
 import numpy as np
 
-OBJ_STORE_SIZE = 4_000_000_000
+OBJ_STORE_SIZE = 3_000_000_000
 
 @ray.remote
 def producer():
@@ -63,6 +63,7 @@ ray.get(b)
 print("Spilled to remote node")
 
 res = consumer.remote(a)
+# del a
 print(ray.get(res))
 
 res1 = consumer.remote(b)

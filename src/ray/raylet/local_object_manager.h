@@ -193,7 +193,8 @@ class LocalObjectManager {
                             std::function<void(const ray::Status &)> callback);
 
   /// Release an object that has been freed by its owner.
-  void ReleaseFreedObject(const ObjectID &object_id);
+  /// RSTODO: Revert to void later
+  bool ReleaseFreedObject(const ObjectID &object_id);
 
 
   /// RSTODO:

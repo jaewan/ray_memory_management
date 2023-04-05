@@ -522,6 +522,9 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   // uint64_t metadata_size = static_cast<uint64_t>(object_info.metadata_size);
   // uint64_t offset = 0;
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Owner address: " << object_info.owner_ip_address << " for object: " << object_id;
+
   rpc::Address owner_address;
   owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
   owner_address.set_ip_address(object_info.owner_ip_address);
