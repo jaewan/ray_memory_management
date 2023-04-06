@@ -42,18 +42,10 @@ inline void LogPlaceSeq(const std::string &fnc_name, const Priority &pri){
 }
 
 inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri, ray::NodeID raylet_id){
-  static long long produced_obj = 0;
-  if (fnc_name.find("producer") != std::string::npos) {
-    produced_obj++;
-  }else{
-    produced_obj--;
-  }
-
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
   stream << task_id <<" " <<
-	fnc_name << " " << pri << 
-	" obj:" << produced_obj << " raylet:" << raylet_id  << "\n";
+	fnc_name << " " << pri << " raylet:" << raylet_id  << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
@@ -577,7 +569,8 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 
   if ( resource_spec.JobId().IsNil() ){
 		RAY_LOG(DEBUG) << "[JAE_DEBUG] ERROR Jae redirect request should be handled. Local raylet already calculated the remote resource";
-		RAY_CHECK(!is_spillback) << "Jae redirect request should be handled. Local raylet already calculated the remote resource";
+		if(is_spillback)
+		  RAY_CHECK(is_spillback) << "Jae redirect request should be handled. Local raylet already calculated the remote resource";
     return;
   }
 
@@ -688,7 +681,9 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               }
             } else if (reply.rejected()) {
               RAY_LOG(DEBUG) << "Lease rejected " << task_id;
-              priority_task_queues_.emplace(pri);
+							if(priority_task_queues_not_pushed_.contains(pri)){
+								priority_task_queues_.emplace(pri);
+							}
               // It might happen when the first raylet has a stale view
               // of the spillback raylet resources.
               // Retry the request at the first raylet since the resource view may be
@@ -720,7 +715,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                            /*worker_exiting=*/false,
                            resources_copy);
             } else {
-              //RAY_CHECK(false) << "Jae you should handle worker lease redirection"; // TODO(Jae) Handle this case for DFS patch
               // The raylet redirected us to a different raylet to retry at.
               RAY_CHECK(!is_spillback);
               RAY_LOG(DEBUG) << "Redirect lease for task " << task_id << " from raylet "
@@ -731,13 +725,16 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 							if(priority_task_queues_not_pushed_.contains(pri)){
 								LeaseGrant("\t\tRedirect Request" , pri, priority_task_queues_.size(), is_spillback);
 								priority_task_queues_.emplace(pri);
+							}else{
 							}
 
               RequestNewWorkerIfNeeded(scheduling_key, &reply.retry_at_raylet_address());
             }
           } else if (lease_client != local_lease_client_) {
             RAY_CHECK(false) << "Jae you should handle worker lease remote raylet failure"; // TODO(Jae) Handle this case for DFS patch
-            priority_task_queues_.emplace(pri);
+						if(priority_task_queues_not_pushed_.contains(pri)){
+							priority_task_queues_.emplace(pri);
+						}
             // A lease request to a remote raylet failed. Retry locally if the lease is
             // still needed.
             // TODO(swang): Fail after some number of retries?
@@ -750,7 +747,9 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 
           } else {
             RAY_CHECK(false) << "Jae you should handle worker lease gRPC unavailable"; // TODO(Jae) Handle this case for DFS patch
-            //priority_task_queues_.emplace(pri);
+						if(priority_task_queues_not_pushed_.contains(pri)){
+							priority_task_queues_.emplace(pri);
+						}
             if (status.IsGrpcUnavailable()) {
               RAY_LOG(WARNING)
                   << "The worker failed to receive a response from the local "
