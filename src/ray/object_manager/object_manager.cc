@@ -186,6 +186,8 @@ void ObjectManager::StartRpcService() {
   for (int i = 0; i < config_.rpc_service_threads_number; i++) {
     rpc_threads_[i] = std::thread(&ObjectManager::RunRpcService, this, i);
   }
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "RPC service threads number: " << config_.rpc_service_threads_number;
   object_manager_server_.RegisterService(object_manager_service_);
   object_manager_server_.Run();
 }
@@ -302,6 +304,8 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
 
   if (rpc_client) {
     // Try pulling from the client.
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for pull";
     rpc_service_.post(
         /// RSCODE:
         [this, object_id, client_id, from_remote, rpc_client]() {
@@ -756,6 +760,8 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
   auto spill_id = UniqueID::FromRandom();
   spill_remote_manager_->StartSpillRemote(
       node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for spill";
         rpc_service_.post(
             [=]() {
               // Post to the multithreaded RPC event loop so that data is copied
@@ -846,6 +852,9 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   spill_remote_request.set_chunk_index(chunk_index);
   spill_remote_request.set_data_size(chunk_reader->GetObject().GetObjectSize());
   spill_remote_request.set_metadata_size(chunk_reader->GetObject().GetMetadataSize());
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "For counting purposes: We are about to calling SpillObjectChunk";
 
   auto optional_chunk = chunk_reader->GetChunk(chunk_index);
   if (!optional_chunk.has_value()) {
@@ -954,6 +963,9 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
                                rpc::SendReplyCallback send_reply_callback) {
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
   NodeID node_id = NodeID::FromBinary(request.node_id());
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "For counting purposes: We are calling HandlePush for pull";
 
   // Serialize.
   uint64_t chunk_index = request.chunk_index();
@@ -1122,6 +1134,9 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
     RAY_LOG(INFO) << "Received remote pull request from node " << node_id << " for object ["
                  << object_id << "].";
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "For counting purposes: We are calling HandlePull for pull";
 
   main_service_->post([this, object_id, node_id, from_remote]() { Push(object_id, node_id, from_remote); },
                       "ObjectManager.HandlePull");
