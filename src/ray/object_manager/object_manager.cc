@@ -513,8 +513,6 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Spill Remote Mapping Info in SpillRemote: " << spilled_remote_objects_url_.size();
 
-  auto rpc_client = GetRpcClient(node_id);
-
   RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
               << object_id;
 
@@ -740,7 +738,7 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                                        const NodeID &node_id,
                                        std::shared_ptr<ChunkObjectReader> chunk_reader,
                                        const std::function<void()> callback) {
-  auto rpc_client = GetRpcClient(node_id);
+  auto rpc_client = GetRemoteSpillRpcClient(node_id);
   if (!rpc_client) {
     RAY_LOG(INFO)
         << "Failed to establish connection for SpillRemote with remote object manager.";
@@ -1211,6 +1209,10 @@ void ObjectManager::SpreadFreeObjectsRequest(
 
 std::shared_ptr<rpc::ObjectManagerClient> ObjectManager::GetRpcClient(
     const NodeID &node_id) {
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Node id in GetRpcClient: " << node_id;
+
   auto it = remote_object_manager_clients_.find(node_id);
   if (it == remote_object_manager_clients_.end()) {
     RemoteConnectionInfo connection_info(node_id);
@@ -1219,6 +1221,32 @@ std::shared_ptr<rpc::ObjectManagerClient> ObjectManager::GetRpcClient(
       return nullptr;
     }
     auto object_manager_client = std::make_shared<rpc::ObjectManagerClient>(
+        connection_info.ip, connection_info.port, client_call_manager_);
+
+    RAY_LOG(DEBUG) << "Get rpc client, address: " << connection_info.ip
+                   << ", port: " << connection_info.port
+                   << ", local port: " << GetServerPort();
+
+    it = remote_object_manager_clients_.emplace(node_id, std::move(object_manager_client))
+             .first;
+  }
+  return it->second;
+}
+
+std::shared_ptr<rpc::RemoteSpillClient> ObjectManager::GetRemoteSpillRpcClient(
+    const NodeID &node_id) {
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Node id in GetRemoteSpillRpcClient: " << node_id;
+
+  auto it = remote_object_manager_clients_.find(node_id);
+  if (it == remote_object_manager_clients_.end()) {
+    RemoteConnectionInfo connection_info(node_id);
+    object_directory_->LookupRemoteConnectionInfo(connection_info);
+    if (!connection_info.Connected()) {
+      return nullptr;
+    }
+    auto remote_spill_client = std::make_shared<rpc::RemoteSpillClient>(
         connection_info.ip, connection_info.port, client_call_manager_);
 
     RAY_LOG(DEBUG) << "Get rpc client, address: " << connection_info.ip
