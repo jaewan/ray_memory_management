@@ -495,6 +495,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param node_id Remote node id, will send rpc request to it
   std::shared_ptr<rpc::ObjectManagerClient> GetRpcClient(const NodeID &node_id);
 
+  /// RSCODE:
+  /// Get the rpc client according to the node ID
+  ///
+  /// \param node_id Remote node id, will send rpc request to it
+  std::shared_ptr<rpc::RemoteSpillClient> GetRemoteSpillRpcClient(const NodeID &node_id);
+
   /// Weak reference to main service. We ensure this object is destroyed before
   /// main_service_ is stopped.
   instrumented_io_context *main_service_;
