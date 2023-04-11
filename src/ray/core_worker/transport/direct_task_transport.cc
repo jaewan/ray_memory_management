@@ -750,11 +750,11 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
             RequestNewWorkerIfNeeded(scheduling_key);
 
           } else {
-            RAY_CHECK(false) << "Jae you should handle worker lease gRPC unavailable"; // TODO(Jae) Handle this case for DFS patch
 						if(priority_task_queues_not_pushed_.contains(pri)){
 							priority_task_queues_.emplace(pri);
 						}
             if (status.IsGrpcUnavailable()) {
+							RAY_CHECK(false) << "Jae you should handle worker lease gRPC unavailable"; // TODO(Jae) Handle this case for DFS patch
               RAY_LOG(WARNING)
                   << "The worker failed to receive a response from the local "
                   << "raylet because the raylet is unavailable (crashed). "
@@ -783,7 +783,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                 scheduling_key_entries_.erase(scheduling_key);
               }
             } else {
-              RAY_CHECK(false) << "Jae you should handle worker lease local raylet failure"; // TODO(Jae) Handle this case for DFS patch
               RAY_LOG(WARNING)
                   << "The worker failed to receive a response from the local raylet, but "
                      "raylet is still alive. Try again on a local node. Error: "
