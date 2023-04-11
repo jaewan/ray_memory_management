@@ -19,6 +19,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <cerrno>
 
 namespace ray {
 namespace core {
@@ -136,7 +137,7 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto inserted = tasks_.emplace(task_spec.TaskId(), TaskEntry(task_spec, scheduling_key, priority));
         RAY_CHECK(inserted.second);
         const auto task_key = inserted.first->second.task_key;
-        auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
+				auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
         RAY_CHECK(scheduling_key_entry.task_priority_queue.emplace(task_key).second) << task_spec.TaskId();
 
         auto ptq_inserted = priority_task_queues_.emplace(priority);
@@ -146,8 +147,7 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
         RAY_CHECK(ptts_inserted.second);
 
-        RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first
-                       << " queue size is now " << scheduling_key_entry.task_priority_queue.size();
+        RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first;
         scheduling_key_entry.resource_spec = task_spec;
 
         if (!AllWorkersBusy()) {
@@ -310,6 +310,8 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 
       executing_tasks_.emplace(task_spec.TaskId(), addr);
       PushNormalTask(addr, client, scheduling_key, task_spec, assigned_resources);
+      const auto it = tasks_.find(task_spec.TaskId());
+      scheduling_key_entries_[scheduling_key].task_priority_queue.erase(it->second.task_key);
       //tasks_.erase(task_spec.TaskId());
     }
 
@@ -371,6 +373,8 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       executing_tasks_.emplace(task_spec.TaskId(), addr);
       lease_entry.lease_expiration_time = current_time_ms() - 1;
       PushNormalTask(addr, client, scheduling_key, task_spec, assigned_resources);
+      const auto it = tasks_.find(task_spec.TaskId());
+      scheduling_key_entries_[scheduling_key].task_priority_queue.erase(it->second.task_key);
       tasks_.erase(task_spec.TaskId());
     }
 
@@ -905,6 +909,7 @@ Status CoreWorkerDirectTaskSubmitter::CancelTask(TaskSpecification task_spec,
                                                  bool recursive) {
   RAY_LOG(INFO) << "Cancelling a task: " << task_spec.TaskId()
                 << " force_kill: " << force_kill << " recursive: " << recursive;
+	RAY_CHECK(false) << "Jae you should handle this function. Get tasks from priority queue not by scheduling key";
   const SchedulingKey scheduling_key(
       task_spec.GetSchedulingClass(),
       task_spec.GetDependencyIds(),
