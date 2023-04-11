@@ -187,7 +187,7 @@ void ObjectManager::StartRpcService() {
     rpc_threads_[i] = std::thread(&ObjectManager::RunRpcService, this, i);
   }
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "RPC service threads number: " << config_.rpc_service_threads_number;
+  RAY_LOG(INFO) << "For counting purposes, RPC service threads number: " << config_.rpc_service_threads_number;
   object_manager_server_.RegisterService(object_manager_service_);
   object_manager_server_.Run();
 }
