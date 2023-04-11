@@ -304,8 +304,6 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
 
   if (rpc_client) {
     // Try pulling from the client.
-    /// RSTODO: Delete later
-    RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for pull for object: " << object_id;
     rpc_service_.post(
         /// RSCODE:
         [this, object_id, client_id, from_remote, rpc_client]() {
@@ -807,6 +805,8 @@ void ObjectManager::PushObjectInternal(const ObjectID &object_id,
   auto push_id = UniqueID::FromRandom();
   push_manager_->StartPush(
       node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for push for object: " << object_id;
         rpc_service_.post(
             [=]() {
               // Post to the multithreaded RPC event loop so that data is copied
@@ -914,6 +914,9 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
   push_request.set_metadata_size(chunk_reader->GetObject().GetMetadataSize());
   push_request.set_chunk_index(chunk_index);
   push_request.set_from_remote(from_remote);
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "For counting purposes: We are about to calling SendObjectChunk for object: " << object_id;
 
   // read a chunk into push_request and handle errors.
   auto optional_chunk = chunk_reader->GetChunk(chunk_index);
@@ -1134,9 +1137,6 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
     RAY_LOG(INFO) << "Received remote pull request from node " << node_id << " for object ["
                  << object_id << "].";
   }
-
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "For counting purposes: We are calling HandlePull for pull for object: " << object_id;
 
   main_service_->post([this, object_id, node_id, from_remote]() { Push(object_id, node_id, from_remote); },
                       "ObjectManager.HandlePull");
