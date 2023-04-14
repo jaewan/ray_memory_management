@@ -43,7 +43,7 @@ Priority TaskManager::GenerateTaskPriority(
   // Priority id to assign when a new task is invoked.
   // Sequentially increase new_priority_s after assign this to a new priority
 	*/
-  static int new_priority_s = 0;
+  //static int new_priority_s = 0;
 
 	RAY_CHECK(timestamp_coordinator_ != 0) << "Jae handle when coordination rpc is slow";
   static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
@@ -60,18 +60,16 @@ Priority TaskManager::GenerateTaskPriority(
   }
 
   Priority pri;
-	/*
 	std::chrono::steady_clock::duration now = std::chrono::steady_clock::now().time_since_epoch();
 	int64_t new_pri = now.count() - timestamp_coordinator_;
-	*/
   //This is an ensemble serve patch for multi driver
   if(ensemble_serving && max_priority == pri && task_deps.size() &&
 			reference_counter_->GetCurrentTaskPriority() != pri){
-    pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
-    //pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_pri);
+    //pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
+    pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_pri);
   }else{
-    //pri.SetFromParentPriority(max_priority, new_pri);
-    pri.SetFromParentPriority(max_priority, new_priority_s++);
+    pri.SetFromParentPriority(max_priority, new_pri);
+    //pri.SetFromParentPriority(max_priority, new_priority_s++);
   }
   spec.SetPriority(pri);
   return pri;

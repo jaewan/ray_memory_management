@@ -290,9 +290,9 @@ inline void MigrationCount(){
 
 void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id) {
   auto rpc_client = GetRpcClient(client_id);
-	MigrationCount();
   if (rpc_client) {
     // Try pulling from the client.
+		MigrationCount();
     rpc_service_.post(
         [this, object_id, client_id, rpc_client]() {
           rpc::PullRequest pull_request;
