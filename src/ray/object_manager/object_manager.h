@@ -44,6 +44,9 @@
 #include "ray/object_manager/spill_remote_manager.h"
 #include "ray/rpc/object_manager/object_manager_client.h"
 #include "ray/rpc/object_manager/object_manager_server.h"
+/// RSCODE:
+#include "ray/rpc/object_manager/remote_spill_client.h"
+#include "ray/rpc/object_manager/remote_spill_server.h"
 #include "src/ray/protobuf/common.pb.h"
 #include "src/ray/protobuf/node_manager.pb.h"
 
@@ -499,7 +502,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// Get the rpc client according to the node ID
   ///
   /// \param node_id Remote node id, will send rpc request to it
-  std::shared_ptr<rpc::RemoteSpillClient> GetRemoteSpillRpcClient(const NodeID &node_id);
+  // std::shared_ptr<rpc::RemoteSpillClient> GetRemoteSpillRpcClient(const NodeID &node_id);
 
   /// Weak reference to main service. We ensure this object is destroyed before
   /// main_service_ is stopped.
