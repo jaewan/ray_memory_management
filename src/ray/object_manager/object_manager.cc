@@ -293,7 +293,6 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
   if (rpc_client) {
 		MigrationCount();
     // Try pulling from the client.
-		MigrationCount();
     rpc_service_.post(
         [this, object_id, client_id, rpc_client]() {
           rpc::PullRequest pull_request;
