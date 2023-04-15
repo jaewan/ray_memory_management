@@ -3276,6 +3276,12 @@ void CoreWorker::HandleRestoreSpilledObjects(
     for (const auto &url : request.spilled_objects_url()) {
       spilled_objects_url.push_back(url);
     }
+		int i=0;
+		for (const auto &obj_id : object_refs_to_restore){
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleRestoreSpilledObjects restore obj:" 
+				<< ObjectID::FromBinary(obj_id.object_id()) << " url:" << spilled_objects_url[i];
+			i++;
+		}
     auto total =
         options_.restore_spilled_objects(object_refs_to_restore, spilled_objects_url);
     reply->set_bytes_restored_total(total);

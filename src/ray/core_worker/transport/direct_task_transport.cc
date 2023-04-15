@@ -244,7 +244,8 @@ void CoreWorkerDirectTaskSubmitter::ReturnWorker(const rpc::WorkerAddress addr,
   worker_to_lease_entry_.erase(addr);
 }
 
-// TODO(Jae) remove this function
+// Dispatch task to leased worker strictly following the requested task as raylet has pulled
+// its arguments. So also ignore block_requested_priority
 void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const rpc::WorkerAddress &addr,
     const SchedulingKey &scheduling_key,
@@ -254,10 +255,10 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
 	// This is because the lease granted task has already been pushed as core_worker pushes
 	// tasks to workers regardless of granted task
-	if(!priority_to_task_spec_.contains(lease_granted_pri) || lease_granted_pri > block_requested_priority_[addr.raylet_id]){
+	if(!priority_to_task_spec_.contains(lease_granted_pri) || !priority_task_queues_not_pushed_.contains(lease_granted_pri)){
+		RAY_CHECK(false) << "Jae Handle this";
 		RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle task with priority:"<<lease_granted_pri 
-									 << " does not exist or lower than block_req_pri:" << block_requested_priority_[addr.raylet_id]
-									 << " , redirecting to general OnWorkerIdle or blocked by backpressure";
+									 << " does not exist , redirecting to general OnWorkerIdle or blocked by backpressure";
 		OnWorkerIdle(addr,
 								 scheduling_key,
 								 /*error=*/was_error,
@@ -288,18 +289,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   } else {
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
-    const auto priority_it = priority_task_queues_not_pushed_.begin();
     Priority pri(lease_granted_pri.score);
-    if(priority_it != priority_task_queues_not_pushed_.end()){
-      if(lease_granted_pri > *priority_it){
-					pri.Set(*priority_it);
-          auto ptq_inserted = priority_task_queues_.emplace(lease_granted_pri);
-          RAY_CHECK(ptq_inserted.second);
-      }
-    }
-		priority_task_queues_not_pushed_.erase(pri);
-		// If a task is granted lease but not pushed for higher priority task, the task is pushed back to grant req queue
-		// It is possible to push this task before the lease request, so remove it from the grant req queue just in case
 		priority_task_queues_.erase(pri);
     while (!lease_entry.is_busy) {
       const auto &task_spec = priority_to_task_spec_[pri];
@@ -712,12 +702,21 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 								LeaseGrant("\t\tRequest Granted" , pri, request_num, is_spillback);
 								priority_task_queues_.emplace(pri);
 							}
-              OnWorkerIdle(addr,
-                           scheduling_key,
-                           //pri,
-                           /*error=*/false,
-                           /*worker_exiting=*/false,
-                           resources_copy);
+							if (reply.pulled_task()){
+								OnWorkerIdle(addr,
+														 scheduling_key,
+														 pri,
+														 /*error=*/false,
+														 /*worker_exiting=*/false,
+														 resources_copy);
+							}else{
+								OnWorkerIdle(addr,
+														 scheduling_key,
+														 //pri,
+														 /*error=*/false,
+														 /*worker_exiting=*/false,
+														 resources_copy);
+							}
             } else {
               // The raylet redirected us to a different raylet to retry at.
               RAY_CHECK(!is_spillback);

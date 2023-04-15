@@ -73,6 +73,7 @@ bool LocalTaskManager::WaitForTaskArgsRequests(std::shared_ptr<internal::Work> w
       RAY_LOG(DEBUG) << "Args already ready, task can be dispatched " << task_id;
       tasks_to_dispatch_[scheduling_key].push_back(work);
     } else {
+			waited_for_task_args_.emplace(task.GetTaskSpecification().TaskId());
       RAY_LOG(DEBUG) << "Waiting for args for task: "
                      << task.GetTaskSpecification().TaskId();
       can_dispatch = false;
@@ -877,6 +878,12 @@ void LocalTaskManager::Dispatch(
   reply->mutable_worker_address()->set_port(worker->Port());
   reply->mutable_worker_address()->set_worker_id(worker->WorkerId().Binary());
   reply->mutable_worker_address()->set_raylet_id(self_node_id_.Binary());
+	if (waited_for_task_args_.contains(task_spec.TaskId())){
+		waited_for_task_args_.erase(task_spec.TaskId());
+		reply->set_pulled_task(true);
+	}else{
+		reply->set_pulled_task(false);
+	}
 	
   if (enable_blockTasks){
     auto p = reply->mutable_priority();

@@ -103,6 +103,8 @@ message RequestWorkerLeaseReply {
   string scheduling_failure_message = 10;
   // Backpressure task priority. Core_worker shouldn't dispatch tasks with memory pressure
   repeated int64 priority = 11;
+  // If scheduler pulled object for this task, do not follow DFS in coreworker and dispatch this task
+  bool pulled_task = 12;
 }
 
 message PrepareBundleResourcesRequest {

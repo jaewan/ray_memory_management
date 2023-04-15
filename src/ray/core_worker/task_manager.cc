@@ -71,6 +71,8 @@ Priority TaskManager::GenerateTaskPriority(
     pri.SetFromParentPriority(max_priority, new_pri);
     //pri.SetFromParentPriority(max_priority, new_priority_s++);
   }
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] priority of the task is:" << pri;
+	RAY_CHECK(pri != Priority()) << "??";
   spec.SetPriority(pri);
   return pri;
 }

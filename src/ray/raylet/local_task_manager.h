@@ -271,6 +271,7 @@ class LocalTaskManager : public ILocalTaskManager {
   void ReleaseTaskArgs(const TaskID &task_id);
 
  private:
+	absl::flat_hash_set<TaskID> waited_for_task_args_;
   const NodeID &self_node_id_;
   /// Responsible for resource tracking/view of the cluster.
   std::shared_ptr<ClusterResourceScheduler> cluster_resource_scheduler_;
