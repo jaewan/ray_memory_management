@@ -26,6 +26,8 @@ class TaskArg {
  public:
   virtual void ToProto(rpc::TaskArg *arg_proto, Priority &priority) const = 0;
   virtual const ObjectID& GetObjectId() const = 0;
+  virtual const std::vector<rpc::ObjectReference> &GetInlinedRefs() const = 0;
+  virtual bool IsRef() const = 0;
   virtual ~TaskArg(){};
 };
 
@@ -43,6 +45,14 @@ class TaskArgByReference : public TaskArg {
   const ObjectID& GetObjectId() const {
     return id_;
   }
+  const std::vector<rpc::ObjectReference> nested_refs_;
+  const std::vector<rpc::ObjectReference> &GetInlinedRefs() const {
+		return nested_refs_;
+	}
+
+  bool IsRef() const {
+		return true;
+	}
 
   void ToProto(rpc::TaskArg *arg_proto, Priority &priority) const {
     RAY_LOG(DEBUG) << "[JAE_DEBUG] ToProto from TaskArgByReference Called" << priority;
@@ -78,6 +88,14 @@ class TaskArgByValue : public TaskArg {
 		//id_ = ObjectID::FromBinary(value_
     RAY_CHECK(value) << "Value can't be null.";
   }
+
+  const std::vector<rpc::ObjectReference> &GetInlinedRefs() const {
+		return value_->GetNestedRefs();
+	}
+
+  bool IsRef() const {
+		return false;
+	}
 
   const ObjectID id_;
   const ObjectID& GetObjectId() const {

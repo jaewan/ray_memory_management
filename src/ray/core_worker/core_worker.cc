@@ -1581,9 +1581,24 @@ void CoreWorker::BuildCommonTaskSpec(
                             concurrency_group_name);
   // Set task arguments.
 	const static ObjectID default_object_id;
+	static Priority dummy_pri;
   for (const auto &arg : args) {
-		Priority priority = reference_counter_->GetObjectPriority(arg->GetObjectId());
-    builder.AddArg(*arg, priority);
+		if (arg->IsRef()){
+			Priority priority = reference_counter_->GetObjectPriority(arg->GetObjectId());
+			builder.AddArg(*arg, priority);
+		}else{
+      const auto &inlined_refs = arg->GetInlinedRefs();
+			Priority &max_pri = dummy_pri;
+      for (const auto &inlined_ref : inlined_refs) {
+        const auto inlined_id = ObjectID::FromBinary(inlined_ref.object_id());
+				Priority priority = reference_counter_->GetObjectPriority(inlined_id);
+				if (max_pri > priority){
+					max_pri = priority;
+				}
+        RAY_LOG(DEBUG) << "[JAE_DEBUG] BuildCommonTaskSpec  arg id:" << inlined_id << " pri:" << priority;
+      }
+			builder.AddArg(*arg, max_pri);
+		}
   }
 }
 
@@ -2243,13 +2258,25 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
                                ReferenceCounter::ReferenceTableProto *borrowed_refs,
                                bool *is_retryable_error) {
   static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
+	static const Priority default_pri;
   //TODO(Jae) is this needed?
   //reference_counter_->UpdateObjectPriority(task_spec.TaskId(), task_spec.GetPriority());
   RAY_LOG(DEBUG) << "Executing task, task info = " << task_spec.DebugString();
   //TODO(Jae) This is a patch to alleviate priority when tasks submit tasks.
 	size_t arg_size = task_spec.NumArgs();
 	for (size_t i=0; i < arg_size; i++){
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] arg priority: " << task_spec.ArgPriority(i);
+		Priority pri = task_spec.ArgPriority(i);
+		if(pri.score.size() > 0 && pri != default_pri){
+			if (task_spec.ArgByRef(i)) {
+				reference_counter_->UpdateObjectPriority(task_spec.ArgId(i), pri);
+			} else {
+				const auto &inlined_refs = task_spec.ArgInlinedRefs(i);
+				for (const auto &inlined_ref : inlined_refs) {
+					const auto inlined_id = ObjectID::FromBinary(inlined_ref.object_id());
+					reference_counter_->UpdateObjectPriority(inlined_id, pri);
+				}
+			}
+		}
 	}
   if(ensemble_serving){
     if(task_spec.GetName().compare("aggregator()") == 0){
