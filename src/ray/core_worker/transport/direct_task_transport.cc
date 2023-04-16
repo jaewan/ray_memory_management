@@ -256,8 +256,8 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 	// This is because the lease granted task has already been pushed as core_worker pushes
 	// tasks to workers regardless of granted task
 	if(!priority_to_task_spec_.contains(lease_granted_pri) || !priority_task_queues_not_pushed_.contains(lease_granted_pri)){
-		RAY_CHECK(false) << "Jae Handle this";
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle task with priority:"<<lease_granted_pri 
+		//RAY_CHECK(false) << "Jae Handle this";
+		RAY_LOG(DEBUG) << "!!!Error Jae [JAE_DEBUG] OnWorkerIdle task with priority:"<<lease_granted_pri 
 									 << " does not exist , redirecting to general OnWorkerIdle or blocked by backpressure";
 		OnWorkerIdle(addr,
 								 scheduling_key,
@@ -318,7 +318,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
   //static std::mutex priority_task_queues_not_pushed_lock;
   auto &lease_entry = worker_to_lease_entry_[addr];
-  const auto pri_it = priority_task_queues_not_pushed_.begin();
+  auto pri_it = priority_task_queues_not_pushed_.begin();
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
 								 << (current_time_ms() > lease_entry.lease_expiration_time)
@@ -328,6 +328,31 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     //priority_task_queues_not_pushed_lock.unlock();
     return;
   }
+
+	bool no_spilled_arguments = true;
+	while(no_spilled_arguments){
+		const auto &task = priority_to_task_spec_[*pri_it];
+		for (size_t i = 0; i < task.NumArgs(); i++) {
+			if (task.ArgByRef(i) && spilled_objects_.contains(task.ArgId(i))) {
+				no_spilled_arguments = false;
+				break;
+			}
+			for (const auto &in : task.ArgInlinedRefs(i)) {
+				auto object_id = ObjectID::FromBinary(in.object_id());
+				if (spilled_objects_.contains(object_id)) {
+					no_spilled_arguments = false;
+					break;
+				}
+			}
+		}
+		if (!no_spilled_arguments){
+			//pri_it = std::advance(pri_it,1);
+			pri_it++;
+			if (pri_it == priority_task_queues_not_pushed_.end()) {
+				return;
+			}
+		}
+	}
 
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
@@ -703,6 +728,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 								priority_task_queues_.emplace(pri);
 							}
 							if (reply.pulled_task()){
+								RAY_LOG(DEBUG) << "[JAE_DEBUG] strictly follow the req" << pri;
 								OnWorkerIdle(addr,
 														 scheduling_key,
 														 pri,

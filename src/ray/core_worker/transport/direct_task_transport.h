@@ -89,6 +89,10 @@ class CoreWorkerDirectTaskSubmitter {
         cancel_retry_timer_(std::move(cancel_timer)),
         get_task_priority_(get_task_priority) {}
 
+	absl::flat_hash_set<ObjectID> spilled_objects_;
+	void AddSpilledObject(const ObjectID &object_id){
+		spilled_objects_.emplace(object_id);
+	}
   /// Schedule a task for direct submission to a worker.
   ///
   /// \param[in] task_spec The task to schedule.

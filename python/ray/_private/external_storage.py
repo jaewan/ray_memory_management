@@ -175,6 +175,11 @@ class ExternalStorage(metaclass=abc.ABCMeta):
             address_len + metadata_len + buffer_len + self.HEADER_LENGTH
         )
         if data_size_in_bytes != obtained_data_size:
+            with open("/tmp/ray/restore_log", 'a+') as f:
+                f.write("Raising Error address_len:"+str(address_len)+ " metadata_len:" 
+                        + str(metadata_len) + " buffer_len:" + str(buffer_len) + " obtained_data_size:" + str(obtained_data_size) + "\n")
+                f.close()
+
             raise ValueError(
                 f"Obtained data has a size of {data_size_in_bytes}, "
                 "although it is supposed to have the "
@@ -319,6 +324,11 @@ class FileSystemStorage(ExternalStorage):
                 address_len = int.from_bytes(f.read(8), byteorder="little")
                 metadata_len = int.from_bytes(f.read(8), byteorder="little")
                 buf_len = int.from_bytes(f.read(8), byteorder="little")
+                with open("/tmp/ray/restore_log", 'a+') as restore_f:
+                    restore_f.write("address_len:"+str(address_len)+ " metadata_len:" + str(metadata_len) +
+                            " buffer_len:" + str(buf_len) + " parsed_result.size:" +
+                            str(parsed_result.size) + " from:" + base_url + " offset:"+str(offset) + "\n")
+                    restore_f.close()
                 self._size_check(address_len, metadata_len, buf_len, parsed_result.size)
                 total += buf_len
                 owner_address = f.read(address_len)
@@ -331,6 +341,22 @@ class FileSystemStorage(ExternalStorage):
 
     def delete_spilled_objects(self, urls: List[str]):
         for url in urls:
+            url_with_offset = url.decode()
+            # Retrieve the information needed.
+            parsed_result = parse_url_with_offset(url_with_offset)
+            base_url = parsed_result.base_url
+            offset = parsed_result.offset
+            # Read a part of the file and recover the object.
+            with open(base_url, "rb") as f:
+                f.seek(offset)
+                address_len = int.from_bytes(f.read(8), byteorder="little")
+                metadata_len = int.from_bytes(f.read(8), byteorder="little")
+                buf_len = int.from_bytes(f.read(8), byteorder="little")
+                with open("/tmp/ray/restore_log", 'a+') as restore_f:
+                    restore_f.write("Delete address_len:"+str(address_len)+ " metadata_len:" + str(metadata_len) +
+                            " buffer_len:" + str(buf_len) + " parsed_result.size:" +
+                            str(parsed_result.size) + " from:" + base_url + " offset:"+str(offset) + "\n")
+                    restore_f.close()
             path = parse_url_with_offset(url.decode()).base_url
             os.remove(path)
 
@@ -406,6 +432,9 @@ class ExternalStorageRayStorageImpl(ExternalStorage):
                 address_len = int.from_bytes(f.read(8), byteorder="little")
                 metadata_len = int.from_bytes(f.read(8), byteorder="little")
                 buf_len = int.from_bytes(f.read(8), byteorder="little")
+                with open("/tmp/ray/restore_log", 'a+') as f:
+                    f.write("address_len:"+str(address_len)+ " metadata_len:" + str(metadata_len) + " buffer_len:" + str(buffer_len) + " parsed_result.size:" + str(parsed_result.size))
+                    f.close()
                 self._size_check(address_len, metadata_len, buf_len, parsed_result.size)
                 total += buf_len
                 owner_address = f.read(address_len)
@@ -418,6 +447,22 @@ class ExternalStorageRayStorageImpl(ExternalStorage):
 
     def delete_spilled_objects(self, urls: List[str]):
         for url in urls:
+            url_with_offset = url.decode()
+            # Retrieve the information needed.
+            parsed_result = parse_url_with_offset(url_with_offset)
+            base_url = parsed_result.base_url
+            offset = parsed_result.offset
+            # Read a part of the file and recover the object.
+            with open(base_url, "rb") as f:
+                f.seek(offset)
+                address_len = int.from_bytes(f.read(8), byteorder="little")
+                metadata_len = int.from_bytes(f.read(8), byteorder="little")
+                buf_len = int.from_bytes(f.read(8), byteorder="little")
+                with open("/tmp/ray/restore_log", 'a+') as restore_f:
+                    restore_f.write("Delete address_len:"+str(address_len)+ " metadata_len:" + str(metadata_len) +
+                            " buffer_len:" + str(buf_len) + " parsed_result.size:" +
+                            str(parsed_result.size) + " from:" + base_url + " offset:"+str(offset) + "\n")
+                    restore_f.close()
             path = parse_url_with_offset(url.decode()).base_url
             self._fs.delete_file(path)
 

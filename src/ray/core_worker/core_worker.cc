@@ -2315,6 +2315,7 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
   // execution and unpinned once the task completes. We will notify the caller
   // about any IDs that we are still borrowing by the time the task completes.
   std::vector<ObjectID> borrowed_ids;
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling GetAndPinArgsForExecutor";
   RAY_CHECK_OK(GetAndPinArgsForExecutor(task_spec, &args, &arg_refs, &borrowed_ids));
 
   std::vector<ObjectID> return_ids;
@@ -2356,6 +2357,7 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
     name_of_concurrency_group_to_execute = task_spec.ConcurrencyGroupName();
   }
 
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling task_execution_callback";
   status = options_.task_execution_callback(
       task_type,
       task_spec.GetName(),
@@ -2379,9 +2381,11 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
   // that were contained in a borrowed ID that we (or a nested task) are now
   // borrowing.
   std::vector<ObjectID> deleted;
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling PopAndClearLocalBorrowers";
   if (!borrowed_ids.empty()) {
     reference_counter_->PopAndClearLocalBorrowers(borrowed_ids, borrowed_refs, &deleted);
   }
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling memory_store Delete";
   memory_store_->Delete(deleted);
 
   if (task_spec.IsNormalTask() && reference_counter_->NumObjectIDsInScope() != 0) {
@@ -2998,7 +3002,9 @@ void CoreWorker::AddSpilledObjectLocationOwner(const ObjectID &object_id,
       reference_counter_->HandleObjectSpilled(object_id, spilled_url, spilled_node_id);
   if (!reference_exists) {
     RAY_LOG(DEBUG) << "Object " << object_id << " not found";
-  }
+  }else{
+		direct_task_submitter_->AddSpilledObject(object_id);
+	}
 }
 
 void CoreWorker::AddObjectLocationOwner(const ObjectID &object_id,
@@ -3303,6 +3309,7 @@ void CoreWorker::HandleDeleteSpilledObjects(
     spilled_objects_url.reserve(request.spilled_objects_url_size());
     for (const auto &url : request.spilled_objects_url()) {
       spilled_objects_url.push_back(url);
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleDeleteSpilledObjects delete spilled objects in location:" << url;
     }
     options_.delete_spilled_objects(spilled_objects_url, worker_context_.GetWorkerType());
     send_reply_callback(Status::OK(), nullptr, nullptr);

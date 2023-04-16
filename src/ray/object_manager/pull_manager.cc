@@ -474,6 +474,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   if (!direct_restore_url.empty()) {
     // Select an url from the object directory update
     UpdateRetryTimer(request, object_id);
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] calling restore worker for object:" << object_id;
     restore_spilled_object_(object_id,
                             request.object_size,
                             direct_restore_url,
@@ -591,6 +592,7 @@ bool PullManager::TryPinObject(const ObjectID &object_id) {
   if (pinned_objects_.count(object_id) == 0) {
     auto ref = pin_object_(object_id);
     if (ref != nullptr) {
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] TryPinObject obj:" << object_id << " succeeded from getting from plasma store";
       num_succeeded_pins_total_++;
       pinned_objects_size_ += ref->GetSize();
       pinned_objects_[object_id] = std::move(ref);
@@ -607,6 +609,7 @@ bool PullManager::TryPinObject(const ObjectID &object_id) {
       }
     } else {
       num_failed_pins_total_++;
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] TryPinObject obj:" << object_id << " failed from getting from plasma store";
     }
   }
   return pinned_objects_.count(object_id) > 0;
