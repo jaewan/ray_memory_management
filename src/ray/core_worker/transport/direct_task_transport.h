@@ -93,6 +93,9 @@ class CoreWorkerDirectTaskSubmitter {
 	void AddSpilledObject(const ObjectID &object_id){
 		spilled_objects_.emplace(object_id);
 	}
+	void RemoveSpilledObject(const ObjectID &object_id){
+		spilled_objects_.erase(object_id);
+	}
   /// Schedule a task for direct submission to a worker.
   ///
   /// \param[in] task_spec The task to schedule.

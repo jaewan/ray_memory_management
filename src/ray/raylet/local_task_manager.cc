@@ -655,6 +655,7 @@ bool LocalTaskManager::PinTaskArgsIfMemoryAvailable(const TaskSpecification &spe
             << " was evicted before the task could be dispatched. This can happen "
                "when there are many objects needed on this node. The task will be "
                "scheduled once all of its dependencies are local.";
+				waited_for_task_args_.emplace(spec.TaskId());
         *args_missing = true;
         return false;
       }

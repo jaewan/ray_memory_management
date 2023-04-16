@@ -3282,15 +3282,12 @@ void CoreWorker::HandleRestoreSpilledObjects(
     for (const auto &url : request.spilled_objects_url()) {
       spilled_objects_url.push_back(url);
     }
-		int i=0;
-		for (const auto &obj_id : object_refs_to_restore){
-			RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleRestoreSpilledObjects restore obj:" 
-				<< ObjectID::FromBinary(obj_id.object_id()) << " url:" << spilled_objects_url[i];
-			i++;
-		}
     auto total =
         options_.restore_spilled_objects(object_refs_to_restore, spilled_objects_url);
     reply->set_bytes_restored_total(total);
+		for (const auto &obj_id : object_refs_to_restore){
+			direct_task_submitter_->RemoveSpilledObject(ObjectID::FromBinary(obj_id.object_id()));
+		}
     send_reply_callback(Status::OK(), nullptr, nullptr);
   } else {
     send_reply_callback(
@@ -3307,10 +3304,6 @@ void CoreWorker::HandleDeleteSpilledObjects(
   if (options_.delete_spilled_objects != nullptr) {
     std::vector<std::string> spilled_objects_url;
     spilled_objects_url.reserve(request.spilled_objects_url_size());
-    for (const auto &url : request.spilled_objects_url()) {
-      spilled_objects_url.push_back(url);
-			RAY_LOG(DEBUG) << "[JAE_DEBUG] HandleDeleteSpilledObjects delete spilled objects in location:" << url;
-    }
     options_.delete_spilled_objects(spilled_objects_url, worker_context_.GetWorkerType());
     send_reply_callback(Status::OK(), nullptr, nullptr);
   } else {

@@ -253,6 +253,17 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool was_error,
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
+	// Calling this function means all its arguments are present in the object store
+	const auto &task = priority_to_task_spec_[lease_granted_pri];
+	for (size_t i = 0; i < task.NumArgs(); i++) {
+		if (task.ArgByRef(i)) {
+			spilled_objects_.erase(task.ArgId(i));
+		}
+		for (const auto &in : task.ArgInlinedRefs(i)) {
+			auto object_id = ObjectID::FromBinary(in.object_id());
+			spilled_objects_.erase(object_id);
+		}
+	}
 	// This is because the lease granted task has already been pushed as core_worker pushes
 	// tasks to workers regardless of granted task
 	if(!priority_to_task_spec_.contains(lease_granted_pri) || !priority_task_queues_not_pushed_.contains(lease_granted_pri)){
@@ -278,8 +289,8 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
-  if ((was_error || worker_exiting ||
-       current_time_ms() > lease_entry.lease_expiration_time)) {
+  if ((was_error || worker_exiting )){
+       //current_time_ms() > lease_entry.lease_expiration_time)) {
     RAY_CHECK(active_workers_.size() >= 1);
 
     // Return the worker only if there are no tasks to do.
@@ -291,6 +302,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 
     Priority pri(lease_granted_pri.score);
 		priority_task_queues_.erase(pri);
+    priority_task_queues_not_pushed_.erase(pri);
     while (!lease_entry.is_busy) {
       const auto &task_spec = priority_to_task_spec_[pri];
       lease_entry.is_busy = true;
@@ -299,10 +311,11 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       num_busy_workers_++;
 
       executing_tasks_.emplace(task_spec.TaskId(), addr);
+      lease_entry.lease_expiration_time = current_time_ms() - 1;
       PushNormalTask(addr, client, scheduling_key, task_spec, assigned_resources);
       const auto it = tasks_.find(task_spec.TaskId());
       scheduling_key_entries_[scheduling_key].task_priority_queue.erase(it->second.task_key);
-      //tasks_.erase(task_spec.TaskId());
+      tasks_.erase(task_spec.TaskId());
     }
 
     CancelWorkerLeaseIfNeeded(scheduling_key);
@@ -316,43 +329,15 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     bool was_error,
     bool worker_exiting,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
-  //static std::mutex priority_task_queues_not_pushed_lock;
   auto &lease_entry = worker_to_lease_entry_[addr];
   auto pri_it = priority_task_queues_not_pushed_.begin();
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
 								 << (current_time_ms() > lease_entry.lease_expiration_time)
 							   << " should be blocked:" << (*pri_it > block_requested_priority_[addr.raylet_id]);
-  //priority_task_queues_not_pushed_lock.lock();
   if (!lease_entry.lease_client && pri_it == priority_task_queues_not_pushed_.end()) {
-    //priority_task_queues_not_pushed_lock.unlock();
     return;
   }
-
-	bool no_spilled_arguments = true;
-	while(no_spilled_arguments){
-		const auto &task = priority_to_task_spec_[*pri_it];
-		for (size_t i = 0; i < task.NumArgs(); i++) {
-			if (task.ArgByRef(i) && spilled_objects_.contains(task.ArgId(i))) {
-				no_spilled_arguments = false;
-				break;
-			}
-			for (const auto &in : task.ArgInlinedRefs(i)) {
-				auto object_id = ObjectID::FromBinary(in.object_id());
-				if (spilled_objects_.contains(object_id)) {
-					no_spilled_arguments = false;
-					break;
-				}
-			}
-		}
-		if (!no_spilled_arguments){
-			//pri_it = std::advance(pri_it,1);
-			pri_it++;
-			if (pri_it == priority_task_queues_not_pushed_.end()) {
-				return;
-			}
-		}
-	}
 
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
@@ -366,9 +351,35 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
     if (!lease_entry.is_busy) {
       ReturnWorker(addr, was_error, worker_exiting);
     }else{
-	  RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
 		}
   } else {
+		bool spilled_arguments = true;
+		while(spilled_arguments){
+			spilled_arguments = false;
+			const auto &task = priority_to_task_spec_[*pri_it];
+			for (size_t i = 0; i < task.NumArgs(); i++) {
+				if (task.ArgByRef(i) && spilled_objects_.contains(task.ArgId(i))) {
+					spilled_arguments = true;
+					break;
+				}
+				for (const auto &in : task.ArgInlinedRefs(i)) {
+					auto object_id = ObjectID::FromBinary(in.object_id());
+					if (spilled_objects_.contains(object_id)) {
+						spilled_arguments = true;
+						break;
+					}
+				}
+			}
+			if(spilled_arguments){
+				// TODO(JAE) remove items from the map later
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle priority:" << *pri_it << " has spilled args, skipping";
+				pri_it++;
+				if (pri_it == priority_task_queues_not_pushed_.end()) {
+					return;
+				}
+			}
+		}	
     const Priority pri(pri_it->score);
 		priority_task_queues_.erase(pri);
     priority_task_queues_not_pushed_.erase(pri_it);
