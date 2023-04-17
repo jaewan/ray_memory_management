@@ -140,6 +140,31 @@ cc_library(
     ],
 )
 
+# RSTODO: Delete later?
+cc_grpc_library(
+    name = "remote_spill_cc_grpc",
+    srcs = ["//src/ray/protobuf:remote_spill_proto"],
+    grpc_only = True,
+    deps = ["//src/ray/protobuf:remote_spill_cc_proto"],
+)
+
+# RSTODO: Delete later?
+cc_library(
+    name = "remote_spill_rpc",
+    hdrs = glob([
+        "src/ray/rpc/remote_spill/*.h",
+    ]),
+    copts = COPTS,
+    strip_include_prefix = "src",
+    deps = [
+        ":grpc_common_lib",
+        ":remote_spill_cc_grpc",
+        ":ray_common",
+        "@boost//:asio",
+        "@com_github_grpc_grpc//:grpc++",
+    ],
+)
+
 # Worker gRPC lib.
 cc_grpc_library(
     name = "worker_cc_grpc",
@@ -2167,6 +2192,7 @@ cc_library(
         ":core_worker_lib",
         ":gcs",
         ":object_manager_rpc",
+        ":remote_spill_rpc",
         ":plasma_store_server_lib",
         ":ray_common",
         ":ray_util",

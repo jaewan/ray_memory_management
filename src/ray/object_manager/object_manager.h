@@ -45,8 +45,8 @@
 #include "ray/rpc/object_manager/object_manager_client.h"
 #include "ray/rpc/object_manager/object_manager_server.h"
 /// RSCODE:
-#include "ray/rpc/object_manager/remote_spill_client.h"
-#include "ray/rpc/object_manager/remote_spill_server.h"
+#include "ray/rpc/remote_spill/remote_spill_client.h"
+#include "ray/rpc/remote_spill/remote_spill_server.h"
 #include "src/ray/protobuf/common.pb.h"
 #include "src/ray/protobuf/node_manager.pb.h"
 
@@ -114,6 +114,82 @@ class ObjectManagerInterface {
   virtual ~ObjectManagerInterface(){};
 };
 
+// class RemoteSpill : public rpc::RemoteSpillServiceHandler {
+//   public: 
+//     /// RSGRPC: (GRPC)
+//     /// Handle spill remote request
+//     ///
+//     /// \param request Spill remote request
+//     /// \param reply Reply
+//     /// \param send_reply_callback
+//     void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+//                           rpc::SpillRemoteReply *reply,
+//                           rpc::SendReplyCallback send_reply_callback) override;
+
+//     /// RSCODE:
+//     /// \param object_id The object's object id.
+//     /// \return Void.
+//     void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback);
+
+//   public: 
+//     RemoteSpill();
+//     /// The gPRC server.
+//     // rpc::GrpcServer remote_spill_server_;
+    
+//     /// RSCODE: Keep rpc service running when no task in rpc service.
+//     boost::asio::io_service::work remote_spill_rpc_work_;
+
+//     /// RSCODE: Multi-thread asio service, deal with all outgoing and incoming RPC request.
+//     instrumented_io_context remote_spill_rpc_service_;
+
+//     /// The gRPC service.
+//     rpc::RemoteSpillGrpcService remote_spill_service_;
+
+//     /// The thread pool used for running `rpc_service`.
+//     /// Data copy operations during request are done in this thread pool.
+//     std::vector<std::thread> remote_spill_rpc_threads_;
+// };
+
+/// RSCODE:
+class RemoteSpill : public rpc::RemoteSpillServiceHandler {
+ public:
+  explicit RemoteSpill(const ObjectManagerConfig &config)
+      : buffer_pool_store_client_(std::make_shared<plasma::PlasmaClient>()),
+        buffer_pool_(buffer_pool_store_client_, config.object_chunk_size) {
+    
+    RAY_CHECK_OK(
+      buffer_pool_store_client_->Connect(config.store_socket_name.c_str(), "", 0, 300));
+  }
+
+  /// RSGRPC: (GRPC)
+  /// Handle spill remote request
+  ///
+  /// \param request Spill remote request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+                        rpc::SpillRemoteReply *reply,
+                        rpc::SendReplyCallback send_reply_callback) override;
+
+ private:
+  bool RemoteSpillReceiveObjectChunk(const NodeID &node_id,
+                                     const ObjectID &object_id,
+                                     const rpc::Address &owner_address,
+                                     uint64_t data_size,
+                                     uint64_t metadata_size,
+                                     uint64_t chunk_index,
+                                     const std::string &data,
+                                     const bool from_remote = false,
+                                     const bool from_remote_spill = false);
+
+  // Used by the buffer pool to read and write objects in the local store
+  /// during object transfers.
+  std::shared_ptr<plasma::PlasmaClient> buffer_pool_store_client_;
+
+  /// Manages accesses to local objects for object transfers.
+  ObjectBufferPool buffer_pool_;
+};
+
 // TODO(hme): Add success/failure callbacks for push and pull.
 class ObjectManager : public ObjectManagerInterface,
                       public rpc::ObjectManagerServiceHandler {
@@ -132,6 +208,16 @@ class ObjectManager : public ObjectManagerInterface,
                   rpc::PushReply *reply,
                   rpc::SendReplyCallback send_reply_callback) override;
 
+  // /// RSGRPC: (GRPC)
+  // /// Handle spill remote request
+  // ///
+  // /// \param request Spill remote request
+  // /// \param reply Reply
+  // /// \param send_reply_callback
+  // void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+  //                       rpc::SpillRemoteReply *reply,
+  //                       rpc::SendReplyCallback send_reply_callback) override;
+
   /// Handle pull request from remote object manager
   ///
   /// \param request Pull request
@@ -148,16 +234,6 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param send_reply_callback
   void HandleFreeObjects(const rpc::FreeObjectsRequest &request,
                          rpc::FreeObjectsReply *reply,
-                         rpc::SendReplyCallback send_reply_callback) override;
-
-  /// RSGRPC: (GRPC)
-  /// Handle spill remote request
-  ///
-  /// \param request Spill remote request
-  /// \param reply Reply
-  /// \param send_reply_callback
-  void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
-                         rpc::SpillRemoteReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
 
   /// RSGRPC: (GRPC)
@@ -416,13 +492,15 @@ class ObjectManager : public ObjectManagerInterface,
                        const ObjectID &object_id,
                        const NodeID &node_id,
                        uint64_t chunk_index,
-                       std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
+                       std::shared_ptr<rpc::RemoteSpillClient> rpc_client,
                        std::function<void(const Status &)> on_complete,
                        std::shared_ptr<ChunkObjectReader> chunk_reader);
 
   /// Handle starting, running, and stopping asio rpc_service.
   void StartRpcService();
   void RunRpcService(int index);
+  /// RSCODE:
+  void RunRemoteSpillRpcService(int index);
   void StopRpcService();
 
   /// Handle an object being added to this node. This adds the object to the
@@ -502,7 +580,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// Get the rpc client according to the node ID
   ///
   /// \param node_id Remote node id, will send rpc request to it
-  // std::shared_ptr<rpc::RemoteSpillClient> GetRemoteSpillRpcClient(const NodeID &node_id);
+  std::shared_ptr<rpc::RemoteSpillClient> GetRemoteSpillRpcClient(const NodeID &node_id);
 
   /// Weak reference to main service. We ensure this object is destroyed before
   /// main_service_ is stopped.
@@ -526,12 +604,22 @@ class ObjectManager : public ObjectManagerInterface,
   /// Multi-thread asio service, deal with all outgoing and incoming RPC request.
   instrumented_io_context rpc_service_;
 
+  /// RSCODE: Multi-thread asio service, deal with all outgoing and incoming RPC request.
+  instrumented_io_context remote_spill_rpc_service_;
+
   /// Keep rpc service running when no task in rpc service.
   boost::asio::io_service::work rpc_work_;
+
+  /// RSCODE: Keep rpc service running when no task in rpc service.
+  boost::asio::io_service::work remote_spill_rpc_work_;
 
   /// The thread pool used for running `rpc_service`.
   /// Data copy operations during request are done in this thread pool.
   std::vector<std::thread> rpc_threads_;
+
+  /// The thread pool used for running `rpc_service`.
+  /// Data copy operations during request are done in this thread pool.
+  std::vector<std::thread> remote_spill_rpc_threads_;
 
   /// Mapping from locally available objects to information about those objects
   /// including when the object was last pushed to other object managers.
@@ -567,12 +655,20 @@ class ObjectManager : public ObjectManagerInterface,
   /// The gRPC service.
   rpc::ObjectManagerGrpcService object_manager_service_;
 
+  /// RSCODE:
+  std::unique_ptr<rpc::RemoteSpillServiceHandler> remote_spill_service_handler_;
+  rpc::RemoteSpillGrpcService remote_spill_service_;
+
   /// The client call manager used to deal with reply.
   rpc::ClientCallManager client_call_manager_;
 
   /// Client id - object manager gRPC client.
   absl::flat_hash_map<NodeID, std::shared_ptr<rpc::ObjectManagerClient>>
       remote_object_manager_clients_;
+
+  /// RSCODE:
+  absl::flat_hash_map<NodeID, std::shared_ptr<rpc::RemoteSpillClient>>
+      remote_spill_clients_;
 
   /// Callback to trigger direct restoration of an object.
   const RestoreSpilledObjectCallback restore_spilled_object_;
