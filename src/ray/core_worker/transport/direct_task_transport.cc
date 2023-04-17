@@ -372,10 +372,11 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 				}
 			}
 			if(spilled_arguments){
-				// TODO(JAE) remove items from the map later
 				RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle priority:" << *pri_it << " has spilled args, skipping";
 				pri_it++;
 				if (pri_it == priority_task_queues_not_pushed_.end()) {
+					ReturnWorker(addr, was_error, worker_exiting);
+					RequestNewWorkerIfNeeded(scheduling_key);
 					return;
 				}
 			}
