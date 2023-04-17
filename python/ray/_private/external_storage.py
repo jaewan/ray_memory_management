@@ -471,8 +471,8 @@ class ExternalStorageRayStorageImpl(ExternalStorage):
                     restore_f.write("Delete address_len:"+str(address_len)+ " metadata_len:" + str(metadata_len) +
                             " buffer_len:" + str(buf_len) + " parsed_result.size:" +
                             str(parsed_result.size) + " from:" + base_url + " offset:"+str(offset) + "\n")
-                '''
                     restore_f.close()
+                '''
             path = parse_url_with_offset(url.decode()).base_url
             self._fs.delete_file(path)
 
