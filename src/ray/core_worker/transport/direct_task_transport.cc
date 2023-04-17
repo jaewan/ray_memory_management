@@ -25,24 +25,29 @@ namespace ray {
 namespace core {
 
 inline void LeaseGrant(const std::string &fnc_name, const Priority &pri, int request_num, bool is_spillback){
+	/*
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
   stream << fnc_name << " " << pri << " request_num: " << request_num << " remote worker:" << is_spillback << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
+	*/
 }
 
 inline void LogPlaceSeq(const std::string &fnc_name, const Priority &pri){
+	/*
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
   stream << fnc_name << " " << pri << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
+	*/
 }
 
 inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, const Priority &pri, ray::NodeID raylet_id){
+	/*
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
   stream << task_id <<" " <<
@@ -50,6 +55,7 @@ inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, cons
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
+	*/
 }
 
 Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {

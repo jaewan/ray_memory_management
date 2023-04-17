@@ -51,12 +51,14 @@ ClusterTaskManager::ClusterTaskManager(
       get_time_ms_(get_time_ms){}
 
 inline void LogLeaseSeq(const std::string &fnc_name, const Priority &pri){
+	/*
   std::ofstream log_stream("/tmp/ray/raylet_log", std::ios_base::app);
   std::ostringstream stream;
   stream << fnc_name << " " << pri << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
+	*/
 }
 
 void ClusterTaskManager::QueueAndScheduleTask(
