@@ -778,7 +778,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               RequestNewWorkerIfNeeded(scheduling_key, &reply.retry_at_raylet_address());
             }
           } else if (lease_client != local_lease_client_) {
-            RAY_CHECK(false) << "Jae you should handle worker lease remote raylet failure"; // TODO(Jae) Handle this case for DFS patch
 						if(priority_task_queues_not_pushed_.contains(pri)){
 							priority_task_queues_.emplace(pri);
 						}
