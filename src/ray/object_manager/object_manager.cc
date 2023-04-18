@@ -1122,12 +1122,12 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
 
   // keep track of received objects. 
   // doesn't care about fault tolerance. 
-  // if (from_remote_spill) {
-  //   if (!received_remote_objects_origin_.contains(object_id)) {
-  //     received_remote_objects_origin_.emplace(object_id, node_id);
-  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  //   }
-  // }
+  if (from_remote_spill) {
+    if (!received_remote_objects_origin_.contains(object_id)) {
+      received_remote_objects_origin_.emplace(object_id, node_id);
+      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    }
+  }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {
