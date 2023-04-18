@@ -487,8 +487,7 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
   RAY_LOG(INFO) << "About to free object in remote node: " << object_id;
 
   auto it = local_objects_.find(object_id);
-  if (it == local_objects_.end() || it->second.second) {
-  } else {
+  if (!(it == local_objects_.end())) {
     RemoteSpillDecrementRefCount(object_id);
   }
 
