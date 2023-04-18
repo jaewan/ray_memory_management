@@ -486,7 +486,11 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
   /// RSTODO: Delete this later
   RAY_LOG(INFO) << "About to free object in remote node: " << object_id;
 
-  RemoteSpillDecrementRefCount(object_id);
+  auto it = local_objects_.find(object_id);
+  if (it == local_objects_.end() || it->second.second) {
+  } else {
+    RemoteSpillDecrementRefCount(object_id);
+  }
 
   // remote_spill_service_handler_.received_remote_objects_origin_.erase(object_id);
 
