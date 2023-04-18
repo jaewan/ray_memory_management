@@ -384,7 +384,7 @@ void ObjectManager::HandlePushTaskTimeout(const ObjectID &object_id,
   auto iter = unfulfilled_push_requests_.find(object_id);
   // Under this scenario, `HandlePushTaskTimeout` can be invoked
   // although timer cancels it.
-  // 1. wait timer is done and the task is queued.
+  // 1. wait timer is done and the task is queued.f
   // 2. While task is queued, timer->cancel() is invoked.
   // In this case this method can be invoked although it is not timed out.
   // https://www.boost.org/doc/libs/1_66_0/doc/html/boost_asio/reference/basic_deadline_timer/cancel/overload1.html.
@@ -1123,10 +1123,12 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   // keep track of received objects. 
   // doesn't care about fault tolerance. 
   if (from_remote_spill) {
-    if (!received_remote_objects_origin_.contains(object_id)) {
-      received_remote_objects_origin_.emplace(object_id, node_id);
-      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    }
+    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    /// RSTODO: Add back later
+    // if (!received_remote_objects_origin_.contains(object_id)) {
+    //   received_remote_objects_origin_.emplace(object_id, node_id);
+    //   buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    // }
   }
 
   /// RSCODE: Try incrementing object count before write chunk
