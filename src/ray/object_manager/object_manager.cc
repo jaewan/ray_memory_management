@@ -488,7 +488,7 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
 
   RemoteSpillDecrementRefCount(object_id);
 
-  received_remote_objects_origin_.erase(object_id);
+  // remote_spill_service_handler_.received_remote_objects_origin_.erase(object_id);
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
@@ -1120,12 +1120,10 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   // keep track of received objects. 
   // doesn't care about fault tolerance. 
   if (from_remote_spill) {
-    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    /// RSTODO: Put back later
-    // if (!received_remote_objects_origin_.contains(object_id)) {
-    //   received_remote_objects_origin_.emplace(object_id, node_id);
-    //   buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    // }
+    if (!received_remote_objects_origin_.contains(object_id)) {
+      received_remote_objects_origin_.emplace(object_id, node_id);
+      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    }
   }
 
   /// RSCODE: Try incrementing object count before write chunk
@@ -1202,12 +1200,12 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
 
   // keep track of received objects. 
   // doesn't care about fault tolerance. 
-  if (from_remote_spill) {
-    if (!received_remote_objects_origin_.contains(object_id)) {
-      received_remote_objects_origin_.emplace(object_id, node_id);
-      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    }
-  }
+  // if (from_remote_spill) {
+  //   if (!received_remote_objects_origin_.contains(object_id)) {
+  //     received_remote_objects_origin_.emplace(object_id, node_id);
+  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  //   }
+  // }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {

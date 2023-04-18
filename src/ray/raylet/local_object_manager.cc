@@ -114,11 +114,11 @@ bool LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
   RAY_LOG(DEBUG) << "Calling Released Freed Object on: " << object_id;
 
   /// RSCODE: Only free object if it's not spilling to remote
-  absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
-  if (objects_pending_spill_.count(object_id) > 0 && spill_remote_mapping.count(object_id) > 0) {
-    RAY_LOG(INFO) << "We are preventing freeing because it is currently spilling to remote";
-    return false;
-  }
+  // absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
+  // if (objects_pending_spill_.count(object_id) > 0 && spill_remote_mapping.count(object_id) > 0) {
+  //   RAY_LOG(INFO) << "We are preventing freeing because it is currently spilling to remote";
+  //   return false;
+  // }
 
   // Only free the object if it is not already freed.
   auto it = local_objects_.find(object_id);

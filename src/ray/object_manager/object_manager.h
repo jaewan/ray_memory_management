@@ -171,6 +171,9 @@ class RemoteSpill : public rpc::RemoteSpillServiceHandler {
                         rpc::SpillRemoteReply *reply,
                         rpc::SendReplyCallback send_reply_callback) override;
 
+  /// RSCODE: add getter function for the flat_hash_map.
+  absl::flat_hash_map<ObjectID, NodeID> GetObjectsFromRemote() { return received_remote_objects_origin_; }
+
  private:
   bool RemoteSpillReceiveObjectChunk(const NodeID &node_id,
                                      const ObjectID &object_id,
@@ -188,6 +191,8 @@ class RemoteSpill : public rpc::RemoteSpillServiceHandler {
 
   /// Manages accesses to local objects for object transfers.
   ObjectBufferPool buffer_pool_;
+
+  absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
 };
 
 // TODO(hme): Add success/failure callbacks for push and pull.
@@ -398,9 +403,6 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE: add getter function for the flat_hash_map.
   absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteMapping() { return spilled_remote_objects_url_; }
-
-  /// RSCODE: add getter function for the flat_hash_map.
-  absl::flat_hash_map<ObjectID, NodeID> GetObjectsFromRemote() { return received_remote_objects_origin_; }
 
  private:
   friend class TestObjectManager;
@@ -629,7 +631,7 @@ class ObjectManager : public ObjectManagerInterface,
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
 
   /// RSCODE: Mapping from object ids to rpc origin node addresses.
-  absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
+  // absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
 
   /// RSCODE: Mapping from object ids to rpc node addresses to free later
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_to_free_;
