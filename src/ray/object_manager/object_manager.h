@@ -404,6 +404,11 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE: add getter function for the flat_hash_map.
   absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteMapping() { return spilled_remote_objects_url_; }
 
+  /// RSCODE:
+  absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteFreeMapping() { return spilled_remote_objects_to_free_; }
+
+  void AddToSpilledRemoteMap(ObjectID object_id, NodeID node_id) {spilled_remote_objects_url_.emplace(object_id, node_id); }
+
  private:
   friend class TestObjectManager;
 

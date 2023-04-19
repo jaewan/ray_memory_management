@@ -545,7 +545,7 @@ void ObjectManager::HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemo
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback) {
   /// RSCODE: Add code to add object id to node id mapping
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
-  spilled_remote_objects_url_.emplace(object_id, node_id);
+  // spilled_remote_objects_url_.emplace(object_id, node_id);
   spilled_remote_objects_to_free_.emplace(object_id, node_id);
 
   if (pulled_objects_from_remote_.contains(object_id)) {
@@ -1124,7 +1124,7 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   // doesn't care about fault tolerance. 
   if (from_remote_spill) {
     if (!received_remote_objects_origin_.contains(object_id)) {
-      RAY_LOG(INFO) << "Increasing ref count of about for remote spill";
+      RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
       received_remote_objects_origin_.emplace(object_id, node_id);
       buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
     }

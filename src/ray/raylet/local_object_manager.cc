@@ -354,6 +354,11 @@ void LocalObjectManager::SpillObjectsInternal(
       RAY_LOG(INFO) << "Callback test";
 
       // object_manager_.RemoteSpillIncrementRefCount(object_id);
+
+      // Add to hashmap of spilled objects
+      absl::flat_hash_map<ObjectID, NodeID> spill_remote_free_mapping = object_manager_.GetSpillRemoteFreeMapping();
+      auto it = spill_remote_free_mapping.find(object_id);
+      object_manager_.AddToSpilledRemoteMap(object_id, it->second);
       
       /// RSTODO: Delete later
       RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;

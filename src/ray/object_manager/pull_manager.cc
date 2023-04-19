@@ -593,7 +593,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
       // Select an url from the object directory update
       UpdateRetryTimer(request, object_id);
       /// RSTODO: Delete this later
-      RAY_LOG(INFO) << "Restoring from disk";
+      RAY_LOG(INFO) << "Restoring from disk for object: " << object_id;
       restore_spilled_object_(object_id,
                               request.object_size,
                               direct_restore_url,
