@@ -133,6 +133,7 @@ class CoreWorkerDirectTaskSubmitter {
   void ReportWorkerBacklog();
 
  private:
+	std::pair<Priority*, bool> GetNextTaskToPush();
   /// Schedule more work onto an idle worker or return it back to the raylet if
   /// no more tasks are queued for submission. If an error was encountered
   /// processing the worker, we don't attempt to re-use the worker.

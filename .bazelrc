@@ -200,4 +200,3 @@ try-import %workspace%/.llvm-local.bazelrc
 build:macos --sandbox_block_path=/usr/local/
 #This option controls whether javac checks for missing direct dependencies.
 build --strict_java_deps=off
-build --local_cpu_resources=HOST_CPUS-16
