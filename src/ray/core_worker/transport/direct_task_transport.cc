@@ -917,6 +917,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
           }
         }
 
+		    priority_to_task_spec_.erase(pri);
         if (!status.ok()) {
           // TODO: It'd be nice to differentiate here between process vs node
           // failure (e.g., by contacting the raylet). If it was a process
@@ -931,7 +932,8 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
               !task_finisher_->RetryTaskIfPossible(task_id)) {
             task_finisher_->CompletePendingTask(task_id, reply, addr.ToProto());
           }
-		  		priority_to_task_spec_.erase(pri);
+					//TODO(Jae) This is original. If somehting wrong remove upper one and revive this
+		  		//priority_to_task_spec_.erase(pri);
         }
       });
 }
