@@ -412,6 +412,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       const auto it = tasks_.find(task_spec.TaskId());
       scheduling_key_entries_[scheduling_key].task_priority_queue.erase(it->second.task_key);
       tasks_.erase(task_spec.TaskId());
+		  priority_to_task_spec_.erase(pri);
     }
 
     CancelWorkerLeaseIfNeeded(scheduling_key);
