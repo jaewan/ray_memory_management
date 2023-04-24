@@ -178,6 +178,10 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto ptqnp_inserted = priority_task_queues_not_pushed_.emplace(priority);
         RAY_CHECK(ptqnp_inserted.second);
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
+				if(!ptts_inserted.second){
+					priority_to_task_spec_.erase(priority);
+					priority_to_task_spec_.emplace(priority, task_spec);
+				}
         //RAY_CHECK(ptts_inserted.second);
 
         RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first;
