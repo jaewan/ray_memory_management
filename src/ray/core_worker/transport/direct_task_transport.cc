@@ -178,7 +178,7 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto ptqnp_inserted = priority_task_queues_not_pushed_.emplace(priority);
         RAY_CHECK(ptqnp_inserted.second);
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
-        RAY_CHECK(ptts_inserted.second);
+        //RAY_CHECK(ptts_inserted.second);
 
         RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first;
         scheduling_key_entry.resource_spec = task_spec;
@@ -892,7 +892,6 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
        scheduling_key,
        addr,
        assigned_resources](Status status, const rpc::PushTaskReply &reply) {
-		    priority_to_task_spec_.erase(pri);
         {
           RAY_LOG(DEBUG) << "Task " << task_id << " finished from worker "
                          << addr.worker_id << " of raylet " << addr.raylet_id;
@@ -935,7 +934,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
             task_finisher_->CompletePendingTask(task_id, reply, addr.ToProto());
           }
 					//TODO(Jae) This is original. If somehting wrong remove one in OnWorkerIdle and revive this
-		  		//priority_to_task_spec_.erase(pri);
+		  		priority_to_task_spec_.erase(pri);
         }
       });
 }
