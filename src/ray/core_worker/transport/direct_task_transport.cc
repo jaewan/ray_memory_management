@@ -892,6 +892,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
        scheduling_key,
        addr,
        assigned_resources](Status status, const rpc::PushTaskReply &reply) {
+		    priority_to_task_spec_.erase(pri);
         {
           RAY_LOG(DEBUG) << "Task " << task_id << " finished from worker "
                          << addr.worker_id << " of raylet " << addr.raylet_id;
