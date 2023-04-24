@@ -349,6 +349,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       const auto it = tasks_.find(task_spec.TaskId());
       scheduling_key_entries_[scheduling_key].task_priority_queue.erase(it->second.task_key);
       tasks_.erase(task_spec.TaskId());
+		  priority_to_task_spec_.erase(pri);
     }
 
     CancelWorkerLeaseIfNeeded(scheduling_key);
@@ -917,7 +918,6 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
           }
         }
 
-		    priority_to_task_spec_.erase(pri);
         if (!status.ok()) {
           // TODO: It'd be nice to differentiate here between process vs node
           // failure (e.g., by contacting the raylet). If it was a process
@@ -932,7 +932,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
               !task_finisher_->RetryTaskIfPossible(task_id)) {
             task_finisher_->CompletePendingTask(task_id, reply, addr.ToProto());
           }
-					//TODO(Jae) This is original. If somehting wrong remove upper one and revive this
+					//TODO(Jae) This is original. If somehting wrong remove one in OnWorkerIdle and revive this
 		  		//priority_to_task_spec_.erase(pri);
         }
       });
