@@ -373,8 +373,7 @@ void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
 
   const auto &task = work->task;
   const auto &task_spec = task.GetTaskSpecification();
-  RAY_LOG(DEBUG) << "Spilling task " << task_spec.TaskId() << " to node " << spillback_to 
-								 << " block_requested_priority_:" << block_requested_priority_;
+  RAY_LOG(DEBUG) << "Spilling task " << task_spec.TaskId() << " to node " << spillback_to;
 
   if (!cluster_resource_scheduler_->AllocateRemoteTaskResources(
           scheduling::NodeID(spillback_to.Binary()),

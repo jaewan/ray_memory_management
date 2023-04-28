@@ -886,6 +886,7 @@ void LocalTaskManager::Dispatch(
 		reply->set_pulled_task(false);
 	}
 	
+	RAY_LOG(DEBUG) << 
   if (enable_blockTasks){
     auto p = reply->mutable_priority();
     p->Clear();

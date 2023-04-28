@@ -23,37 +23,61 @@
 namespace ray {
 namespace core {
 
-std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(){
+std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(NodeID *node_id){
   auto pri_it = priority_task_queues_not_pushed_.begin();
 	static Priority dummy_pri;
-  if (pri_it == priority_task_queues_not_pushed_.end()) {
-		return std::make_pair(&dummy_pri, true);
-  }
 	bool spilled_arguments = true;
 	while(spilled_arguments){
+		if (pri_it == priority_task_queues_not_pushed_.end()){
+			return std::make_pair(&dummy_pri, true);
+		}
+		auto block_pri = block_requested_priority_.find(*node_id);
+		if(*pri_it > block_requested_priority_[*node_id]){
+			RAY_LOG(DEBUG) << "Blocked task:" << *pri_it << " to raylet:" << *node_id << " with block_requested_priority:"<< block_requested_priority_[*node_id];
+			return std::make_pair(&dummy_pri, true);
+		}
 		spilled_arguments = false;
 		const auto &task = priority_to_task_spec_[*pri_it];
-		for (size_t i = 0; i < task.NumArgs(); i++) {
-			if (task.ArgByRef(i) && spilled_objects_.contains(task.ArgId(i))) {
-				spilled_arguments = true;
-				break;
-			}
-			for (const auto &in : task.ArgInlinedRefs(i)) {
-				auto object_id = ObjectID::FromBinary(in.object_id());
-				if (spilled_objects_.contains(object_id)) {
+		if(!spilled_dependency_cache_.contains(*pri_it)){
+			for (size_t i = 0; i < task.NumArgs(); i++) {
+				if (task.ArgByRef(i) && spilled_objects_.contains(task.ArgId(i))) {
 					spilled_arguments = true;
+					spilled_dependency_cache_.emplace(*pri_it);
 					break;
+				}
+				for (const auto &in : task.ArgInlinedRefs(i)) {
+					auto object_id = ObjectID::FromBinary(in.object_id());
+					if (spilled_objects_.contains(object_id)) {
+						spilled_arguments = true;
+						spilled_dependency_cache_.emplace(*pri_it);
+						goto end_task_loop;
+					}
 				}
 			}
 		}
+end_task_loop:
 		if(spilled_arguments){
-			RAY_LOG(DEBUG) << "[JAE_DEBUG] GetNextTaskToPush priority:" << *pri_it << " has spilled args, skipping";
 			pri_it++;
-			if (pri_it == priority_task_queues_not_pushed_.end()) {
-				return std::make_pair(&dummy_pri, true);
+		}else{
+			if(pri_it->score.size() == 1){
+				return std::make_pair(&(*pri_it), false);
 			}
+			if(locality_node_cache_.contains(*pri_it)){
+				if((locality_node_cache_[*pri_it]) == (*node_id)){
+						locality_node_cache_.erase(*pri_it);
+					return std::make_pair(&(*pri_it), false);
+				}
+			}else if(auto task_locality_node_id = lease_policy_->GetBestNodeIdForTask(task)){
+				locality_node_cache_.emplace(*pri_it, *task_locality_node_id);
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] highest priority " << (*pri_it) << " has locality " << (*task_locality_node_id) << " and worker is from " << (*node_id);
+				if((*task_locality_node_id) == (*node_id)){
+					return std::make_pair(&(*pri_it), false);
+				}
+			}
+			spilled_arguments=true;
+			pri_it++;
 		}
-	}	
+	}//end while	
 	return std::make_pair(&(*pri_it), false);
 }
 
@@ -85,8 +109,43 @@ inline void LogLeaseSeq(const TaskID &task_id, const std::string &fnc_name, cons
   log_stream.close();
 }
 
+void CoreWorkerDirectTaskSubmitter::LogObjectCount(const Priority &pri, const ray::NodeID *raylet_id){
+	static absl::flat_hash_map<ray::NodeID, int> object_count;
+	auto it = object_count.find(*raylet_id);
+	if(it == object_count.end()){
+		object_count.emplace(*raylet_id,1);
+	}else{
+		if(pri.score.size() == 1){
+			it->second = it->second + 1;
+			num_producers_--;
+		}else{
+			it->second = it->second - 1;
+			num_consumers_--;
+		}
+	}
+	std::ostringstream log_path;
+	log_path << "/tmp/ray/" << *raylet_id;
+  std::ofstream log_stream(log_path.str(), std::ios_base::app);
+  std::ostringstream stream;
+  stream << it->second <<" num_producer:" <<
+	num_producers_ << " num_consumers:" << num_consumers_ << "\n";
+  std::string log_str = stream.str();
+  log_stream << log_str;
+  log_stream.close();
+}
+
+inline void LogMisPlacedTask(const TaskID &task_id, const Priority &pri, ray::NodeID object_location, ray::NodeID raylet_id){
+  std::ofstream log_stream("/tmp/ray/misplace_log", std::ios_base::app);
+  std::ostringstream stream;
+  stream << task_id <<" " <<
+	pri << " object location:" << object_location <<  " dispatch location " << raylet_id << "\n";
+  std::string log_str = stream.str();
+  log_stream << log_str;
+  log_stream.close();
+}
+
 Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
-  RAY_LOG(DEBUG) << "Submit task " << task_spec.TaskId() << " TaskSubmitter JobId:" << task_spec.JobId();
+  RAY_LOG(DEBUG) << "Submit task " << task_spec.TaskId() << " TaskSubmitter JobId:" << task_spec.JobId() << " " << task_spec.GetName();
   num_tasks_submitted_++;
 
   resolver_.ResolveDependencies(task_spec, [this, task_spec](Status status) {
@@ -185,6 +244,12 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         //RAY_CHECK(ptts_inserted.second);
 
         RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first;
+				if(priority.score.size() == 1){
+					num_producers_++;
+				}else{
+					num_consumers_++;
+				}
+				
         scheduling_key_entry.resource_spec = task_spec;
 
         if (!AllWorkersBusy()) {
@@ -371,10 +436,6 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
 								 << (current_time_ms() > lease_entry.lease_expiration_time);
-	Priority *pri_to_push;
-	bool return_worker;
-	std::tie(pri_to_push, return_worker) = GetNextTaskToPush();
-	
   if (!lease_entry.lease_client) {
     return;
   }
@@ -382,9 +443,8 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   // Return the worker if there was an error executing the previous task,
   // the lease is expired; Return the worker if there are no more applicable
   // queued tasks.
-  if (return_worker || (was_error || worker_exiting ||
-       current_time_ms() > lease_entry.lease_expiration_time) || *pri_to_push > block_requested_priority_[addr.raylet_id]) {
-    //priority_task_queues_not_pushed_lock.unlock();
+  if ((was_error || worker_exiting ||
+       current_time_ms() > lease_entry.lease_expiration_time)) {
     RAY_CHECK(active_workers_.size() >= 1);
 
     // Return the worker only if there are no tasks to do.
@@ -394,6 +454,12 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 			RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
 		}
   } else {
+		RAY_CHECK(true) << "Oops";
+		/*
+		Priority *pri_to_push;
+		bool return_worker;
+		std::tie(pri_to_push, return_worker) = GetNextTaskToPush();
+	
     const Priority pri(pri_to_push->score);
 		priority_task_queues_.erase(pri);
     priority_task_queues_not_pushed_.erase(*pri_to_push);
@@ -418,6 +484,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       tasks_.erase(task_spec.TaskId());
 		  priority_to_task_spec_.erase(pri);
     }
+		*/
 
     CancelWorkerLeaseIfNeeded(scheduling_key);
   }
@@ -541,7 +608,7 @@ void CoreWorkerDirectTaskSubmitter::SetBlockSpill(const std::string &raylet_addr
 }
 
 void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
-    const SchedulingKey &scheduling_key, const rpc::Address *raylet_address) {
+    const SchedulingKey &scheduling_key,const Priority *request_priority, const rpc::Address *raylet_address) {
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
   if (!AllWorkersBusy() || priority_task_queues_.empty()) {
     // There are idle workers, so we don't need more.
@@ -551,29 +618,35 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 	   RAY_LOG(DEBUG) << "Exceeding the pending request limit " << 32;
      return;
   }
-  auto priority_it = priority_task_queues_.begin();
   const bool is_spillback = (raylet_address != nullptr);
-  auto resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
   TaskSpecification resource_spec;
-  do{
-    resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
-    resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
-    resource_spec = TaskSpecification(resource_spec_msg);
-    priority_it = std::next(priority_it);
-  }while(priority_it != priority_task_queues_.end() && resource_spec.JobId().IsNil());
-
-  if ( resource_spec.JobId().IsNil() ){
+  Priority pri;
+	if (!is_spillback){
+		auto priority_it = priority_task_queues_.begin();
+		while(priority_it != priority_task_queues_.end() && priority_to_task_spec_[*priority_it].JobId().IsNil()){
+			priority_task_queues_.erase(priority_it);
+			priority_it = priority_task_queues_.begin();
+		}
+		auto resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
+		resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
+		resource_spec = TaskSpecification(resource_spec_msg);
+		pri.Set(priority_it->score);
+	}else{
+		auto resource_spec_msg = priority_to_task_spec_[*request_priority].GetMutableMessage();
+		resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
+		resource_spec = TaskSpecification(resource_spec_msg);
+		pri.Set(request_priority->score);
+	}
+	if (resource_spec.JobId().IsNil()){
 		RAY_LOG(DEBUG) << "[JAE_DEBUG] ERROR Jae redirect request should be handled. Local raylet already calculated the remote resource";
 		if(is_spillback)
-		  RAY_CHECK(is_spillback) << "Jae redirect request should be handled. Local raylet already calculated the remote resource";
-    return;
-  }
+			RAY_CHECK(is_spillback) << "Jae redirect request should be handled. Local raylet already calculated the remote resource";
+		return;
+	}
 
-  priority_it = std::prev(priority_it);
-  Priority pri(priority_it->score);
   const TaskID task_id = resource_spec.TaskId();
   resource_spec.SetPriority(pri);
-  priority_task_queues_.erase(priority_it);
+  priority_task_queues_.erase(pri);
   int64_t queue_size = priority_task_queues_.size();
 
   num_leases_on_flight_++;
@@ -588,6 +661,9 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     std::tie(best_node_address, is_selected_based_on_locality) =
         lease_policy_->GetBestNodeForTask(resource_spec);
     raylet_address = &best_node_address;
+		if(is_selected_based_on_locality){
+			locality_node_cache_.emplace(pri, NodeID::FromBinary(raylet_address->raylet_id()));
+		}
   }
 
   auto lease_client = GetOrConnectLeaseClient(raylet_address);
@@ -712,9 +788,10 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 															 resources_copy);
 								}else{
 									Priority *highest_priority;
-									bool return_worker;
-									std::tie(highest_priority, return_worker) = GetNextTaskToPush();
-									if (return_worker || *highest_priority == pri){
+									bool no_high_pri_task;
+									NodeID raylet_id = NodeID::FromBinary(raylet_address.raylet_id());
+									std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&raylet_id);
+									if(no_high_pri_task){
 										OnWorkerIdle(addr,
 																 scheduling_key,
 																 pri,
@@ -722,46 +799,41 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 																 /*worker_exiting=*/false,
 																 resources_copy);
 									}else{
-										if(auto node_id = lease_policy_->GetBestNodeIdForTask(priority_to_task_spec_[*highest_priority])){
-											if(node_id == NodeID::FromBinary(raylet_address.raylet_id())){
-												priority_task_queues_.emplace(pri);
-												OnWorkerIdle(addr,
-																		 scheduling_key,
-																		 *highest_priority,
-																		 /*error=*/false,
-																		 /*worker_exiting=*/false,
-																		 resources_copy);
-											}else{
-												OnWorkerIdle(addr,
-																		 scheduling_key,
-																		 pri,
-																		 /*error=*/false,
-																		 /*worker_exiting=*/false,
-																		 resources_copy);
-											}
-										}else{
-											OnWorkerIdle(addr,
-																	 scheduling_key,
-																	 pri,
-																	 /*error=*/false,
-																	 /*worker_exiting=*/false,
-																	 resources_copy);
-										}
+										priority_task_queues_.emplace(pri);
+										RAY_LOG(DEBUG) << "[JAE_DEBUG] original was:" << pri << " pushing " << *highest_priority;
+										OnWorkerIdle(addr,
+																 scheduling_key,
+																 *highest_priority,
+																 /*error=*/false,
+																 /*worker_exiting=*/false,
+																 resources_copy);
 									}
 								}
-							}
-							else{
-								OnWorkerIdle(addr,
-														 scheduling_key,
-														 //pri,
-														 /*error=*/false,
-														 /*worker_exiting=*/false,
-														 resources_copy);
+							}else{
+								Priority *highest_priority;
+								bool no_high_pri_task;
+								NodeID raylet_id = NodeID::FromBinary(raylet_address.raylet_id());
+								std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&raylet_id);
+								if(no_high_pri_task){
+									auto &lease_entry = worker_to_lease_entry_[addr];
+									if (lease_entry.lease_client && !lease_entry.is_busy){
+										ReturnWorker(addr, false, true);
+									}
+								}else{
+									priority_task_queues_.emplace(pri);
+									RAY_LOG(DEBUG) << "[JAE_DEBUG] original was:" << pri << " pushing " << *highest_priority;
+									OnWorkerIdle(addr,
+															 scheduling_key,
+															 *highest_priority,
+															 /*error=*/false,
+															 /*worker_exiting=*/false,
+															 resources_copy);
+								}
 							}
             } else {
               // The raylet redirected us to a different raylet to retry at.
               RAY_CHECK(!is_spillback);
-              RAY_LOG(DEBUG) << "Redirect lease for task " << task_id << " from raylet "
+              RAY_LOG(DEBUG) << "Redirect lease for task " << task_id << " priority:" << pri << " from raylet "
                              << NodeID::FromBinary(raylet_address.raylet_id())
                              << " to raylet "
                              << NodeID::FromBinary(reply.retry_at_raylet_address().raylet_id())
@@ -769,10 +841,10 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 							if(priority_task_queues_not_pushed_.contains(pri)){
 								LeaseGrant("\t\tRedirect Request" , pri, priority_task_queues_.size(), is_spillback);
 								priority_task_queues_.emplace(pri);
+								RequestNewWorkerIfNeeded(scheduling_key, &pri, &reply.retry_at_raylet_address());
 							}else{
+								RequestNewWorkerIfNeeded(scheduling_key);
 							}
-
-              RequestNewWorkerIfNeeded(scheduling_key, &reply.retry_at_raylet_address());
             }
           } else if (lease_client != local_lease_client_) {
 						if(priority_task_queues_not_pushed_.contains(pri)){
@@ -861,11 +933,22 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
     const SchedulingKey &scheduling_key,
     const TaskSpecification &task_spec,
     const google::protobuf::RepeatedPtrField<rpc::ResourceMapEntry> &assigned_resources) {
+  Priority pri = task_spec.GetPriority();
   RAY_LOG(DEBUG) << "Pushing task " << task_spec.TaskId() << " to worker "
                  << addr.worker_id << " of raylet " << addr.raylet_id
-                 << " with priority:" << task_spec.GetPriority() 
+                 << " with priority:" << pri 
 								 << " with num_arg:" << task_spec.NumArgs();
-  LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), task_spec.GetPriority(), addr.raylet_id);
+  LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), pri, addr.raylet_id);
+
+	static absl::flat_hash_map<int64_t, ray::NodeID> object_location;
+	if ( pri.score.size() == 1){
+		object_location.emplace(pri.score[0], addr.raylet_id);
+	}else{
+		if(object_location[pri.score[0]] != addr.raylet_id){
+			LogMisPlacedTask(task_spec.TaskId(), pri, object_location[pri.score[0]], addr.raylet_id);
+		}
+	}
+	LogObjectCount(pri, &addr.raylet_id);
 
   auto task_id = task_spec.TaskId();
   auto request = std::make_unique<rpc::PushTaskRequest>();
@@ -878,7 +961,6 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
   request->mutable_task_spec()->CopyFrom(task_spec.GetMessage());
   auto msg_priority = request->mutable_task_spec()->mutable_priority();
   msg_priority->Clear();
-  Priority pri = task_spec.GetPriority();
   for (auto &s : pri.score) {
     msg_priority->Add(s);
   }

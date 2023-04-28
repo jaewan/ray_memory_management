@@ -94,6 +94,7 @@ class CoreWorkerDirectTaskSubmitter {
 		spilled_objects_.emplace(object_id);
 	}
 	void RemoveSpilledObject(const ObjectID &object_id){
+		spilled_dependency_cache_.clear();
 		spilled_objects_.erase(object_id);
 	}
   /// Schedule a task for direct submission to a worker.
@@ -133,7 +134,7 @@ class CoreWorkerDirectTaskSubmitter {
   void ReportWorkerBacklog();
 
  private:
-	std::pair<Priority*, bool> GetNextTaskToPush();
+	std::pair<Priority*, bool> GetNextTaskToPush(ray::NodeID *node_id);
   /// Schedule more work onto an idle worker or return it back to the raylet if
   /// no more tasks are queued for submission. If an error was encountered
   /// processing the worker, we don't attempt to re-use the worker.
@@ -179,6 +180,7 @@ class CoreWorkerDirectTaskSubmitter {
   /// the worker should be requested from the raylet at that address. Else, the
   /// worker should be requested from the local raylet.
   void RequestNewWorkerIfNeeded(const SchedulingKey &task_queue_key,
+                                const Priority *request_priority = nullptr,
                                 const rpc::Address *raylet_address = nullptr)
       EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
@@ -376,6 +378,8 @@ class CoreWorkerDirectTaskSubmitter {
 
   // For backpressure. Do not push tasks to workers if the priority of the task is lower than this value
 	absl::flat_hash_map<const ray::NodeID, Priority> block_requested_priority_;
+	absl::flat_hash_set<Priority> spilled_dependency_cache_;
+	absl::flat_hash_map<Priority, NodeID> locality_node_cache_;
   // Keep track of the active workers globally to check rooms for task alloc
   absl::flat_hash_set<rpc::WorkerAddress> active_workers_ =
       absl::flat_hash_set<rpc::WorkerAddress>();
@@ -401,6 +405,11 @@ class CoreWorkerDirectTaskSubmitter {
   int64_t num_tasks_submitted_ = 0;
   int64_t num_leases_requested_ GUARDED_BY(mu_) = 0;
   int64_t num_leases_on_flight_ GUARDED_BY(mu_) = 0;
+	// ******Logging variables, delete after debugging***************
+	int num_producers_ = 0;
+	int num_consumers_ = 0;
+  void LogObjectCount(const Priority &pri, const ray::NodeID *raylet_id);
+	// *********************
 };
 
 }  // namespace core
