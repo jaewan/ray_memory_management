@@ -47,32 +47,43 @@ const LocalObject *ObjectStore::CreateObject(const ray::ObjectInfo &object_info,
   entry->construct_duration = -1;
   entry->source = source;
 
-  RAY_LOG(DEBUG) << "create object " << object_info.object_id << " succeeded";
+	if ((!recalculate_lowest_priority_ && lowest_priority_==nullptr) ||
+			(lowest_priority_ != nullptr && *lowest_priority_ < entry->object_info.priority)){
+		lowest_priority_ = &entry->object_info.priority;
+	}
+
+  RAY_LOG(DEBUG) << "create object " << object_info.object_id << " with priority" << entry->object_info.priority << " succeeded";
   return entry;
 }
 
 ray::Priority ObjectStore::GetLowestPriObject() {
+	if(!recalculate_lowest_priority_){
+		return *lowest_priority_;
+	}
   // Return the lowest priority object in object_table
-  static ray::Priority base_priority;
+  const static ray::Priority base_priority;
   auto it = object_table_.begin();
-  ray::Priority lowest_priority;
+  ray::Priority *lowest_priority;
   do{
     if(it == object_table_.end()){
-	  return ray::Priority();
+			return base_priority;
     }
-    lowest_priority = it->second->GetPriority();
+    lowest_priority = &it->second->object_info.priority;
     it++;
-  }while(lowest_priority == base_priority);
+  }while(*lowest_priority == base_priority);
 
   for (; it != object_table_.end(); it++){
-	ray::Priority p = it->second->GetPriority();
-	if(p == base_priority)
-	  continue;
-    if(lowest_priority < p){
+		ray::Priority *p = &it->second->object_info.priority;
+		if(*p == base_priority)
+			continue;
+    if(*lowest_priority < *p){
       lowest_priority = p;
-	}
+		}
   }
-  return lowest_priority;
+	lowest_priority_ = lowest_priority;
+	recalculate_lowest_priority_ = false;
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] GetLowestPriObject lowest_priority:" << *lowest_priority;
+  return *lowest_priority_;
 }
 
 
@@ -99,6 +110,10 @@ bool ObjectStore::DeleteObject(const ObjectID &object_id) {
   if (entry == nullptr) {
     return false;
   }
+	if(&entry->object_info.priority == lowest_priority_){
+		recalculate_lowest_priority_ = true;
+		lowest_priority_ = nullptr;
+	}
   allocator_.Free(std::move(entry->allocation));
   object_table_.erase(object_id);
   return true;

@@ -104,5 +104,7 @@ class ObjectStore : public IObjectStore {
 
   /// Mapping from ObjectIDs to information about the object.
   absl::flat_hash_map<ObjectID, std::unique_ptr<LocalObject>> object_table_;
+	ray::Priority *lowest_priority_ = nullptr;
+	bool recalculate_lowest_priority_ = false;
 };
 }  // namespace plasma
