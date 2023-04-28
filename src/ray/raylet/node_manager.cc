@@ -267,6 +267,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 			}
 
 			if(block_tasks){
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] turn on backpressure at:" << base_priority;
 				cluster_task_manager_->BlockTasks(base_priority, io_service_);
 			}
 
