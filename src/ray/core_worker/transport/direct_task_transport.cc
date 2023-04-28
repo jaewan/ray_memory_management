@@ -31,7 +31,6 @@ std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(Node
 		if (pri_it == priority_task_queues_not_pushed_.end()){
 			return std::make_pair(&dummy_pri, true);
 		}
-		auto block_pri = block_requested_priority_.find(*node_id);
 		if(*pri_it > block_requested_priority_[*node_id]){
 			RAY_LOG(DEBUG) << "Blocked task:" << *pri_it << " to raylet:" << *node_id << " with block_requested_priority:"<< block_requested_priority_[*node_id];
 			return std::make_pair(&dummy_pri, true);

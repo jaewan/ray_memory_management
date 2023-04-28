@@ -886,7 +886,9 @@ void LocalTaskManager::Dispatch(
 		reply->set_pulled_task(false);
 	}
 	
-	RAY_LOG(DEBUG) << 
+	static const Priority base_priority;
+	if(base_priority != block_requested_priority_)
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] setting backpressure:"  << block_requested_priority_;
   if (enable_blockTasks){
     auto p = reply->mutable_priority();
     p->Clear();
