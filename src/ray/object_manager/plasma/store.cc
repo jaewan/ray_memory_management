@@ -200,8 +200,8 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
   	    for(i=0; i<size; i++){
           lowest_priority->SetScore(i, p.GetScore(i));
         }
-				static Priority default_priority;
-				if(lowest_priority != default_priority)
+				static ray::Priority default_priority;
+				if(*lowest_priority != default_priority)
 					RAY_LOG(DEBUG) << "[JAE_DEBUG] Lowest pri set:" << *lowest_priority;
 			}
 			*block_tasks_required = true;
