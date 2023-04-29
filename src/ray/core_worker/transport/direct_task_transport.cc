@@ -68,7 +68,6 @@ end_task_loop:
 				}
 			}else if(auto task_locality_node_id = lease_policy_->GetBestNodeIdForTask(task)){
 				locality_node_cache_.emplace(*pri_it, *task_locality_node_id);
-				RAY_LOG(DEBUG) << "[JAE_DEBUG] highest priority " << (*pri_it) << " has locality " << (*task_locality_node_id) << " and worker is from " << (*node_id);
 				if((*task_locality_node_id) == (*node_id)){
 					return std::make_pair(&(*pri_it), false);
 				}
@@ -131,6 +130,8 @@ void CoreWorkerDirectTaskSubmitter::LogObjectCount(const Priority &pri, const ra
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
+	if(*raylet_id == local_raylet_id_){
+	}
 }
 
 inline void LogMisPlacedTask(const TaskID &task_id, const Priority &pri, ray::NodeID object_location, ray::NodeID raylet_id){
@@ -601,8 +602,6 @@ void CoreWorkerDirectTaskSubmitter::SetBlockSpill(const std::string &raylet_addr
 		std::vector<int64_t> block_score(reply.priority().data(), reply.priority().data() +
 			reply.priority().size());
 		block_requested_priority_[NodeID::FromBinary(raylet_address)].Set(block_score);
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] SetBlockSpill set from raylet: " 
-									 << NodeID::FromBinary(raylet_address) << " to priority:" << block_score;
 	}
 }
 
@@ -651,7 +650,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   num_leases_on_flight_++;
   num_leases_requested_++;
 
-	LeaseGrant("\t Lease req:" , pri, priority_task_queues_.size(), is_spillback);
+	//LeaseGrant("\t Lease req:" , pri, priority_task_queues_.size(), is_spillback);
 
   rpc::Address best_node_address;
   bool is_selected_based_on_locality = false;
@@ -776,7 +775,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
               RAY_CHECK(active_workers_.size() >= 1);
 							if(priority_task_queues_not_pushed_.contains(pri)){
 								// This means the task is not yet dispatched to a worker
-								LeaseGrant("\t\tRequest Granted" , pri, request_num, is_spillback);
+								//LeaseGrant("\t\tRequest Granted" , pri, request_num, is_spillback);
 								if (reply.pulled_task()){
 									RAY_LOG(DEBUG) << "[JAE_DEBUG] strictly follow the req" << pri;
 									OnWorkerIdle(addr,
@@ -799,7 +798,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 																 resources_copy);
 									}else{
 										priority_task_queues_.emplace(pri);
-										RAY_LOG(DEBUG) << "[JAE_DEBUG] original was:" << pri << " pushing " << *highest_priority;
 										OnWorkerIdle(addr,
 																 scheduling_key,
 																 *highest_priority,
@@ -820,7 +818,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 									}
 								}else{
 									priority_task_queues_.emplace(pri);
-									RAY_LOG(DEBUG) << "[JAE_DEBUG] original was:" << pri << " pushing " << *highest_priority;
 									OnWorkerIdle(addr,
 															 scheduling_key,
 															 *highest_priority,
@@ -838,7 +835,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                              << NodeID::FromBinary(reply.retry_at_raylet_address().raylet_id())
 			  										 << " is_spillback:" << (&reply.retry_at_raylet_address() != nullptr);
 							if(priority_task_queues_not_pushed_.contains(pri)){
-								LeaseGrant("\t\tRedirect Request" , pri, priority_task_queues_.size(), is_spillback);
+								//LeaseGrant("\t\tRedirect Request" , pri, priority_task_queues_.size(), is_spillback);
 								priority_task_queues_.emplace(pri);
 								RequestNewWorkerIfNeeded(scheduling_key, &pri, &reply.retry_at_raylet_address());
 							}else{
@@ -937,6 +934,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
                  << addr.worker_id << " of raylet " << addr.raylet_id
                  << " with priority:" << pri 
 								 << " with num_arg:" << task_spec.NumArgs();
+	/*
   LogLeaseSeq(task_spec.TaskId(), task_spec.GetName(), pri, addr.raylet_id);
 
 	static absl::flat_hash_map<int64_t, ray::NodeID> object_location;
@@ -948,6 +946,7 @@ void CoreWorkerDirectTaskSubmitter::PushNormalTask(
 		}
 	}
 	LogObjectCount(pri, &addr.raylet_id);
+	*/
 
   auto task_id = task_spec.TaskId();
   auto request = std::make_unique<rpc::PushTaskRequest>();

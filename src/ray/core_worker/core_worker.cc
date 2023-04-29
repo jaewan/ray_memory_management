@@ -2315,7 +2315,6 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
   // execution and unpinned once the task completes. We will notify the caller
   // about any IDs that we are still borrowing by the time the task completes.
   std::vector<ObjectID> borrowed_ids;
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling GetAndPinArgsForExecutor";
   RAY_CHECK_OK(GetAndPinArgsForExecutor(task_spec, &args, &arg_refs, &borrowed_ids));
 
   std::vector<ObjectID> return_ids;
@@ -2357,7 +2356,6 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
     name_of_concurrency_group_to_execute = task_spec.ConcurrencyGroupName();
   }
 
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling task_execution_callback";
   status = options_.task_execution_callback(
       task_type,
       task_spec.GetName(),
@@ -2381,11 +2379,9 @@ Status CoreWorker::ExecuteTask(const TaskSpecification &task_spec,
   // that were contained in a borrowed ID that we (or a nested task) are now
   // borrowing.
   std::vector<ObjectID> deleted;
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling PopAndClearLocalBorrowers";
   if (!borrowed_ids.empty()) {
     reference_counter_->PopAndClearLocalBorrowers(borrowed_ids, borrowed_refs, &deleted);
   }
-	RAY_LOG(DEBUG) << "[JAE_DEBUG] calling memory_store Delete";
   memory_store_->Delete(deleted);
 
   if (task_spec.IsNormalTask() && reference_counter_->NumObjectIDsInScope() != 0) {
