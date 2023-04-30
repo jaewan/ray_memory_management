@@ -104,6 +104,8 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
   // blocking where a task which cannot be dispatched because
   // there are not enough available resources blocks other
   // tasks from being dispatched.
+  const static uint64_t total_cpus =
+      cluster_resource_scheduler_->GetLocalResourceManager().GetNumCpus();
   for (auto shapes_it = tasks_to_dispatch_.begin();
        shapes_it != tasks_to_dispatch_.end();) {
     //auto &scheduling_class = shapes_it->first;
@@ -141,15 +143,16 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
       }
 
       // Check if the scheduling class is at capacity now.
-      if (sched_cls_cap_enabled_ &&
-          sched_cls_info.running_tasks.size() >= sched_cls_info.capacity &&
+      //if (sched_cls_cap_enabled_ &&
+			// This is because in DFS we aggregated all tasks into a single scheduling class
+      if (sched_cls_info.running_tasks.size() >= total_cpus &&
           work->GetState() == internal::WorkStatus::WAITING) {
         RAY_LOG(DEBUG) << "Hit cap! time=" << get_time_ms_()
                        << " next update time=" << sched_cls_info.next_update_time
                        << " scheduling_class:" << scheduling_class 
 											 << " capacity:" << sched_cls_info.capacity  << " running_tasks:" <<  sched_cls_info.running_tasks.size();
         if (get_time_ms_() < sched_cls_info.next_update_time) {
-          // We're over capacity and it's not time to admit a new task yet.
+          // We're over capacity and it's not time to admit a new task yetoooojjjji.
           // Calculate the next time we should admit a new task.
           int64_t current_capacity = sched_cls_info.running_tasks.size();
           int64_t allowed_capacity = sched_cls_info.capacity;
