@@ -62,8 +62,7 @@ void LocalTaskManager::QueueAndScheduleTask(std::shared_ptr<internal::Work> work
 bool LocalTaskManager::WaitForTaskArgsRequests(std::shared_ptr<internal::Work> work) {
   const auto &task = work->task;
   const auto &task_id = task.GetTaskSpecification().TaskId();
-  //const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
-  const auto scheduling_key = 0;
+  const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
   auto object_ids = task.GetTaskSpecification().GetDependencies();
   bool can_dispatch = true;
   if (object_ids.size() > 0) {
@@ -443,9 +442,8 @@ bool LocalTaskManager::PoppedWorkerHandler(
 
   auto erase_from_dispatch_queue_fn = [this](const std::shared_ptr<internal::Work> &work,
                                              const SchedulingClass &scheduling_class) {
-		int sched_cls_for_dfs = 0;
-    //auto shapes_it = tasks_to_dispatch_.find(scheduling_class);
-    auto shapes_it = tasks_to_dispatch_.find(sched_cls_for_dfs);
+    auto shapes_it = tasks_to_dispatch_.find(scheduling_class);
+    //auto shapes_it = tasks_to_dispatch_.find(sched_cls_for_dfs);
     RAY_CHECK(shapes_it != tasks_to_dispatch_.end()) << scheduling_class;
     auto &dispatch_queue = shapes_it->second;
     bool erased = false;
@@ -601,8 +599,8 @@ void LocalTaskManager::TasksUnblocked(const std::vector<TaskID> &ready_ids) {
     if (it != waiting_tasks_index_.end()) {
       auto work = *it->second;
       const auto &task = work->task;
-      //const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
-      const auto scheduling_key = 0;
+      const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
+      //const auto scheduling_key = 0;
       RAY_LOG(DEBUG) << "Args ready, task can be dispatched "
                      << task.GetTaskSpecification().TaskId();
       tasks_to_dispatch_[scheduling_key].push_back(work);
