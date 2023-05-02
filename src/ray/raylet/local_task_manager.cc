@@ -103,8 +103,6 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
   // blocking where a task which cannot be dispatched because
   // there are not enough available resources blocks other
   // tasks from being dispatched.
-  const static uint64_t total_cpus =
-      cluster_resource_scheduler_->GetLocalResourceManager().GetNumCpus();
   for (auto shapes_it = tasks_to_dispatch_.begin();
        shapes_it != tasks_to_dispatch_.end();) {
     //auto &scheduling_class = shapes_it->first;
@@ -142,9 +140,8 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
       }
 
       // Check if the scheduling class is at capacity now.
-      //if (sched_cls_cap_enabled_ &&
-			// This is because in DFS we aggregated all tasks into a single scheduling class
-      if (sched_cls_info.running_tasks.size() >= total_cpus &&
+      if (sched_cls_cap_enabled_ &&
+          sched_cls_info.running_tasks.size() >= sched_cls_info.capacity &&
           work->GetState() == internal::WorkStatus::WAITING) {
         RAY_LOG(DEBUG) << "Hit cap! time=" << get_time_ms_()
                        << " next update time=" << sched_cls_info.next_update_time
