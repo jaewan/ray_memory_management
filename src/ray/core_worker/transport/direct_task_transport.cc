@@ -27,8 +27,8 @@ std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(cons
   auto pri_it = priority_task_queues_not_pushed_.begin();
 	static Priority dummy_pri;
 	bool spilled_arguments = true;
-	while(spilled_arguments && *pri_it < base_priority){
-		if (pri_it == priority_task_queues_not_pushed_.end()){
+	while(spilled_arguments){
+		if (pri_it == priority_task_queues_not_pushed_.end() || *pri_it > base_priority){
 			return std::make_pair(&dummy_pri, true);
 		}
 		if(*pri_it > block_requested_priority_[*node_id]){
@@ -59,16 +59,19 @@ end_task_loop:
 			pri_it++;
 		}else{
 			if(pri_it->score.size() == 1){
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] GetNextTaskToPush 1 returning" << *pri_it;
 				return std::make_pair(&(*pri_it), false);
 			}
 			if(locality_node_cache_.contains(*pri_it)){
 				if((locality_node_cache_[*pri_it]) == (*node_id)){
 						locality_node_cache_.erase(*pri_it);
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] GetNextTaskToPush 2 returning" << *pri_it;
 					return std::make_pair(&(*pri_it), false);
 				}
 			}else if(auto task_locality_node_id = lease_policy_->GetBestNodeIdForTask(task)){
 				locality_node_cache_.emplace(*pri_it, *task_locality_node_id);
 				if((*task_locality_node_id) == (*node_id)){
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] GetNextTaskToPush 3 returning" << *pri_it;
 					return std::make_pair(&(*pri_it), false);
 				}
 			}
@@ -76,6 +79,7 @@ end_task_loop:
 			pri_it++;
 		}
 	}//end while	
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] GetNextTaskToPush 4 returning" << *pri_it;
 	return std::make_pair(&(*pri_it), false);
 }
 
@@ -821,9 +825,11 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 								if(no_high_pri_task){
 									auto &lease_entry = worker_to_lease_entry_[addr];
 									if (lease_entry.lease_client && !lease_entry.is_busy){
+										RAY_LOG(DEBUG) << "[JAE_DEBUG] call from 3" << pri;
 										ReturnWorker(addr, false, true);
 									}
 								}else{
+										RAY_LOG(DEBUG) << "[JAE_DEBUG] call from 4" << pri;
 									priority_task_queues_.emplace(pri);
 									OnWorkerIdle(addr,
 															 scheduling_key,
