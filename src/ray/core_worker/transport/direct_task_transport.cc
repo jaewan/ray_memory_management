@@ -130,8 +130,6 @@ void CoreWorkerDirectTaskSubmitter::LogObjectCount(const Priority &pri, const ra
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
-	if(*raylet_id == local_raylet_id_){
-	}
 }
 
 inline void LogMisPlacedTask(const TaskID &task_id, const Priority &pri, ray::NodeID object_location, ray::NodeID raylet_id){
