@@ -385,8 +385,23 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 					RequestNewWorkerIfNeeded(scheduling_key);
 					return;
 				}
-			}
-		}	
+			}else{
+				// Find locality
+				if ( pri_it->score.size() == 1)
+					break;
+				if(locality_node_cache_.contains(*pri_it)){
+					if((locality_node_cache_[*pri_it]) == addr.raylet_id){
+						locality_node_cache_.erase(*pri_it);
+						break;
+					}
+				}else if(auto task_locality_node_id = lease_policy_->GetBestNodeIdForTask(task)){
+					locality_node_cache_.emplace(*pri_it, *task_locality_node_id);
+					if((*task_locality_node_id) == addr.raylet_id){
+						break;
+					}
+				}
+			}//end locality
+		}//end while	
     const Priority pri(pri_it->score);
 		priority_task_queues_.erase(pri);
     priority_task_queues_not_pushed_.erase(pri_it);
@@ -630,6 +645,9 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     std::tie(best_node_address, is_selected_based_on_locality) =
         lease_policy_->GetBestNodeForTask(resource_spec);
     raylet_address = &best_node_address;
+		if(is_selected_based_on_locality){
+			locality_node_cache_.emplace(pri, NodeID::FromBinary(raylet_address->raylet_id()));
+		}
   }
 
   auto lease_client = GetOrConnectLeaseClient(raylet_address);

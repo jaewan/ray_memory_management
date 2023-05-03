@@ -94,6 +94,7 @@ class CoreWorkerDirectTaskSubmitter {
 		spilled_objects_.emplace(object_id);
 	}
 	void RemoveSpilledObject(const ObjectID &object_id){
+		spilled_dependency_cache_.clear();
 		spilled_objects_.erase(object_id);
 	}
   /// Schedule a task for direct submission to a worker.
@@ -375,6 +376,8 @@ class CoreWorkerDirectTaskSubmitter {
 
   // For backpressure. Do not push tasks to workers if the priority of the task is lower than this value
 	absl::flat_hash_map<const ray::NodeID, Priority> block_requested_priority_;
+	absl::flat_hash_set<Priority> spilled_dependency_cache_;
+	absl::flat_hash_map<Priority, NodeID> locality_node_cache_;
   // Keep track of the active workers globally to check rooms for task alloc
   absl::flat_hash_set<rpc::WorkerAddress> active_workers_ =
       absl::flat_hash_set<rpc::WorkerAddress>();

@@ -45,6 +45,7 @@ class LeasePolicyInterface {
   virtual std::pair<rpc::Address, bool> GetBestNodeForTask(
       const TaskSpecification &spec) = 0;
 
+  virtual absl::optional<NodeID> GetBestNodeIdForTask(const TaskSpecification &spec) = 0;
   virtual ~LeasePolicyInterface() {}
 };
 
@@ -69,9 +70,9 @@ class LocalityAwareLeasePolicy : public LeasePolicyInterface {
   std::pair<rpc::Address, bool> GetBestNodeForTask(
       const TaskSpecification &spec) override;
 
- private:
   /// Get the best worker node for a lease request for the provided task.
   absl::optional<NodeID> GetBestNodeIdForTask(const TaskSpecification &spec);
+ private:
 
   /// Provider of locality data that will be used in choosing the best lessor.
   std::shared_ptr<LocalityDataProviderInterface> locality_data_provider_;
@@ -96,6 +97,11 @@ class LocalLeasePolicy : public LeasePolicyInterface {
   std::pair<rpc::Address, bool> GetBestNodeForTask(
       const TaskSpecification &spec) override;
 
+  absl::optional<NodeID> GetBestNodeIdForTask(const TaskSpecification &spec) {
+		RAY_CHECK(false) << "This shouldn't be called!!";
+		absl::optional<NodeID> max_bytes_node;
+		return max_bytes_node;
+	}
  private:
   /// RPC address of the local node.
   const rpc::Address local_node_rpc_address_;
