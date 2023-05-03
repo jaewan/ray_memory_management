@@ -489,7 +489,9 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
   RAY_LOG(INFO) << "About to free object in remote node: " << object_id;
 
   auto it = local_objects_.find(object_id);
-  if (!(it == local_objects_.end())) {
+  // Check if object is local
+  if (it != local_objects_.end()) {
+    RAY_LOG(INFO) << "Object " << object_id << " is local";
     RemoteSpillDecrementRefCount(object_id);
   }
 
@@ -1134,9 +1136,9 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   }
 
   /// RSCODE: Try incrementing object count before write chunk
-  if (from_remote_spill) {
-    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  }
+  // if (from_remote_spill) {
+  //   buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  // }
 
   if (chunk_status.ok()) {
     // Avoid handling this chunk if it's already being handled by another process.
