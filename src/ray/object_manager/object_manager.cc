@@ -1002,6 +1002,14 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
         on_complete(status);
       };
 
+  if (from_remote_spill) {
+    if (!received_remote_objects_origin_.contains(object_id)) {
+      RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
+      received_remote_objects_origin_.emplace(object_id, node_id);
+      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    }
+  }
+
   rpc_client->Push(push_request, callback);
 }
 
@@ -1125,15 +1133,14 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
     return false;
   }
 
-  // keep track of received objects. 
-  // doesn't care about fault tolerance. 
-  if (from_remote_spill) {
-    if (!received_remote_objects_origin_.contains(object_id)) {
-      RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
-      received_remote_objects_origin_.emplace(object_id, node_id);
-      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    }
-  }
+  /// RSTODO: Maybe delete later
+  // if (from_remote_spill) {
+  //   if (!received_remote_objects_origin_.contains(object_id)) {
+  //     RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
+  //     received_remote_objects_origin_.emplace(object_id, node_id);
+  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  //   }
+  // }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {
