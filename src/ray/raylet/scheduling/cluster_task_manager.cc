@@ -125,8 +125,8 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 			scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
 				task.GetTaskSpecification(),
 				false,
-				/*exclude_local_node*/ true,
-				/*requires_object_store_memory*/ false,
+				true, //exclude_local_node
+				false,//requires_object_store_memory
 				&is_infeasible);
 			if (scheduling_node_id.IsNil()) {
 				task_blocked_ = true;
@@ -146,8 +146,8 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 			scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
 					task.GetTaskSpecification(),
 					work->PrioritizeLocalNode(),
-					/*exclude_local_node*/ false,
-					/*requires_object_store_memory*/ false,
+					false,//exclude_local_node
+					false,//requires_object_store_memory
 					&is_infeasible);
 		}
 
@@ -176,7 +176,6 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 						break;
 					}
 				}
-				que_it = dfs_tasks_to_schedule_.erase(que_it);
 				is_infeasible = false;
 			}else{
 				if (announce_infeasible_task_) {
@@ -187,6 +186,7 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 				// TODO(Jae) if something's wrong this could be causing it. Erase one item instead of entire sched class
 				tasks_to_schedule_.erase(scheduling_class);
 			}
+			que_it = dfs_tasks_to_schedule_.erase(que_it);
 
 			continue;
 		}

@@ -209,22 +209,23 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
       if (keep_executing) {
         // Note that the dependencies in the task spec are mutated to only contain
         // plasma dependencies after ResolveDependencies finishes.
-				/*
+				static const std::vector<ObjectID> empty_dependencies;
         const SchedulingKey scheduling_key(task_spec.GetSchedulingClass(),
                                            task_spec.GetDependencyIds(),
                                            task_spec.IsActorCreationTask()
                                                ? task_spec.ActorCreationId()
                                                : ActorID::Nil(),
                                            task_spec.GetRuntimeEnvHash());
-																					 */
 				// This is a DFS patch
-				static const std::vector<ObjectID> empty_dependencies;
+				/*
         const SchedulingKey scheduling_key(0,
 																					 empty_dependencies,
                                            task_spec.IsActorCreationTask()
                                                ? task_spec.ActorCreationId()
                                                : ActorID::Nil(),
                                            0);
+				*/
+				
         const auto priority = task_spec.GetPriority();
         auto inserted = tasks_.emplace(task_spec.TaskId(), TaskEntry(task_spec, scheduling_key, priority));
         RAY_CHECK(inserted.second);
@@ -237,11 +238,11 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
         auto ptqnp_inserted = priority_task_queues_not_pushed_.emplace(priority);
         RAY_CHECK(ptqnp_inserted.second);
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
+        RAY_CHECK(ptts_inserted.second);
 				if(!ptts_inserted.second){
 					priority_to_task_spec_.erase(priority);
 					priority_to_task_spec_.emplace(priority, task_spec);
 				}
-        //RAY_CHECK(ptts_inserted.second);
 
         RAY_LOG(DEBUG) << "Placed task " << task_key.second << " " << task_key.first;
 				if(priority.score.size() == 1){
@@ -455,37 +456,38 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 			RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
 		}
   } else {
-		RAY_CHECK(false) << "Oops";
 		Priority *highest_priority;
 		bool no_high_pri_task;
 		std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&addr.raylet_id, base_priority);
-	
-    const Priority pri(highest_priority->score);
-		priority_task_queues_.erase(pri);
-    priority_task_queues_not_pushed_.erase(*highest_priority);
-    //priority_task_queues_not_pushed_lock.unlock();
-    auto &client = *client_cache_->GetOrConnect(addr.ToProto());
+		if (no_high_pri_task){
+      ReturnWorker(addr, was_error, true);
+		}else{
+			const Priority pri(highest_priority->score);
+			priority_task_queues_.erase(pri);
+			priority_task_queues_not_pushed_.erase(*highest_priority);
+			//priority_task_queues_not_pushed_lock.unlock();
+			auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
-    while (!lease_entry.is_busy) {
-      const auto &task_spec = priority_to_task_spec_[pri];
-      lease_entry.is_busy = true;
+			while (!lease_entry.is_busy) {
+				const auto &task_spec = priority_to_task_spec_[pri];
+				lease_entry.is_busy = true;
 
-      // Increment the total number of tasks in flight to any worker associated with the
-      // current scheduling_key
+				// Increment the total number of tasks in flight to any worker associated with the
+				// current scheduling_key
 
-      RAY_CHECK(active_workers_.size() >= 1);
-      num_busy_workers_++;
+				RAY_CHECK(active_workers_.size() >= 1);
+				num_busy_workers_++;
 
-      executing_tasks_.emplace(task_spec.TaskId(), addr);
-      lease_entry.lease_expiration_time = current_time_ms() - 1;
-      PushNormalTask(addr, client, scheduling_key, task_spec, assigned_resources);
-      const auto it = tasks_.find(task_spec.TaskId());
-      scheduling_key_entries_[scheduling_key].task_priority_queue.erase(it->second.task_key);
-      tasks_.erase(task_spec.TaskId());
-		  priority_to_task_spec_.erase(pri);
-    }
-
-    CancelWorkerLeaseIfNeeded(scheduling_key);
+				executing_tasks_.emplace(task_spec.TaskId(), addr);
+				lease_entry.lease_expiration_time = current_time_ms() - 1;
+				PushNormalTask(addr, client, scheduling_key, task_spec, assigned_resources);
+				const auto it = tasks_.find(task_spec.TaskId());
+				scheduling_key_entries_[scheduling_key].task_priority_queue.erase(it->second.task_key);
+				tasks_.erase(task_spec.TaskId());
+				priority_to_task_spec_.erase(pri);
+			}
+			CancelWorkerLeaseIfNeeded(scheduling_key);
+		}
   }
   RequestNewWorkerIfNeeded(scheduling_key);
 }
@@ -630,8 +632,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 	if (!is_spillback){
 		auto priority_it = priority_task_queues_.begin();
 		while(priority_it != priority_task_queues_.end() && priority_to_task_spec_[*priority_it].JobId().IsNil()){
-			priority_task_queues_.erase(priority_it);
-			priority_it = priority_task_queues_.begin();
+			priority_it = priority_task_queues_.erase(priority_it);
 		}
 		auto resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
 		resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
