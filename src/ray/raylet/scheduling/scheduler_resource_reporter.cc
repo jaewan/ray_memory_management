@@ -132,10 +132,12 @@ void SchedulerResourceReporter::FillResourceUsage(
     // DFS patch. When a task request comes at cluster_task_manager, 
     // all of them are manged in a single queue of scheduling class 0
     // So should not rely on what scheduling class queue it is on
+		/*
 		auto work_it = pair.second.begin();
     const std::shared_ptr<internal::Work> &work = *work_it;
     auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
-    return std::make_pair(scheduling_class, pair.second.size());
+		*/
+    return std::make_pair(pair.first, pair.second.size());
   };
 
   fill_resource_usage_helper(

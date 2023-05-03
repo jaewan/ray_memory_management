@@ -62,8 +62,7 @@ void LocalTaskManager::QueueAndScheduleTask(std::shared_ptr<internal::Work> work
 bool LocalTaskManager::WaitForTaskArgsRequests(std::shared_ptr<internal::Work> work) {
   const auto &task = work->task;
   const auto &task_id = task.GetTaskSpecification().TaskId();
-  //const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
-  const auto scheduling_key = 0;
+  const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
   auto object_ids = task.GetTaskSpecification().GetDependencies();
   bool can_dispatch = true;
   if (object_ids.size() > 0) {
@@ -106,14 +105,11 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
   // tasks from being dispatched.
   for (auto shapes_it = tasks_to_dispatch_.begin();
        shapes_it != tasks_to_dispatch_.end();) {
-    //auto &scheduling_class = shapes_it->first;
-    // DFS patch. When a task request comes at cluster_task_manager, 
-    // all of them are manged in a single queue of scheduling class 0
-    // So should not rely on what scheduling class queue it is on
+    auto &scheduling_class = shapes_it->first;
     auto &dispatch_queue = shapes_it->second;
-    auto work_it = dispatch_queue.begin();
-    const std::shared_ptr<internal::Work> &work = *work_it;
-    auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
+    //auto work_it = dispatch_queue.begin();
+    //const std::shared_ptr<internal::Work> &work = *work_it;
+    //auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
 
     if (info_by_sched_cls_.find(scheduling_class) == info_by_sched_cls_.end()) {
       // Initialize the class info.
@@ -129,8 +125,8 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
     /// pressure to limit the number of worker processes started in scenarios
     /// with nested tasks.
     bool is_infeasible = false;
-    //for (auto work_it = dispatch_queue.begin(); work_it != dispatch_queue.end();) {
-    for (; work_it != dispatch_queue.end();) {
+    for (auto work_it = dispatch_queue.begin(); work_it != dispatch_queue.end();) {
+    //for (; work_it != dispatch_queue.end();) {
       auto &work = *work_it;
       const auto &task = work->task;
       const auto spec = task.GetTaskSpecification();
@@ -440,9 +436,8 @@ bool LocalTaskManager::PoppedWorkerHandler(
 
   auto erase_from_dispatch_queue_fn = [this](const std::shared_ptr<internal::Work> &work,
                                              const SchedulingClass &scheduling_class) {
-		int sched_cls_for_dfs = 0;
-    //auto shapes_it = tasks_to_dispatch_.find(scheduling_class);
-    auto shapes_it = tasks_to_dispatch_.find(sched_cls_for_dfs);
+    auto shapes_it = tasks_to_dispatch_.find(scheduling_class);
+    //auto shapes_it = tasks_to_dispatch_.find(sched_cls_for_dfs);
     RAY_CHECK(shapes_it != tasks_to_dispatch_.end()) << scheduling_class;
     auto &dispatch_queue = shapes_it->second;
     bool erased = false;
@@ -598,8 +593,8 @@ void LocalTaskManager::TasksUnblocked(const std::vector<TaskID> &ready_ids) {
     if (it != waiting_tasks_index_.end()) {
       auto work = *it->second;
       const auto &task = work->task;
-      //const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
-      const auto scheduling_key = 0;
+      const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
+      //const auto scheduling_key = 0;
       RAY_LOG(DEBUG) << "Args ready, task can be dispatched "
                      << task.GetTaskSpecification().TaskId();
       tasks_to_dispatch_[scheduling_key].push_back(work);

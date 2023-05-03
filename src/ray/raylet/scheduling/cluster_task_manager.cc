@@ -67,23 +67,23 @@ void ClusterTaskManager::QueueAndScheduleTask(
     bool is_selected_based_on_locality,
     rpc::RequestWorkerLeaseReply *reply,
     rpc::SendReplyCallback send_reply_callback) {
+	Priority pri = task.GetTaskSpecification().GetPriority();
   RAY_LOG(DEBUG) << "Queuing and scheduling task "
                  << task.GetTaskSpecification().TaskId()
-								 << " priority:" << task.GetTaskSpecification().GetPriority()
+								 << " priority:" << pri
 								 << " JobId:" << task.GetTaskSpecification().JobId();
   auto work = std::make_shared<internal::Work>(
       task, grant_or_reject, is_selected_based_on_locality, reply, [send_reply_callback] {
         send_reply_callback(Status::OK(), nullptr, nullptr);
       });
-  //const auto &scheduling_class = task.GetTaskSpecification().GetSchedulingClass();
-  const auto &scheduling_class = 0;
-	// Jae this is DFS patch to have a single queue for all tasks
+  const auto &scheduling_class = task.GetTaskSpecification().GetSchedulingClass();
   // If the scheduling class is infeasible, just add the work to the infeasible queue
   // directly.
   if (infeasible_tasks_.count(scheduling_class) > 0) {
     infeasible_tasks_[scheduling_class].push_back(work);
   } else {
     tasks_to_schedule_[scheduling_class].push_back(work);
+    dfs_tasks_to_schedule_.emplace(pri, work);
   }
 	LogLeaseSeq("Lease Req", task.GetTaskSpecification().GetPriority());
   ScheduleAndDispatchTasks();
@@ -105,107 +105,108 @@ void ReplyCancelled(const internal::Work &work,
 void ClusterTaskManager::ScheduleAndDispatchTasks() {
   // Always try to schedule infeasible tasks in case they are now feasible.
   TryScheduleInfeasibleTask();
-  for (auto shapes_it = tasks_to_schedule_.begin();
-       shapes_it != tasks_to_schedule_.end();) {
-    auto &work_queue = shapes_it->second;
-    bool is_infeasible = false;
-    for (auto work_it = work_queue.begin(); work_it != work_queue.end();) {
-      // Check every task in task_to_schedule queue to see
-      // whether it can be scheduled. This avoids head-of-line
-      // blocking where a task which cannot be scheduled because
-      // there are not enough available resources blocks other
-      // tasks from being scheduled.
-      const std::shared_ptr<internal::Work> &work = *work_it;
-      RayTask task = work->task;
-      const Priority &task_priority = task.GetTaskSpecification().GetPriority();
-      RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks task " <<
-		  task.GetTaskSpecification().TaskId() << " priority:" << task_priority
-                     << " block requested is " << block_requested_priority_;
-			scheduling::NodeID scheduling_node_id;
-			// TODO(Jae) Add redirect task req to the coreworker for multi-node backpressure
-      if (task_priority >= block_requested_priority_) {
-				scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
-          task.GetTaskSpecification(),
-					false,
-          /*exclude_local_node*/ true,
-          /*requires_object_store_memory*/ false,
-          &is_infeasible);
-				if (scheduling_node_id.IsNil()) {
-					task_blocked_ = true;
-					RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks blocked task " << task_priority;
-					work_it++;
-					continue;
-					//break;
-				}else{
-					NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
-					RAY_LOG(DEBUG) << "[JAE_DEBUG] ScheduleAndDispatchTasks redirect to remote node:" << (node_id == self_node_id_);
-				}
-      }else{
-				task_blocked_ = false;
-
-				RAY_LOG(DEBUG) << "Scheduling pending task "
-											 << task.GetTaskSpecification().TaskId();
-				scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
-						task.GetTaskSpecification(),
-						work->PrioritizeLocalNode(),
-						/*exclude_local_node*/ false,
-						/*requires_object_store_memory*/ false,
-						&is_infeasible);
+  for (auto que_it = dfs_tasks_to_schedule_.begin();
+       que_it != dfs_tasks_to_schedule_.end();) {
+		bool is_infeasible = false;
+		// Check every task in task_to_schedule queue to see
+		// whether it can be scheduled. This avoids head-of-line
+		// blocking where a task which cannot be scheduled because
+		// there are not enough available resources blocks other
+		// tasks from being scheduled.
+		const std::shared_ptr<internal::Work> &work = que_it->second;
+		RayTask task = work->task;
+		const Priority &task_priority = task.GetTaskSpecification().GetPriority();
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks task " <<
+		task.GetTaskSpecification().TaskId() << " priority:" << task_priority
+									 << " block requested is " << block_requested_priority_;
+		scheduling::NodeID scheduling_node_id;
+		// TODO(Jae) Add redirect task req to the coreworker for multi-node backpressure
+		if (task_priority >= block_requested_priority_) {
+			scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
+				task.GetTaskSpecification(),
+				false,
+				true, //exclude_local_node
+				false,//requires_object_store_memory
+				&is_infeasible);
+			if (scheduling_node_id.IsNil()) {
+				task_blocked_ = true;
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] schedulePendingTasks blocked task " << task_priority;
+				que_it++;
+				continue;
+				//break;
+			}else{
+				NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
+				RAY_LOG(DEBUG) << "[JAE_DEBUG] ScheduleAndDispatchTasks redirect to remote node:" << (node_id == self_node_id_);
 			}
+		}else{
+			task_blocked_ = false;
 
-      // There is no node that has available resources to run the request.
-      // Move on to the next shape.
-      if (scheduling_node_id.IsNil()) {
-        RAY_LOG(DEBUG) << "No node found to schedule a task "
-                       << task.GetTaskSpecification().TaskId() << " is infeasible?"
-                       << is_infeasible;
+			RAY_LOG(DEBUG) << "Scheduling pending task "
+										 << task.GetTaskSpecification().TaskId();
+			scheduling_node_id = cluster_resource_scheduler_->GetBestSchedulableNode(
+					task.GetTaskSpecification(),
+					work->PrioritizeLocalNode(),
+					false,//exclude_local_node
+					false,//requires_object_store_memory
+					&is_infeasible);
+		}
 
-        if (task.GetTaskSpecification().IsNodeAffinitySchedulingStrategy() &&
-            !task.GetTaskSpecification().GetNodeAffinitySchedulingStrategySoft()) {
-          // This can only happen if the target node doesn't exist or is infeasible.
-          // The task will never be schedulable in either case so we should fail it.
-          ReplyCancelled(
-              *work,
-              rpc::RequestWorkerLeaseReply::SCHEDULING_CANCELLED_UNSCHEDULABLE,
-              "The node specified via NodeAffinitySchedulingStrategy doesn't exist "
-              "any more or is infeasible, and soft=False was specified.");
-          // We don't want to trigger the normal infeasible task logic (i.e. waiting),
-          // but rather we want to fail the task immediately.
-          work_it = work_queue.erase(work_it);
-          is_infeasible = false;
-          continue;
-        }
+		const auto &scheduling_class = task.GetTaskSpecification().GetSchedulingClass();
+		// There is no node that has available resources to run the request.
+		// Move on to the next shape.
+		if (scheduling_node_id.IsNil()) {
+			RAY_LOG(DEBUG) << "No node found to schedule a task "
+										 << task.GetTaskSpecification().TaskId() << " is infeasible?"
+										 << is_infeasible;
 
-        break;
-      }
-			LogLeaseSeq("\t\t Granted to ", task.GetTaskSpecification().GetPriority());
-      NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
-      ScheduleOnNode(node_id, work);
-      work_it = work_queue.erase(work_it);
+			if (task.GetTaskSpecification().IsNodeAffinitySchedulingStrategy() &&
+					!task.GetTaskSpecification().GetNodeAffinitySchedulingStrategySoft()) {
+				// This can only happen if the target node doesn't exist or is infeasible.
+				// The task will never be schedulable in either case so we should fail it.
+				ReplyCancelled(
+						*work,
+						rpc::RequestWorkerLeaseReply::SCHEDULING_CANCELLED_UNSCHEDULABLE,
+						"The node specified via NodeAffinitySchedulingStrategy doesn't exist "
+						"any more or is infeasible, and soft=False was specified.");
+				// We don't want to trigger the normal infeasible task logic (i.e. waiting),
+				// but rather we want to fail the task immediately.
+				for(auto it = tasks_to_schedule_[scheduling_class].begin(); it != tasks_to_schedule_[scheduling_class].end(); it++){
+					if ( *it == que_it->second){
+						tasks_to_schedule_[scheduling_class].erase(it);
+						break;
+					}
+				}
+				is_infeasible = false;
+			}else{
+				if (announce_infeasible_task_) {
+					announce_infeasible_task_(task);
+				}
+
+				infeasible_tasks_[scheduling_class].push_back(que_it->second);
+				// TODO(Jae) if something's wrong this could be causing it. Erase one item instead of entire sched class
+				tasks_to_schedule_.erase(scheduling_class);
+			}
+			que_it = dfs_tasks_to_schedule_.erase(que_it);
+
+			continue;
+		}
+		LogLeaseSeq("\t\t Granted to ", task.GetTaskSpecification().GetPriority());
+		NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
+		ScheduleOnNode(node_id, work);
+		for(auto it = tasks_to_schedule_[scheduling_class].begin(); it != tasks_to_schedule_[scheduling_class].end(); it++){
+			if ( *it == que_it->second){
+				tasks_to_schedule_[scheduling_class].erase(it);
+				break;
+			}
+		}
+		que_it = dfs_tasks_to_schedule_.erase(que_it);
     }
 
-    if (is_infeasible) {
-      RAY_CHECK(!work_queue.empty());
-      // Only announce the first item as infeasible.
-      auto &work_queue = shapes_it->second;
-      const auto &work = *(work_queue.begin());
-      const RayTask task = work->task;
-      if (announce_infeasible_task_) {
-        announce_infeasible_task_(task);
-      }
-
-      // TODO(sang): Use a shared pointer deque to reduce copy overhead.
-      infeasible_tasks_[shapes_it->first] = shapes_it->second;
-      tasks_to_schedule_.erase(shapes_it++);
-    } else if (work_queue.empty()) {
-      tasks_to_schedule_.erase(shapes_it++);
-    } else {
-      shapes_it++;
-    }
-  }
   local_task_manager_->ScheduleAndDispatchTasks();
 }
 
+
+// No DFS for infeasibleTasks
 void ClusterTaskManager::TryScheduleInfeasibleTask() {
   for (auto shapes_it = infeasible_tasks_.begin();
        shapes_it != infeasible_tasks_.end();) {
@@ -235,6 +236,9 @@ void ClusterTaskManager::TryScheduleInfeasibleTask() {
       RAY_LOG(DEBUG) << "Infeasible task of task id "
                      << task.GetTaskSpecification().TaskId()
                      << " is now feasible. Move the entry back to tasks_to_schedule_";
+			for(auto it = shapes_it->second.begin(); it != shapes_it->second.end(); it++){
+				dfs_tasks_to_schedule_.emplace((*it)->task.GetTaskSpecification().GetPriority(), *it);
+			}
       tasks_to_schedule_[shapes_it->first] = shapes_it->second;
       infeasible_tasks_.erase(shapes_it++);
     }
@@ -256,6 +260,7 @@ bool ClusterTaskManager::CancelTask(
         RAY_LOG(DEBUG) << "Canceling task " << task_id << " Priority " <<
 			task.GetTaskSpecification().GetPriority() <<" from schedule queue.";
         ReplyCancelled(*(*work_it), failure_type, scheduling_failure_message);
+				dfs_tasks_to_schedule_.erase(task.GetTaskSpecification().GetPriority());
         work_queue.erase(work_it);
         if (work_queue.empty()) {
           tasks_to_schedule_.erase(shapes_it);
@@ -417,6 +422,7 @@ size_t ClusterTaskManager::GetInfeasibleQueueSize() const {
 }
 
 size_t ClusterTaskManager::GetPendingQueueSize() const {
+	return dfs_tasks_to_schedule_.size();
   size_t count = 0;
   for (const auto &cls_entry : tasks_to_schedule_) {
     count += cls_entry.second.size();
@@ -442,19 +448,19 @@ void ClusterTaskManager::CheckDeadlock(size_t num_spinning_workers, int64_t firs
   static Priority init_priority;
   //Deadlock #1 this is diff from all workes spinning
   if(enable_deadlock1 && num_spinning_workers && num_spinning_workers == leased_workers_size_()){
-	RAY_LOG(DEBUG) << "[" << __func__ << "] All leased workers are spinning ";
-	if(enable_eagerSpill){
-      //DeleteEagerSpilledObjects(local_objects_, local_object_manager, true);
-	  io_service.post([&local_object_manager](){
-	    local_object_manager.DeleteEagerSpilledObjects(true);
-	  },"");
-	}else{
-	  io_service.post([this](){
-	    object_manager_->SetShouldSpill(true);
-	  },"");
-	}
-	BlockTasks(init_priority, io_service);
-	return;
+		RAY_LOG(DEBUG) << "[" << __func__ << "] All leased workers are spinning ";
+		if(enable_eagerSpill){
+				//DeleteEagerSpilledObjects(local_objects_, local_object_manager, true);
+			io_service.post([&local_object_manager](){
+				local_object_manager.DeleteEagerSpilledObjects(true);
+			},"");
+		}else{
+			io_service.post([this](){
+				object_manager_->SetShouldSpill(true);
+			},"");
+		}
+		BlockTasks(init_priority, io_service);
+		return;
   }
   if(!enable_deadlock2){
     if(enable_eagerSpill){

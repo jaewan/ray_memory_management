@@ -190,6 +190,8 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
   absl::flat_hash_map<SchedulingClass, std::deque<std::shared_ptr<internal::Work>>>
       infeasible_tasks_;
 
+	absl::btree_map<ray::Priority, std::shared_ptr<internal::Work>> dfs_tasks_to_schedule_;
+
   const SchedulerResourceReporter scheduler_resource_reporter_;
   mutable SchedulerStats internal_stats_;
 

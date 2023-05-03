@@ -123,15 +123,14 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
       if (keep_executing) {
         // Note that the dependencies in the task spec are mutated to only contain
         // plasma dependencies after ResolveDependencies finishes.
-				/*
         const SchedulingKey scheduling_key(task_spec.GetSchedulingClass(),
                                            task_spec.GetDependencyIds(),
                                            task_spec.IsActorCreationTask()
                                                ? task_spec.ActorCreationId()
                                                : ActorID::Nil(),
                                            task_spec.GetRuntimeEnvHash());
-																					 */
 				// This is a DFS patch
+				/*
 				static const std::vector<ObjectID> empty_dependencies;
         const SchedulingKey scheduling_key(0,
 																					 empty_dependencies,
@@ -139,6 +138,7 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
                                                ? task_spec.ActorCreationId()
                                                : ActorID::Nil(),
                                            0);
+				 */
         const auto priority = task_spec.GetPriority();
         auto inserted = tasks_.emplace(task_spec.TaskId(), TaskEntry(task_spec, scheduling_key, priority));
         RAY_CHECK(inserted.second);
