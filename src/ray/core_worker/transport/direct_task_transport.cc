@@ -23,7 +23,7 @@
 namespace ray {
 namespace core {
 
-std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(NodeID *node_id, const Priority &base_priority){
+std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(const NodeID *node_id, const Priority &base_priority){
   auto pri_it = priority_task_queues_not_pushed_.begin();
 	static Priority dummy_pri;
 	bool spilled_arguments = true;
@@ -436,6 +436,7 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
   RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle worker:"<<addr.worker_id << " was_error:" 
                  << was_error << " worker_exiting:"<< worker_exiting << " lease time expired:" 
 								 << (current_time_ms() > lease_entry.lease_expiration_time);
+	const static Priority base_priority;
   if (!lease_entry.lease_client) {
     return;
   }
@@ -454,15 +455,14 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 			RAY_LOG(DEBUG) << "[JAE_DEBUG] OnWorkerIdle lease_entry is busy";
 		}
   } else {
-		RAY_CHECK(true) << "Oops";
-		/*
-		Priority *pri_to_push;
-		bool return_worker;
-		std::tie(pri_to_push, return_worker) = GetNextTaskToPush();
+		RAY_CHECK(false) << "Oops";
+		Priority *highest_priority;
+		bool no_high_pri_task;
+		std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&addr.raylet_id, base_priority);
 	
-    const Priority pri(pri_to_push->score);
+    const Priority pri(highest_priority->score);
 		priority_task_queues_.erase(pri);
-    priority_task_queues_not_pushed_.erase(*pri_to_push);
+    priority_task_queues_not_pushed_.erase(*highest_priority);
     //priority_task_queues_not_pushed_lock.unlock();
     auto &client = *client_cache_->GetOrConnect(addr.ToProto());
 
@@ -484,7 +484,6 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
       tasks_.erase(task_spec.TaskId());
 		  priority_to_task_spec_.erase(pri);
     }
-		*/
 
     CancelWorkerLeaseIfNeeded(scheduling_key);
   }
