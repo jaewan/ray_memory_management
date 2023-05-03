@@ -198,7 +198,7 @@ class LocalObjectManager {
 
 
   /// RSTODO:
-  void OnObjectRemoteSpilled(const ObjectID &object_id);
+  void OnObjectRemoteSpilled(const std::vector<ObjectID> object_ids);
 
   /// Do operations that are needed after spilling objects such as
   /// 1. Unpin the pending spilling object.
@@ -251,6 +251,12 @@ class LocalObjectManager {
 
   /// RSCODE:
   absl::flat_hash_map<ObjectID, rpc::Address> object_to_worker_address_;
+
+  /// RSCODE:
+  absl::flat_hash_map<size_t, absl::flat_hash_map<ObjectID, size_t>> spilled_remote_objects_tracker_;
+
+  /// RSCODE:
+  size_t spilled_remote_objects_tracker_id_ = 0;
 
   // Objects that are pinned on this node.
   absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject>> pinned_objects_;

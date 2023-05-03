@@ -39,7 +39,7 @@ void SpillRemoteManager::StartSpillRemote(const NodeID &dest_id,
   ScheduleRemainingSpills();
 }
 
-void SpillRemoteManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id, const std::function<void()> callback) {
+void SpillRemoteManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id, const std::function<void(ObjectID)> callback) {
   auto spill_remote_id = std::make_pair(dest_id, obj_id);
   chunks_in_flight_ -= 1;
   chunks_remaining_ -= 1;
@@ -50,7 +50,7 @@ void SpillRemoteManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &
                    << " completed, remaining: " << NumPushesInFlight();
 
     RAY_LOG(INFO) << "About to call callback in OnChunkComplete";
-    callback();
+    callback(obj_id);
   }
   ScheduleRemainingSpills();
 }

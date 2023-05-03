@@ -308,12 +308,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback);
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback);
 
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void FindNodeToSpill(const ObjectID &object_id, const std::function<void()> callback);
+  void FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback);
 
   /// RSCODE:
   void RemoteSpillDecrementRefCount(const ObjectID &object_id);
@@ -407,8 +407,6 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteFreeMapping() { return spilled_remote_objects_to_free_; }
 
-  void AddToSpilledRemoteMap(ObjectID object_id, NodeID node_id) {spilled_remote_objects_url_.emplace(object_id, node_id); }
-
  private:
   friend class TestObjectManager;
 
@@ -444,7 +442,7 @@ class ObjectManager : public ObjectManagerInterface,
   void SpillRemoteInternal(const ObjectID &object_id,
                           const NodeID &node_id,
                           std::shared_ptr<ChunkObjectReader> chunk_reader,
-                          const std::function<void()> callback);
+                          const std::function<void(ObjectID)> callback);
 
 
   /// The internal implementation of pushing an object.
@@ -634,6 +632,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE: Mapping from object ids to rpc node addresses for remotely spilled objects.
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
+
+  /// RSCODE: Map to keep track of when spills are finished
+  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_tracker_;
 
   /// RSCODE: Mapping from object ids to rpc origin node addresses.
   // absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;

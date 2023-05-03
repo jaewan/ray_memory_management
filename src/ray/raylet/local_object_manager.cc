@@ -325,7 +325,14 @@ void LocalObjectManager::SpillObjectsInternal(
     return;
   }
 
+  /// RSTODO: Might be useful later
+  // {
+  //   absl::MutexLock lock(&mutex_);
+  //   num_active_workers_ += 1;
+  // }
+
   /// RSCODE: Simply call SpillRemote() function in object_manager
+  std::vector<ObjectID> requested_objects_to_spill;
   for (const auto &object_id : objects_to_spill) {
     auto it = objects_pending_spill_.find(object_id);
     RAY_CHECK(it != objects_pending_spill_.end());
@@ -337,39 +344,58 @@ void LocalObjectManager::SpillObjectsInternal(
 
       num_bytes_pending_spill_ -= it->second->GetSize();
       objects_pending_spill_.erase(it);
-      continue;
+    } else {
+      requested_objects_to_spill.push_back(object_id);
     }
+  }
 
-    // object_to_worker_address_.emplace(object_id, freed_it->second.first);
+  size_t spilled_remote_objects_tracker_id;
+  absl::flat_hash_map<ObjectID, size_t> spill_remote_tracker_mapping;
+  {
+    absl::MutexLock lock(&mutex_);
+    spilled_remote_objects_tracker_id = spilled_remote_objects_tracker_id_;
+    spilled_remote_objects_tracker_id_ += 1;
+  }
 
-    /// RSTODO: Delete later
-    RAY_LOG(INFO) << "We are about to spill object: " << object_id;
+  // itereate through requested_objects_to_spill
+  for (size_t i = 0; i < requested_objects_to_spill.size(); i++) {
+    spill_remote_tracker_mapping.emplace(requested_objects_to_spill[i], spilled_remote_objects_tracker_id);
+  }
 
-    // Increase ref count
-    // object_manager_.RemoteSpillIncrementRefCount(object_id);
+  spilled_remote_objects_tracker_.emplace(spilled_remote_objects_tracker_id, spill_remote_tracker_mapping);
 
-    object_manager_.FindNodeToSpill(object_id, 
-    [this, object_id, callback]() {
-      /// RSTODO: Delete this later
-      RAY_LOG(INFO) << "Callback test";
+  object_manager_.FindNodeToSpill(requested_objects_to_spill, 
+  [this, requested_objects_to_spill, spilled_remote_objects_tracker_id, callback](const ObjectID &object_id) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Callback test";
+  
+    absl::flat_hash_map<ObjectID, size_t>& spill_remote_tracker_mapping = spilled_remote_objects_tracker_.at(spilled_remote_objects_tracker_id);
 
-      // object_manager_.RemoteSpillIncrementRefCount(object_id);
+    spill_remote_tracker_mapping.erase(object_id);
 
-      // Add to hashmap of spilled objects
-      absl::flat_hash_map<ObjectID, NodeID> spill_remote_free_mapping = object_manager_.GetSpillRemoteFreeMapping();
-      auto it = spill_remote_free_mapping.find(object_id);
-      object_manager_.AddToSpilledRemoteMap(object_id, it->second);
-      
+    spilled_remote_objects_tracker_[spilled_remote_objects_tracker_id] = spill_remote_tracker_mapping;
+
+    if (spill_remote_tracker_mapping.empty()) {
       /// RSTODO: Delete later
       RAY_LOG(INFO) << "About to call OnObjectRemoteSpilled on object: " << object_id;
-      OnObjectRemoteSpilled(object_id);
+      OnObjectRemoteSpilled(requested_objects_to_spill);
+
+      /// RSTODO: Might be useful later
+      // if (objects_pending_spill_.empty()) {
+      //   RAY_LOG(INFO) << "About to decrement num_active_workers_";
+
+      //   {
+      //     absl::MutexLock lock(&mutex_);
+      //     num_active_workers_ -= 1;
+      //   } 
+      // }
 
       /// RSCODE: Call callback here?
       if (callback) {
         callback(Status::OK());
       }
-    });
-  }
+    }
+  });
 
   // /// RSTODO: Comment this out for now
   // {
@@ -458,68 +484,72 @@ void LocalObjectManager::SpillObjectsInternal(
 }
 
 /// RSTODO: Code to free a remotely spilled object
-void LocalObjectManager::OnObjectRemoteSpilled(const ObjectID &object_id) {
-  /// RSTODO: Delete later
-  const std::string &object_url = "remotelyspilled" + std::to_string(rand());
-  RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
+void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> object_ids) {
+  for (size_t i = 0; i < object_ids.size(); ++i) {
+    const ObjectID &object_id = object_ids[i];
 
-  // View ref count
-  // object_manager_.RemoteSpillViewRefCount(object_id);
+    /// RSTODO: Delete later
+    const std::string &object_url = "remotelyspilled" + std::to_string(rand());
+    RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
 
-  // Update the object_id -> url_ref_count to use it for deletion later.
-  // We need to track the references here because a single file can contain
-  // multiple objects, and we shouldn't delete the file until
-  // all the objects are gone out of scope.
-  // object_url is equivalent to url_with_offset.
-  // auto parsed_url = ParseURL(object_url);
-  // const auto base_url_it = parsed_url->find("url");
-  // RAY_CHECK(base_url_it != parsed_url->end());
-  /// RSTODO: Maybe comment out / delete later
-  if (!url_ref_count_.contains(object_url)) {
-    url_ref_count_[object_url] = 1;
-  } else {
-    url_ref_count_[object_url] += 1;
+    // View ref count
+    // object_manager_.RemoteSpillViewRefCount(object_id);
+
+    // Update the object_id -> url_ref_count to use it for deletion later.
+    // We need to track the references here because a single file can contain
+    // multiple objects, and we shouldn't delete the file until
+    // all the objects are gone out of scope.
+    // object_url is equivalent to url_with_offset.
+    // auto parsed_url = ParseURL(object_url);
+    // const auto base_url_it = parsed_url->find("url");
+    // RAY_CHECK(base_url_it != parsed_url->end());
+    /// RSTODO: Maybe comment out / delete later
+    if (!url_ref_count_.contains(object_url)) {
+      url_ref_count_[object_url] = 1;
+    } else {
+      url_ref_count_[object_url] += 1;
+    }
+
+    // Mark that the object is spilled and unpin the pending requests.
+    // spilled_objects_url_.emplace(object_id, object_url);
+    /// RSTODO:
+    RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
+
+    /// RSTODO: Might have to just delete this later because it messes up with bookkeeping but rn we need it to get past the check:
+    /// RAY_CHECK((pinned_objects_.count(object_id) > 0) || (spilled_objects_url_.count(object_id) > 0) || (objects_pending_spill_.count(object_id) > 0));
+    spilled_objects_url_.emplace(object_id, object_url);
+
+    RAY_LOG(DEBUG) << "Unpinning pending spill object " << object_id;
+    auto it = objects_pending_spill_.find(object_id);
+    RAY_CHECK(it != objects_pending_spill_.end());
+    const auto object_size = it->second->GetSize();
+    num_bytes_pending_spill_ -= object_size;
+    objects_pending_spill_.erase(it);
+
+    // Asynchronously Update the spilled URL.
+    auto freed_it = local_objects_.find(object_id);
+    if (freed_it == local_objects_.end() || freed_it->second.second) {
+      RAY_LOG(DEBUG) << "Spilled object already freed, skipping send of spilled URL to "
+                        "object directory for object "
+                      << object_id;
+      return;
+    }
+    
+    // auto worker_it = object_to_worker_address_.find(object_id);
+    // if (worker_it == object_to_worker_address_.end()) {
+    //   RAY_LOG(DEBUG) << "Object doesn't exist in object to worker address map: " << object_id;
+    //   return;
+    // }
+
+    // const auto &worker_addr = worker_it->second;
+    const auto &worker_addr = freed_it->second.first;
+    object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
+
+    RAY_LOG(INFO) << "Decrementing ref count after ReportObjectSpilled";
+
+    // Decrease ref count
+    // object_manager_.RemoteSpillDecrementRefCount(object_id);
   }
-
-  // Mark that the object is spilled and unpin the pending requests.
-  // spilled_objects_url_.emplace(object_id, object_url);
-  /// RSTODO:
-  RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
-
-  /// RSTODO: Might have to just delete this later because it messes up with bookkeeping but rn we need it to get past the check:
-  /// RAY_CHECK((pinned_objects_.count(object_id) > 0) || (spilled_objects_url_.count(object_id) > 0) || (objects_pending_spill_.count(object_id) > 0));
-  spilled_objects_url_.emplace(object_id, object_url);
-
-  RAY_LOG(DEBUG) << "Unpinning pending spill object " << object_id;
-  auto it = objects_pending_spill_.find(object_id);
-  RAY_CHECK(it != objects_pending_spill_.end());
-  const auto object_size = it->second->GetSize();
-  num_bytes_pending_spill_ -= object_size;
-  objects_pending_spill_.erase(it);
-
-  // Asynchronously Update the spilled URL.
-  auto freed_it = local_objects_.find(object_id);
-  if (freed_it == local_objects_.end() || freed_it->second.second) {
-    RAY_LOG(DEBUG) << "Spilled object already freed, skipping send of spilled URL to "
-                      "object directory for object "
-                    << object_id;
-    return;
-  }
-  
-  // auto worker_it = object_to_worker_address_.find(object_id);
-  // if (worker_it == object_to_worker_address_.end()) {
-  //   RAY_LOG(DEBUG) << "Object doesn't exist in object to worker address map: " << object_id;
-  //   return;
-  // }
-
-  // const auto &worker_addr = worker_it->second;
-  const auto &worker_addr = freed_it->second.first;
-  object_directory_->ReportObjectSpilled(object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
-
-  RAY_LOG(INFO) << "Decrementing ref count after ReportObjectSpilled";
-
-  // Decrease ref count
-  // object_manager_.RemoteSpillDecrementRefCount(object_id);
 }
 
 void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids,
@@ -670,6 +700,59 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
   });
 }
 
+/// RSCODE: Original ProcessSpilledObjectsDeleteQueue Code
+// void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_size) {
+//   std::vector<std::string> object_urls_to_delete;
+//   // Process upto batch size of objects to delete.
+//   while (!spilled_object_pending_delete_.empty() &&
+//          object_urls_to_delete.size() < max_batch_size) {
+//     auto &object_id = spilled_object_pending_delete_.front();
+//     // If the object is still spilling, do nothing. This will block other entries to be
+//     // processed, but it should be fine because the spilling will be eventually done,
+//     // and deleting objects is the low priority tasks. This will instead enable simpler
+//     // logic after this block.
+//     if (objects_pending_spill_.contains(object_id)) {
+//       break;
+//     }
+
+//     // Object id is either spilled or not spilled at this point.
+//     const auto spilled_objects_url_it = spilled_objects_url_.find(object_id);
+//     if (spilled_objects_url_it != spilled_objects_url_.end()) {
+//       // If the object was spilled, see if we can delete it. We should first check the
+//       // ref count.
+//       std::string &object_url = spilled_objects_url_it->second;
+//       // Note that here, we need to parse the object url to obtain the base_url.
+//       auto parsed_url = ParseURL(object_url);
+//       const auto base_url_it = parsed_url->find("url");
+//       RAY_CHECK(base_url_it != parsed_url->end());
+//       const auto &url_ref_count_it = url_ref_count_.find(base_url_it->second);
+//       RAY_CHECK(url_ref_count_it != url_ref_count_.end())
+//           << "url_ref_count_ should exist when spilled_objects_url_ exists. Please "
+//              "submit a Github issue if you see this error.";
+//       url_ref_count_it->second -= 1;
+
+//       // If there's no more refs, delete the object.
+//       if (url_ref_count_it->second == 0) {
+//         url_ref_count_.erase(url_ref_count_it);
+//         RAY_LOG(DEBUG) << "The URL " << object_url
+//                        << " is deleted because the references are out of scope.";
+//         object_urls_to_delete.emplace_back(object_url);
+//       }
+//       spilled_objects_url_.erase(spilled_objects_url_it);
+//     } else {
+//       // If the object was not spilled, it gets pinned again. Unpin here to
+//       // prevent a memory leak.
+//       pinned_objects_.erase(object_id);
+//     }
+//     local_objects_.erase(object_id);
+//     spilled_object_pending_delete_.pop();
+//   }
+//   if (object_urls_to_delete.size() > 0) {
+//     DeleteSpilledObjects(object_urls_to_delete);
+//   }
+// }
+
+/// RSCODE: Freeing from remote version
 void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_size) {
   
   /// RSTODO: Delete later

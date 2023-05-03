@@ -421,12 +421,14 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 }
 
 /// RSCODE: Function to identify remote node with available memory
-void ObjectManager::FindNodeToSpill(const ObjectID &object_id, const std::function<void()> callback) {
+void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
   /// RSTODO: Figure out how to exit this for loop once we find a node that can store data
   for (const auto &connection_info : remote_connections) {
     const NodeID node_id = connection_info.node_id;
-    SpillRemote(object_id, node_id, callback);
+    for(size_t i = 0; i < requested_objects_to_spill.size(); i++) {
+      SpillRemote(requested_objects_to_spill[i], node_id, callback);
+    }
   }
 }
 
@@ -542,11 +544,12 @@ void ObjectManager::HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemo
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
 /// RSCODE: Implement spill function to spill object to remote memory
-void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback) {
+void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback) {
   /// RSCODE: Add code to add object id to node id mapping
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
-  // spilled_remote_objects_url_.emplace(object_id, node_id);
+  spilled_remote_objects_url_.emplace(object_id, node_id);
   spilled_remote_objects_to_free_.emplace(object_id, node_id);
+  spilled_remote_objects_tracker_.emplace(object_id, node_id);
 
   if (pulled_objects_from_remote_.contains(object_id)) {
     pulled_objects_from_remote_.erase(object_id );
@@ -779,7 +782,7 @@ void ObjectManager::PushFromFilesystem(const ObjectID &object_id,
 void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                                        const NodeID &node_id,
                                        std::shared_ptr<ChunkObjectReader> chunk_reader,
-                                       const std::function<void()> callback) {
+                                       const std::function<void(ObjectID)> callback) {
   auto rpc_client = GetRemoteSpillRpcClient(node_id);
   if (!rpc_client) {
     RAY_LOG(INFO)
@@ -1131,9 +1134,9 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   }
 
   /// RSCODE: Try incrementing object count before write chunk
-  // if (from_remote_spill) {
-  //   buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  // }
+  if (from_remote_spill) {
+    buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  }
 
   if (chunk_status.ok()) {
     // Avoid handling this chunk if it's already being handled by another process.

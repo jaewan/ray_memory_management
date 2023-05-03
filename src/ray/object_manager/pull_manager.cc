@@ -122,13 +122,8 @@ uint64_t PullManager::Pull(const std::vector<rpc::ObjectReference> &object_ref_b
 bool PullManager::ActivateNextBundlePullRequest(BundlePullRequestQueue &bundles,
                                                 bool respect_quota,
                                                 std::vector<ObjectID> *objects_to_pull) {
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Calling ActivateNextBundlePullRequest";
-
   if (bundles.inactive_requests.empty()) {
     // No inactive requests in the queue.
-    /// RSTODO: Delete later
-    RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 1";
     return false;
   }
 
@@ -136,9 +131,6 @@ bool PullManager::ActivateNextBundlePullRequest(BundlePullRequestQueue &bundles,
   const auto next_request_id = *(bundles.inactive_requests.cbegin());
   const auto &next_request = map_find_or_die(bundles.requests, next_request_id);
   RAY_CHECK(next_request.IsPullable());
-
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 2";
 
   // Activate the pull bundle request if possible.
   {
@@ -293,9 +285,6 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
     RAY_LOG(DEBUG) << "Updating pulls based on available memory: " << num_bytes_available;
   }
 
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 1";
-
   num_bytes_available_ = num_bytes_available;
 
   std::vector<ObjectID> objects_to_pull;
@@ -307,9 +296,6 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
   // by canceling task args and wait requests.
   bool get_requests_remaining = !get_request_bundles_.inactive_requests.empty();
   while (get_requests_remaining) {
-    /// RSTODO: Delete later
-    RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 2";
-
     const int64_t margin_required = NextRequestBundleSize(get_request_bundles_);
     DeactivateUntilMarginAvailable("task args request",
                                    task_argument_bundles_,
