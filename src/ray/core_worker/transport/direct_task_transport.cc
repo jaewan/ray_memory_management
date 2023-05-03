@@ -23,11 +23,11 @@
 namespace ray {
 namespace core {
 
-std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(NodeID *node_id){
+std::pair<Priority*, bool> CoreWorkerDirectTaskSubmitter::GetNextTaskToPush(NodeID *node_id, const Priority &base_priority){
   auto pri_it = priority_task_queues_not_pushed_.begin();
 	static Priority dummy_pri;
 	bool spilled_arguments = true;
-	while(spilled_arguments){
+	while(spilled_arguments && *pri_it < base_priority){
 		if (pri_it == priority_task_queues_not_pushed_.end()){
 			return std::make_pair(&dummy_pri, true);
 		}
@@ -612,10 +612,19 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     // There are idle workers, so we don't need more.
     return;
   }
+	const static uint64_t max_pending_lease_requests_per_scheduling_category_ = 10;
+  if (scheduling_key_entry.pending_lease_requests.size() ==
+      max_pending_lease_requests_per_scheduling_category_) {
+    RAY_LOG(DEBUG) << "Exceeding the pending request limit "
+                   << max_pending_lease_requests_per_scheduling_category_;
+    return;
+  }
+	/*
   if(num_leases_on_flight_ >= 32){
 	   RAY_LOG(DEBUG) << "Exceeding the pending request limit " << 32;
      return;
   }
+	*/
   const bool is_spillback = (raylet_address != nullptr);
   TaskSpecification resource_spec;
   Priority pri;
@@ -787,7 +796,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 								}else{
 									Priority *highest_priority;
 									bool no_high_pri_task;
-									std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&raylet_id);
+									std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&raylet_id, pri);
 									if(no_high_pri_task){
 										OnWorkerIdle(addr,
 																 scheduling_key,
@@ -808,7 +817,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 							}else{
 								Priority *highest_priority;
 								bool no_high_pri_task;
-								std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&raylet_id);
+								std::tie(highest_priority, no_high_pri_task) = GetNextTaskToPush(&raylet_id, pri);
 								if(no_high_pri_task){
 									auto &lease_entry = worker_to_lease_entry_[addr];
 									if (lease_entry.lease_client && !lease_entry.is_busy){
