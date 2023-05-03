@@ -551,55 +551,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     const SchedulingKey &scheduling_key, const rpc::Address *raylet_address) {
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
 
-  /*
-  RAY_CHECK(scheduling_key_entry.pending_lease_requests.size() <
-            max_pending_lease_requests_per_scheduling_category_);
-  if (scheduling_key_entry.pending_lease_requests.size() ==
-      max_pending_lease_requests_per_scheduling_category_) {
-    RAY_LOG(DEBUG) << "Exceeding the pending request limit "
-                   << max_pending_lease_requests_per_scheduling_category_;
-    return;
-  }
-  RAY_CHECK(scheduling_key_entry.pending_lease_requests.size() <
-            max_pending_lease_requests_per_scheduling_category_);
-
-  const auto &task_priority_queue = scheduling_key_entry.task_priority_queue;
-  if (task_priority_queue.empty()) {
-    if (scheduling_key_entry.CanDelete()) {
-      // We can safely remove the entry keyed by scheduling_key from the
-      // scheduling_key_entries_ hashmap.
-      scheduling_key_entries_.erase(scheduling_key);
-    }
-    return;
-  } else if ((size_t)scheduling_key_entry.task_priority_queue.size() <=
-             scheduling_key_entry.pending_lease_requests.size()) {
-    // All tasks have corresponding pending leases, no need to request more
-    return;
-  }
-
-  // Create a TaskSpecification with an overwritten TaskID to make sure we don't reuse the
-  // same TaskID to request a worker
-  auto resource_spec_msg = scheduling_key_entry.resource_spec.GetMutableMessage();
-  resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
-  TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
-  const TaskID task_id = resource_spec.TaskId();
-
-  */
-  /*
-  // Finding priority of the request
-  Priority dummy_pri = Priority();
-  Priority &pri = dummy_pri;
-  for (const auto& priority_it : task_priority_queue){
-    if(priority_it.second == scheduling_key_entry.resource_spec.TaskId()){
-	    pri = priority_it.first;
-      break;
-	  }
-  }
-  */
-  /*
-  const Priority &pri = task_priority_queue.begin()->first;
-  resource_spec.SetPriority(pri);
-  */
   if (!AllWorkersBusy() || priority_task_queues_.empty()) {
     // There are idle workers, so we don't need more.
     return;
@@ -609,15 +560,17 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
      return;
   }
   auto priority_it = priority_task_queues_.begin();
+	// Remove all Nill jobs. This could happen for race condition
+	while(priority_it != priority_task_queues_.end() && priority_to_task_spec_[*priority_it].JobId().IsNil()){
+		priority_it = priority_task_queues_.erase(priority_it);
+	}
+	if(priority_it == priority_task_queues_.end()){
+		return;
+	}
   const bool is_spillback = (raylet_address != nullptr);
   auto resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
-  TaskSpecification resource_spec;
-  do{
-    resource_spec_msg = priority_to_task_spec_[*priority_it].GetMutableMessage();
-    resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
-    resource_spec = TaskSpecification(resource_spec_msg);
-    priority_it = std::next(priority_it);
-  }while(priority_it != priority_task_queues_.end() && resource_spec.JobId().IsNil());
+	resource_spec_msg.set_task_id(TaskID::FromRandom(job_id_).Binary());
+  TaskSpecification resource_spec = TaskSpecification(resource_spec_msg);
 
   if ( resource_spec.JobId().IsNil() ){
 		RAY_LOG(DEBUG) << "[JAE_DEBUG] ERROR Jae redirect request should be handled. Local raylet already calculated the remote resource";
@@ -626,7 +579,6 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     return;
   }
 
-  priority_it = std::prev(priority_it);
   Priority pri(priority_it->score);
   const TaskID task_id = resource_spec.TaskId();
   resource_spec.SetPriority(pri);

@@ -81,7 +81,7 @@ PlasmaStore::PlasmaStore(instrumented_io_context &main_service,
                          std::function<void()> object_store_full_callback,
                          ray::AddObjectCallback add_object_callback,
                          ray::DeleteObjectCallback delete_object_callback,
-						 ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback)
+												 ray::ObjectCreationBlockedCallback on_object_creation_blocked_callback)
     : io_context_(main_service),
       socket_name_(socket_name),
       acceptor_(main_service, ParseUrlEndpoint(socket_name)),
@@ -181,8 +181,8 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
                    << ", metadata_size=" << object_info.metadata_size
                    << ", remaining_size=" << allocator_.GetFootprintLimit() - allocator_.Allocated();
   }else if(error == PlasmaError::OK && enable_eagerSpill){
-	on_object_creation_blocked_callback_(object_info.priority, object_info.object_id, false, false,
-			false, false, 0, 0);
+		on_object_creation_blocked_callback_(object_info.priority, object_info.object_id, false, false,
+				false, false, 0, 0);
   }
 
   if (footprint_limit != 0) {
