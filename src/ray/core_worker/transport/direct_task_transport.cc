@@ -555,10 +555,18 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
     // There are idle workers, so we don't need more.
     return;
   }
+  if (scheduling_key_entry.pending_lease_requests.size() ==
+      10) {
+    RAY_LOG(DEBUG) << "Exceeding the pending request limit "
+                   << max_pending_lease_requests_per_scheduling_category_;
+    return;
+  }
+	/*
   if(num_leases_on_flight_ >= 32){
 	   RAY_LOG(DEBUG) << "Exceeding the pending request limit " << 32;
      return;
   }
+	*/
   auto priority_it = priority_task_queues_.begin();
 	// Remove all Nill jobs. This could happen for race condition
 	while(priority_it != priority_task_queues_.end() && priority_to_task_spec_[*priority_it].JobId().IsNil()){
