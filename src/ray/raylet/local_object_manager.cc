@@ -39,6 +39,9 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
       continue;
     }
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Calling PinObjectsAndWaitForFree on object: " << object_id;
+
     const auto inserted =
         local_objects_.emplace(object_id, std::make_pair<>(owner_address, false));
     if (inserted.second) {
