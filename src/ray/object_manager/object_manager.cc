@@ -488,6 +488,11 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
   /// RSTODO: Delete this later
   RAY_LOG(INFO) << "About to free object in remote node: " << object_id;
 
+  /// RSTODO: Delete this later
+  for (auto it = local_objects_.begin(); it != local_objects_.end(); it++) {
+    RAY_LOG(INFO) << "Object in local_objects_: " << it->first;
+  }
+
   auto it = local_objects_.find(object_id);
   // Check if object is local
   if (it != local_objects_.end()) {
