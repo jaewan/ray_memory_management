@@ -578,7 +578,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   if (scheduling_key_entry.pending_lease_requests.size() ==
       10) {
     RAY_LOG(DEBUG) << "Exceeding the pending request limit "
-                   << max_pending_lease_requests_per_scheduling_category_;
+                   << 10;
     return;
   }
 	/*
