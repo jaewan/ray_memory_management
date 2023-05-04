@@ -141,15 +141,31 @@ Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
 				 */
         const auto priority = task_spec.GetPriority();
         auto inserted = tasks_.emplace(task_spec.TaskId(), TaskEntry(task_spec, scheduling_key, priority));
-        RAY_CHECK(inserted.second);
+        if(!inserted.second){
+        	tasks_.erase(task_spec.TaskId());
+        	tasks_.emplace(task_spec.TaskId(), TaskEntry(task_spec, scheduling_key, priority));
+				}
+        //RAY_CHECK(inserted.second);
         const auto task_key = inserted.first->second.task_key;
 				auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
-        RAY_CHECK(scheduling_key_entry.task_priority_queue.emplace(task_key).second) << task_spec.TaskId();
+        //RAY_CHECK(scheduling_key_entry.task_priority_queue.emplace(task_key).second) << task_spec.TaskId();
+        if(!scheduling_key_entry.task_priority_queue.emplace(task_key).second){
+					scheduling_key_entry.task_priority_queue.erase(task_key);
+					scheduling_key_entry.task_priority_queue.emplace(task_key);
+				}
 
         auto ptq_inserted = priority_task_queues_.emplace(priority);
-        RAY_CHECK(ptq_inserted.second);
+        if(!ptq_inserted.second){
+        	priority_task_queues_.erase(priority);
+        	priority_task_queues_.emplace(priority);
+				}
+        //RAY_CHECK(ptq_inserted.second);
         auto ptqnp_inserted = priority_task_queues_not_pushed_.emplace(priority);
-        RAY_CHECK(ptqnp_inserted.second);
+        if(!ptqnp_inserted.second){
+        	priority_task_queues_not_pushed_.erase(priority);
+        	priority_task_queues_not_pushed_.emplace(priority);
+				}
+        //RAY_CHECK(ptqnp_inserted.second);
         auto ptts_inserted = priority_to_task_spec_.emplace(priority, task_spec);
 				if(!ptts_inserted.second){
 					priority_to_task_spec_.erase(priority);
