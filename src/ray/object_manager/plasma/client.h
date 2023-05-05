@@ -141,6 +141,9 @@ class PlasmaClientInterface {
   /// \param object_ids The list of IDs of the objects to delete.
   /// \return The return status. If all the objects are non-existent, return OK.
   virtual Status Delete(const std::vector<ObjectID> &object_ids) = 0;
+
+  /// RSCODE:
+  virtual void RemoteSpillIncreaseObjectCount(const ObjectID &object_id) = 0;
 };
 
 class PlasmaClient : public PlasmaClientInterface {

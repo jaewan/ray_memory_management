@@ -605,6 +605,9 @@ void PlasmaClient::Impl::RemoteSpillDecreaseObjectCount(const ObjectID &object_i
 
 /// RSCODE: Increase ref count
 void PlasmaClient::Impl::RemoteSpillIncreaseObjectCount(const ObjectID &object_id) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "About to increase ref count in RemoteSpillIncreaseObjectCount";
+
   auto elem = objects_in_use_.find(object_id);
   ObjectInUseEntry *object_entry;
   if (elem == objects_in_use_.end()) {
