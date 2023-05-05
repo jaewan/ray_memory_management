@@ -149,9 +149,9 @@ void ObjectBufferPool::WriteChunk(const ObjectID &object_id,
                    << ", last chunk index: " << chunk_index;
     
     /// RSCODE:
-    if (from_remote_spill) {
-      store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    }
+    // if (from_remote_spill) {
+    //   store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    // }
   }
 }
 
