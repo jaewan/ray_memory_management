@@ -497,7 +497,7 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
   // Check if object is local
   if (it != local_objects_.end()) {
     RAY_LOG(INFO) << "Object " << object_id << " is local";
-    RemoteSpillDecrementRefCount(object_id);
+    // RemoteSpillDecrementRefCount(object_id);
   }
 
   // remote_spill_service_handler_.received_remote_objects_origin_.erase(object_id);
@@ -1131,13 +1131,13 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   }
 
   /// RSTODO: Maybe delete later
-  if (from_remote_spill) {
-    if (!received_remote_objects_origin_.contains(object_id)) {
-      RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
-      received_remote_objects_origin_.emplace(object_id, node_id);
-      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    }
-  }
+  // if (from_remote_spill) {
+  //   if (!received_remote_objects_origin_.contains(object_id)) {
+  //     RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
+  //     received_remote_objects_origin_.emplace(object_id, node_id);
+  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  //   }
+  // }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {
