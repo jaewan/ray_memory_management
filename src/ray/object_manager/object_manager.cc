@@ -69,7 +69,7 @@ ObjectManager::ObjectManager(
     /// RSCOMMENT: code that goes to LocalObjectManager to restore spilled objects. 
     RestoreSpilledObjectCallback restore_spilled_object,
     /// RSCODE:
-    std::function<bool(const ObjectID &)> restore_remote_spilled_object,
+    std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
     SpillObjectsCallback spill_objects_callback,
     std::function<void()> object_store_full_callback,
@@ -333,7 +333,7 @@ void ObjectManager::CancelPull(uint64_t request_id) {
   }
 }
 
-void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const bool from_remote) {
+void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const std::function<void()> callback, const bool from_remote) {
   auto rpc_client = GetRpcClient(client_id);
 
   /// RSTODO: Delete this later
@@ -345,7 +345,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
     // Try pulling from the client.
     rpc_service_.post(
         /// RSCODE:
-        [this, object_id, client_id, from_remote, rpc_client]() {
+        [this, object_id, client_id, from_remote, rpc_client, callback]() {
           rpc::PullRequest pull_request;
           pull_request.set_object_id(object_id.Binary());
           pull_request.set_node_id(self_node_id_.Binary());
@@ -356,10 +356,15 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
           rpc_client->Pull(
               pull_request,
               /// RSCODE:
-              [object_id, client_id](const Status &status, const rpc::PullReply &reply) {
+              [object_id, client_id, callback](const Status &status, const rpc::PullReply &reply) {
                 if (!status.ok()) {
                   RAY_LOG(WARNING) << "Send pull " << object_id << " request to client "
                                    << client_id << " failed due to" << status.message();
+                }
+                /// RSCODE: Callback to update object pending restore
+                else {
+                  RAY_LOG(INFO) << "We are calling callback to update object pending restore";
+                  callback();
                 }
               });
         },
@@ -416,8 +421,8 @@ void ObjectManager::HandleSendFinished(const ObjectID &object_id,
 }
 
 /// RSTODO: Refactor and delete this later
-void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_id) {
-  SendPullRequest(object_id, node_id, true);
+void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback) {
+  SendPullRequest(object_id, node_id, callback, true);
 }
 
 /// RSCODE: Function to identify remote node with available memory

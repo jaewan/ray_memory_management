@@ -284,7 +284,7 @@ class ObjectManager : public ObjectManagerInterface,
       IObjectDirectory *object_directory,
       RestoreSpilledObjectCallback restore_spilled_object,
       /// RSCODE:
-      std::function<bool(const ObjectID &)> restore_remote_spilled_object,
+      std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
       SpillObjectsCallback spill_objects_callback,
       std::function<void()> object_store_full_callback,
@@ -341,7 +341,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param object_id The object's object id.
   /// \param node_id The remote node's id.
   /// \return Void.
-  void TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_i);
+  void TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
@@ -571,11 +571,11 @@ class ObjectManager : public ObjectManagerInterface,
                           const bool from_remote = false,
                           const bool from_remote_spill = false);
 
-  /// Send pull request RSCODE: modified adding from_remote param. 
+  /// Send pull request RSCODE: modified adding from_remote param and callback
   ///
   /// \param object_id Object id
   /// \param client_id Remote server client id
-  void SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const bool from_remote = false);
+  void SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const std::function<void()> callback = [](){}, const bool from_remote = false);
 
   /// Get the rpc client according to the node ID
   ///
@@ -683,7 +683,7 @@ class ObjectManager : public ObjectManagerInterface,
   const RestoreSpilledObjectCallback restore_spilled_object_;
 
   /// RSCODE:
-  const std::function<bool(const ObjectID &)> restore_remote_spilled_object_;
+  const std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object_;
 
   /// Callback to get the URL of a locally spilled object.
   /// This returns the empty string if the object was not spilled locally.

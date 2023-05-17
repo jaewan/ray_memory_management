@@ -614,7 +614,7 @@ std::string LocalObjectManager::GetLocalSpilledObjectURL(const ObjectID &object_
   }
 }
 
-bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
+bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id, int64_t object_size) {
   /// RSCODE: check for remote spill and restore.
   /// NVM: keeping this here, but this comment is obsolete.  
   absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
@@ -630,6 +630,8 @@ bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
     return true;
   }
 
+  num_bytes_pending_restore_ += object_size;
+
   if (spill_remote_mapping.contains(object_id)) {
     /// RSTODO: Delete this later
     RAY_LOG(INFO) << "Remote object has been found: " << object_id;
@@ -637,7 +639,33 @@ bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id) {
     RAY_CHECK(objects_pending_restore_.emplace(object_id).second)
       << "Object dedupe wasn't done properly. Please report if you see this issue.";
       
-    object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id]);
+    auto start_time = absl::GetCurrentTimeNanos();
+    object_manager_.TempAccessPullRequest(object_id, spill_remote_mapping[object_id], 
+      [this, start_time, object_id, object_size]() {
+        num_bytes_pending_restore_ -= object_size;
+        objects_pending_restore_.erase(object_id);
+
+        auto now = absl::GetCurrentTimeNanos();
+        auto restored_bytes = object_size;
+        RAY_LOG(DEBUG) << "Restored " << restored_bytes << " in "
+                        << (now - start_time) / 1e6 << "ms. Object id:" << object_id;
+        restored_bytes_total_ += restored_bytes;
+        restored_objects_total_ += 1;
+        // Adjust throughput timing to account for concurrent restore operations.
+        restore_time_total_s_ +=
+            (now - std::max(start_time, last_restore_finish_ns_)) / 1e9;
+        if (now - last_restore_log_ns_ > 1e9) {
+          last_restore_log_ns_ = now;
+          RAY_LOG(INFO) << "Restored "
+                        << static_cast<int>(restored_bytes_total_ / (1024 * 1024))
+                        << " MiB, " << restored_objects_total_
+                        << " objects, read throughput "
+                        << static_cast<int>(restored_bytes_total_ / (1024 * 1024) /
+                                            restore_time_total_s_)
+                        << " MiB/s";
+        }
+        last_restore_finish_ns_ = now;
+      });
     return true;
   }
   return false; 

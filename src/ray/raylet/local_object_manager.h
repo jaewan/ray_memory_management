@@ -106,7 +106,7 @@ class LocalObjectManager {
                     std::function<void(const ray::Status &)> callback);
 
   /// RSTODO: Function to fetch remote object
-  bool RestoreRemoteSpilledObject(const ObjectID &object_id);
+  bool RestoreRemoteSpilledObject(const ObjectID &object_id, int64_t object_size);
 
   /// Restore a spilled object from external storage back into local memory.
   /// Note: This is no-op if the same restoration request is in flight or the requested
