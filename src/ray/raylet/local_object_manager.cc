@@ -492,7 +492,8 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> objec
     const ObjectID &object_id = object_ids[i];
 
     /// RSTODO: Delete later
-    const std::string &object_url = "remotelyspilled" + std::to_string(rand());
+    // const std::string &object_url = "remotelyspilled" + std::to_string(rand());
+    const std::string &object_url = "remotelyspilled";
     RAY_LOG(DEBUG) << "Object " << object_id << " spilled at " << object_url;
 
     // View ref count
