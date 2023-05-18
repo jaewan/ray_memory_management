@@ -363,7 +363,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
                 }
                 /// RSCODE: Callback to update object pending restore
                 else {
-                  RAY_LOG(INFO) << "We are calling callback to update object pending restore";
+                  RAY_LOG(INFO) << "We are calling callback to update object pending restore for object: " << object_id;
                   callback();
                 }
               });
@@ -372,7 +372,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
     /// RSCODE: Add code to delete object entry from hash map if remote
     if (from_remote) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Erasing from spilled_remote_objects_url_ after pull";
+      RAY_LOG(INFO) << "Erasing from spilled_remote_objects_url_ after pull for object: " << object_id;
       spilled_remote_objects_url_.erase(object_id);
     }
   } else {
@@ -663,7 +663,7 @@ void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const
 
   if (local_objects_.count(object_id) != 0) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Pushing from local";
+    RAY_LOG(INFO) << "Pushing from local for object " << object_id;
 
     /// RSCODE:
     return PushLocalObject(object_id, node_id, from_remote);
@@ -1136,13 +1136,13 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   }
 
   /// RSTODO: Maybe delete later
-  // if (from_remote_spill) {
-  //   if (!received_remote_objects_origin_.contains(object_id)) {
-  //     RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
-  //     received_remote_objects_origin_.emplace(object_id, node_id);
-  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  //   }
-  // }
+  if (from_remote_spill) {
+    if (!received_remote_objects_origin_.contains(object_id)) {
+      RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
+      received_remote_objects_origin_.emplace(object_id, node_id);
+      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    }
+  }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {
