@@ -447,7 +447,15 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
         }
       };
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "About to call CheckAvailableRemoteMemory RPC on node: " << node_id;
+
     rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, callback);   
+  }
+
+  // Print contents of node_to_available_memory
+  for (const auto &pair : node_to_available_memory) {
+    RAY_LOG(INFO) << "Node: " << pair.first << " has available memory: " << pair.second;
   }
 
   // Iterate through node_to_available_memory to find node with most available memory
@@ -478,8 +486,14 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 void ObjectManager::HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRemoteMemoryRequest &request,
                                       rpc::CheckAvailableRemoteMemoryReply *reply,
                                       rpc::SendReplyCallback send_reply_callback) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Starting call HandleCheckAvailableRemoteMemory RPC";
+
   // Something like this
   reply->set_available_memory(config_.object_store_memory - used_memory_);
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Finishing call HandleCheckAvailableRemoteMemory RPC";
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
