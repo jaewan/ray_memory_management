@@ -468,12 +468,12 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
   }
 
   // Iterate through node_to_available_memory to find node with most available memory
-  NodeID node_id;
-  int64_t max_available_memory = 0;
   for(size_t i = 0; i < requested_objects_to_spill.size(); i++) {
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "We are finding available memory for object: " << requested_objects_to_spill[i];
 
+    NodeID node_id;
+    int64_t max_available_memory = 0;
     for (const auto &pair : node_to_available_memory_) {
       if (pair.second > max_available_memory) {
         node_id = pair.first;
@@ -485,7 +485,8 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 
     if (data_size > max_available_memory) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Data size: " << data_size << " is greater than max available memory: " << max_available_memory << " for node: " << node_id << " and we will spill to disk instead";
+      RAY_LOG(INFO) << "Data size: " << data_size << " is greater than max available memory: " << max_available_memory 
+        << " for node: " << node_id << " and we will spill to disk instead for object: " << requested_objects_to_spill[i];
 
       objects_to_spill_to_disk.push_back(requested_objects_to_spill[i]);
     } else {
