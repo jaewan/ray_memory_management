@@ -58,7 +58,7 @@ const int64_t kDlMallocReserved = 256 * sizeof(size_t);
 
 }  // namespace
 
-PlasmaAllocator::PlasmaAllocator(const std::string &plasma_directory,
+PlasmaAllocator::(const std::string &plasma_directory,
                                  const std::string &fallback_directory,
                                  bool hugepage_enabled,
                                  int64_t footprint_limit)

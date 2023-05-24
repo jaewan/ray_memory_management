@@ -29,7 +29,8 @@ namespace rpc {
   RPC_SERVICE_HANDLER(ObjectManagerService, FreeObjects, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, DeleteRemoteSpilledObject, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, IncrementRemoteObjectRefCount, -1) \
-  /// RSGRPC: *create new GRPC for SpillRemote, DeleteRemoteSpilledObject, and IncrementRemoteObjectRefCount
+  RPC_SERVICE_HANDLER(ObjectManagerService, CheckAvailableRemoteMemory, -1) \
+  /// RSGRPC: *create new GRPC for SpillRemote, DeleteRemoteSpilledObject, IncrementRemoteObjectRefCount, and CheckAvailableRemoteMemory
   
 
 /// Implementations of the `ObjectManagerGrpcService`, check interface in
@@ -65,6 +66,10 @@ class ObjectManagerServiceHandler {
   /// RSGRPC: Handle a `HandleIncrementRemoteObjectRefCount` request (GRPC)
   virtual void HandleIncrementRemoteObjectRefCount(const IncrementRemoteObjectRefCountRequest &request,
                                  IncrementRemoteObjectRefCountReply *reply,
+                                 SendReplyCallback send_reply_callback) = 0;
+  /// RSGRPC: Handle a `HandleCheckAvailableRemoteMemory` request (GRPC)
+  virtual void HandleCheckAvailableRemoteMemory(const CheckAvailableRemoteMemoryRequest &request,
+                                 CheckAvailableRemoteMemoryReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
 };
 

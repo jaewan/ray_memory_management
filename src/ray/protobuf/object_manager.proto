@@ -80,6 +80,23 @@ message FreeObjectsRequest {
   repeated bytes object_ids = 1;
 }
 
+/// RSGRPC:
+message DeleteRemoteSpilledObjectRequest {
+  // The object id of spilled object.
+  bytes remote_spilled_object_id = 1;
+}
+
+/// RSGRPC:
+message IncrementRemoteObjectRefCountRequest {
+  // The object id of spilled object.
+  bytes remote_spilled_object_id = 1;
+}
+
+/// RSGRPC:
+message CheckAvailableRemoteMemoryRequest {
+
+}
+
 // Reply for request
 message PushReply {
 }
@@ -95,22 +112,16 @@ message FreeObjectsReply {
 }
 
 /// RSGRPC:
-message DeleteRemoteSpilledObjectRequest {
-  // The object id of spilled object.
-  bytes remote_spilled_object_id = 1;
-}
-
-/// RSGRPC:
 message DeleteRemoteSpilledObjectReply {}
 
 /// RSGRPC:
-message IncrementRemoteObjectRefCountRequest {
-  // The object id of spilled object.
-  bytes remote_spilled_object_id = 1;
-}
+message IncrementRemoteObjectRefCountReply {}
 
 /// RSGRPC:
-message IncrementRemoteObjectRefCountReply {}
+message CheckAvailableRemoteMemoryReply {
+  // The available memory in bytes.
+  int64 available_memory = 1;
+}
 
 service ObjectManagerService {
   // Push service used to send object chunks
@@ -125,4 +136,6 @@ service ObjectManagerService {
   rpc DeleteRemoteSpilledObject(DeleteRemoteSpilledObjectRequest) returns (DeleteRemoteSpilledObjectReply);
   // RSGRPC: (GRPC)
   rpc IncrementRemoteObjectRefCount(IncrementRemoteObjectRefCountRequest) returns (IncrementRemoteObjectRefCountReply);
+  // RSGRPC: (GRPC)
+  rpc CheckAvailableRemoteMemory(CheckAvailableRemoteMemoryRequest) returns (CheckAvailableRemoteMemoryReply);
 }

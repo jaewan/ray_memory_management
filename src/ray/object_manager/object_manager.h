@@ -253,13 +253,23 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::SendReplyCallback send_reply_callback) override;
 
   /// RSGRPC: (GRPC)
-  /// Handle increment remote object ref countrequest
+  /// Handle increment remote object ref count request
   ///
   /// \param request Increment remote object ref count request
   /// \param reply Reply
   /// \param send_reply_callback
   void HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemoteObjectRefCountRequest &request,
                          rpc::IncrementRemoteObjectRefCountReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;
+
+  /// RSGRPC: (GRPC)
+  /// Handle check available remote memory request
+  ///
+  /// \param request Check available remote memory
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRemoteMemoryRequest &request,
+                         rpc::CheckAvailableRemoteMemoryReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
   
   /// Get the port of the object manager rpc server.
@@ -314,7 +324,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback);
+  bool FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback);
 
   /// RSCODE:
   void RemoteSpillDecrementRefCount(const ObjectID &object_id);

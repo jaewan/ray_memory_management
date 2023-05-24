@@ -63,7 +63,7 @@ ray.get(b)
 print("Spilled to remote node")
 
 res = consumer.remote(a)
-# del a
+# ray a
 print(ray.get(res))
 
 res1 = consumer.remote(b)

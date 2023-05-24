@@ -40,7 +40,7 @@ class ObjectManagerClient {
   ObjectManagerClient(const std::string &address,
                       const int port,
                       ClientCallManager &client_call_manager,
-                      int num_connections = 6 /*RSCODE: original=4*/)
+                      int num_connections = 7 /*RSCODE: original=4*/)
       : num_connections_(num_connections) {
     push_rr_index_ = rand() % num_connections_;
     pull_rr_index_ = rand() % num_connections_;
@@ -55,6 +55,9 @@ class ObjectManagerClient {
 
     /// RSGRPC:
     increment_remote_object_ref_count_rr_index_ = rand() % num_connections_;
+
+    /// RSGRPC:
+    check_available_remote_memory_rr_index_ = rand() % num_connections_;
     
     grpc_clients_.reserve(num_connections_);
     for (int i = 0; i < num_connections_; i++) {
@@ -120,6 +123,16 @@ class ObjectManagerClient {
                          grpc_clients_[increment_remote_object_ref_count_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )  
 
+  /// RSGRPC: (GRPC)
+  /// Tell remote object manager to accept check available remote memory
+  ///
+  /// \param request The request message
+  /// \param callback  The callback function that handles reply
+  VOID_RPC_CLIENT_METHOD(ObjectManagerService,
+                         CheckAvailableRemoteMemory,
+                         grpc_clients_[check_available_remote_memory_rr_index_++ % num_connections_],
+                         /*method_timeout_ms*/ -1, )  
+
  private:
   /// To optimize object manager performance we create multiple concurrent
   /// GRPC connections, and use these connections in a round-robin way.
@@ -143,6 +156,11 @@ class ObjectManagerClient {
   /// RSGRPC: (GRPC)
   // Current connection index for `IncrementRemoteObjectRefCount`.
   std::atomic<unsigned int> increment_remote_object_ref_count_rr_index_;
+
+  /// RSGRPC: (GRPC)
+  // Current connection index for `CheckAvailableRemoteMemory`.
+  std::atomic<unsigned int> check_available_remote_memory_rr_index_;
+
 
   /// The RPC clients.
   std::vector<std::unique_ptr<GrpcClient<ObjectManagerService>>> grpc_clients_;

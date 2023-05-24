@@ -426,15 +426,58 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 }
 
 /// RSCODE: Function to identify remote node with available memory
-void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
+bool ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
+  std::unordered_map<NodeID, int64_t> node_to_available_memory;
+
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
-  /// RSTODO: Figure out how to exit this for loop once we find a node that can store data
   for (const auto &connection_info : remote_connections) {
     const NodeID node_id = connection_info.node_id;
+
+    auto rpc_client = GetRpcClient(node_id);
+    if (!rpc_client) {
+      RAY_LOG(INFO) << "Failed to establish connection for FindNodeToSpill with remote object manager.";
+    }
+
+    rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
+    rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
+      [this, &node_to_available_memory, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+        if (status.ok()) {
+          node_to_available_memory[node_id] = reply.available_memory();
+        }
+      };
+
+    rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, callback);   
+  }
+
+  // Iterate through node_to_available_memory to find node with most available memory
+  NodeID node_id;
+  int64_t max_available_memory = 0;
+  bool found = false;
+  for (const auto &pair : node_to_available_memory) {
+    if (pair.second > max_available_memory) {
+      node_id = pair.first;
+      max_available_memory = pair.second;
+      found = true;
+    }
+  }
+
+  if (found) {
     for(size_t i = 0; i < requested_objects_to_spill.size(); i++) {
       SpillRemote(requested_objects_to_spill[i], node_id, callback);
     }
+  } else {
+    return false;
   }
+
+  return true;
+}
+
+/// RSGRPC:
+void ObjectManager::HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRemoteMemoryRequest &request,
+                                      rpc::CheckAvailableRemoteMemoryReply *reply,
+                                      rpc::SendReplyCallback send_reply_callback) {
+  // Something like this
+  // reply->add_available_memory(100);
 }
 
 /// RSCODE: Decrement object ref count
