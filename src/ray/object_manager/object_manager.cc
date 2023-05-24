@@ -432,6 +432,9 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
   for (const auto &connection_info : remote_connections) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Iterating through remote connections";
+
     const NodeID node_id = connection_info.node_id;
 
     auto rpc_client = GetRpcClient(node_id);
@@ -443,6 +446,9 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
     rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
       [this, &node_to_available_memory, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
         if (status.ok()) {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "About to add available memory to hashmap for node: " << node_id;
+
           node_to_available_memory[node_id] = reply.available_memory();
         }
       };
