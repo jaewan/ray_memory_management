@@ -483,6 +483,9 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
     const ObjectInfo &object_info = local_objects_[requested_objects_to_spill[i]].object_info;
     int64_t data_size = object_info.data_size;
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Max available memory: " << max_available_memory << " for node: " << node_id;
+
     if (data_size > max_available_memory) {
       /// RSTODO: Delete later
       RAY_LOG(INFO) << "Data size: " << data_size << " is greater than max available memory: " << max_available_memory 
