@@ -447,9 +447,11 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
       [this, &node_to_available_memory, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
         if (status.ok()) {
           /// RSTODO: Delete later
-          RAY_LOG(INFO) << "About to add available memory to hashmap for node: " << node_id;
+          RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
 
           node_to_available_memory[node_id] = reply.available_memory();
+
+          RAY_LOG(INFO) << "Finishing adding available memory to hashmap for node: " << node_id;
         }
       };
 
@@ -494,6 +496,8 @@ void ObjectManager::HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRe
                                       rpc::SendReplyCallback send_reply_callback) {
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Starting call HandleCheckAvailableRemoteMemory RPC";
+
+  RAY_LOG(INFO) << "Available memory: " << config_.object_store_memory - used_memory_;  
 
   // Something like this
   reply->set_available_memory(config_.object_store_memory - used_memory_);
