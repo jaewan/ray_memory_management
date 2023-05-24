@@ -8,7 +8,7 @@ from time import perf_counter
 import json
 import threading
 from collections import defaultdict
-# from ray import profiling
+#from ray import profiling
 from ray._private.profiling import profile
 from ray.experimental.internal_kv import _internal_kv_put, \
     _internal_kv_get
@@ -155,8 +155,8 @@ class Viewer:
         if(frame_out.shape[1] > 1920): 
             frame_out = cv2.resize(frame_out, (frame_out.shape[1]//2, frame_out.shape[0]//2));
         
-        cv2.imshow("Before and After", frame_out)
-        cv2.waitKey(1)
+        #cv2.imshow("Before and After", frame_out)
+        #cv2.waitKey(1)
         #out.write(frame_out)
 
     def ready(self):
@@ -368,6 +368,7 @@ def process_videos(video_pathname, num_videos, output_filename, view,
     v = cv2.VideoCapture(video_pathname)
     num_total_frames = int(min(v.get(cv2.CAP_PROP_FRAME_COUNT), max_frames))
     fps = int(v.get(cv2.CAP_PROP_FPS))
+    print(video_pathname)
     print("Processing total frames", num_total_frames, "from video", video_pathname, "fps", fps)
     for i in range(num_videos):
         ray.get(sinks[i % len(sinks)].set_expected_frames.remote(i, num_total_frames - 1))
@@ -412,7 +413,7 @@ def process_videos(video_pathname, num_videos, output_filename, view,
     runtime = perf_counter() - start_time
     print("Mean latency:", mean_latency)
     print("Max latency:", max_latency)
-    # store_results(mean_latency, max_latency, runtime, args.RESULT_PATH, is_multi_node)
+    store_results(mean_latency, max_latency, runtime, args.RESULT_PATH, is_multi_node)
 
 def kill_node(fail_at, kill_script, worker_ip):
     start = time.time()
@@ -495,18 +496,18 @@ def main(args):
         for node in nodes:
             if not node["Alive"]:
                 continue
-            if head_node_resource in node["Resources"]:
-                continue
+            #if head_node_resource in node["Resources"]:
+                #continue
             for r in node["Resources"]:
                 if "node" in r:
                     node_resources.append(r)
 
         print("All nodes joined")
-        i = 0
+        #i = 0
         worker_resources = node_resources[:num_worker_nodes]
-        i += num_worker_nodes
+        #i += num_worker_nodes
         owner_resources = node_resources[:num_owner_nodes]
-        i += num_owner_nodes
+        #i += num_owner_nodes
         sink_resources = node_resources[-num_sink_nodes:]
 
     # Start processing at an offset from the current time to give all processes
@@ -559,7 +560,7 @@ if __name__ == "__main__":
     parser.add_argument('--RESULT_PATH', '-r', type=str, default="../data/dummy.csv")
     parser.add_argument('--NUM_NODES', '-n', type=int, required=True)
     parser.add_argument("--num-videos", required=True, type=int)
-    parser.add_argument("--video-path", type=str, default="/home/jae/OSDI23/macrobench/video-processing/husky.mp4")
+    parser.add_argument("--video-path", type=str, default="/home/tonyhong/OSDI23/macrobench/video-processing/husky.mp4")
     parser.add_argument("--output", type=str)
     parser.add_argument("--v07", action="store_true")
     parser.add_argument("--failure", action="store_true")

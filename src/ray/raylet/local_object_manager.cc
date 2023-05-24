@@ -367,7 +367,7 @@ void LocalObjectManager::SpillObjectsInternal(
 
   spilled_remote_objects_tracker_.emplace(spilled_remote_objects_tracker_id, spill_remote_tracker_mapping);
 
-  bool remote_memory_available = object_manager_.FindNodeToSpill(requested_objects_to_spill, 
+  objects_to_spill = object_manager_.FindNodeToSpill(requested_objects_to_spill, 
   [this, requested_objects_to_spill, spilled_remote_objects_tracker_id, callback](const ObjectID &object_id) {
     /// RSTODO: Delete this later
     RAY_LOG(INFO) << "Callback test";
@@ -401,83 +401,83 @@ void LocalObjectManager::SpillObjectsInternal(
   });
 
   // /// RSTODO: Comment this out for now
-  if (remote_memory_available == false) {
-  //   {
-  //     absl::MutexLock lock(&mutex_);
-  //     num_active_workers_ += 1;
-  //   }
-  //   io_worker_pool_.PopSpillWorker(
-  //       [this, objects_to_spill, callback](std::shared_ptr<WorkerInterface> io_worker) {
-  //         rpc::SpillObjectsRequest request;
-  //         std::vector<ObjectID> requested_objects_to_spill;
-  //         for (const auto &object_id : objects_to_spill) {
-  //           auto it = objects_pending_spill_.find(object_id);
-  //           RAY_CHECK(it != objects_pending_spill_.end());
-  //           auto freed_it = local_objects_.find(object_id);
-  //           // If the object hasn't already been freed, spill it.
-  //           if (freed_it == local_objects_.end() || freed_it->second.second) {
-  //             num_bytes_pending_spill_ -= it->second->GetSize();
-  //             objects_pending_spill_.erase(it);
-  //           } else {
-  //             auto ref = request.add_object_refs_to_spill();
-  //             ref->set_object_id(object_id.Binary());
-  //             ref->mutable_owner_address()->CopyFrom(freed_it->second.first);
-  //             RAY_LOG(DEBUG) << "Sending spill request for object " << object_id;
-  //             requested_objects_to_spill.push_back(object_id);
-  //           }
-  //         }
+  if (!objects_to_spill.empty()) {
+    {
+      absl::MutexLock lock(&mutex_);
+      num_active_workers_ += 1;
+    }
+    io_worker_pool_.PopSpillWorker(
+        [this, objects_to_spill, callback](std::shared_ptr<WorkerInterface> io_worker) {
+          rpc::SpillObjectsRequest request;
+          std::vector<ObjectID> requested_objects_to_spill;
+          for (const auto &object_id : objects_to_spill) {
+            auto it = objects_pending_spill_.find(object_id);
+            RAY_CHECK(it != objects_pending_spill_.end());
+            auto freed_it = local_objects_.find(object_id);
+            // If the object hasn't already been freed, spill it.
+            if (freed_it == local_objects_.end() || freed_it->second.second) {
+              num_bytes_pending_spill_ -= it->second->GetSize();
+              objects_pending_spill_.erase(it);
+            } else {
+              auto ref = request.add_object_refs_to_spill();
+              ref->set_object_id(object_id.Binary());
+              ref->mutable_owner_address()->CopyFrom(freed_it->second.first);
+              RAY_LOG(DEBUG) << "Sending spill request for object " << object_id;
+              requested_objects_to_spill.push_back(object_id);
+            }
+          }
 
-  //         if (request.object_refs_to_spill_size() == 0) {
-  //           {
-  //             absl::MutexLock lock(&mutex_);
-  //             num_active_workers_ -= 1;
-  //           }
-  //           io_worker_pool_.PushSpillWorker(io_worker);
-  //           callback(Status::OK());
-  //           return;
-  //         }
+          if (request.object_refs_to_spill_size() == 0) {
+            {
+              absl::MutexLock lock(&mutex_);
+              num_active_workers_ -= 1;
+            }
+            io_worker_pool_.PushSpillWorker(io_worker);
+            callback(Status::OK());
+            return;
+          }
 
-  //         io_worker->rpc_client()->SpillObjects(
-  //             request,
-  //             [this, requested_objects_to_spill, callback, io_worker](
-  //                 const ray::Status &status, const rpc::SpillObjectsReply &r) {
-  //               {
-  //                 absl::MutexLock lock(&mutex_);
-  //                 num_active_workers_ -= 1;
-  //               } 
-  //               /// RSTODO: Delete this later
-  //               RAY_LOG(INFO) << "Spilling to disk";
+          io_worker->rpc_client()->SpillObjects(
+              request,
+              [this, requested_objects_to_spill, callback, io_worker](
+                  const ray::Status &status, const rpc::SpillObjectsReply &r) {
+                {
+                  absl::MutexLock lock(&mutex_);
+                  num_active_workers_ -= 1;
+                } 
+                /// RSTODO: Delete this later
+                RAY_LOG(INFO) << "Spilling to disk";
 
-  //               io_worker_pool_.PushSpillWorker(io_worker);
-  //               size_t num_objects_spilled = status.ok() ? r.spilled_objects_url_size() : 0;
-  //               // Object spilling is always done in the order of the request.
-  //               // For example, if an object succeeded, it'll guarentee that all objects
-  //               // before this will succeed.
-  //               RAY_CHECK(num_objects_spilled <= requested_objects_to_spill.size());
-  //               for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size();
-  //                   ++i) {
-  //                 const auto &object_id = requested_objects_to_spill[i];
-  //                 auto it = objects_pending_spill_.find(object_id);
-  //                 RAY_CHECK(it != objects_pending_spill_.end());
-  //                 pinned_objects_size_ += it->second->GetSize();
-  //                 num_bytes_pending_spill_ -= it->second->GetSize();
-  //                 pinned_objects_.emplace(object_id, std::move(it->second));
-  //                 objects_pending_spill_.erase(it);
-  //               }
+                io_worker_pool_.PushSpillWorker(io_worker);
+                size_t num_objects_spilled = status.ok() ? r.spilled_objects_url_size() : 0;
+                // Object spilling is always done in the order of the request.
+                // For example, if an object succeeded, it'll guarentee that all objects
+                // before this will succeed.
+                RAY_CHECK(num_objects_spilled <= requested_objects_to_spill.size());
+                for (size_t i = num_objects_spilled; i != requested_objects_to_spill.size();
+                    ++i) {
+                  const auto &object_id = requested_objects_to_spill[i];
+                  auto it = objects_pending_spill_.find(object_id);
+                  RAY_CHECK(it != objects_pending_spill_.end());
+                  pinned_objects_size_ += it->second->GetSize();
+                  num_bytes_pending_spill_ -= it->second->GetSize();
+                  pinned_objects_.emplace(object_id, std::move(it->second));
+                  objects_pending_spill_.erase(it);
+                }
                 
-  //               if (!status.ok()) {
-  //                 RAY_LOG(ERROR) << "Failed to send object spilling request: "
-  //                               << status.ToString();
-  //               } else {
-  //                 /// RSTODO: Delete this later
-  //                 RAY_LOG(INFO) << "Spilling to disk was successful";
-  //                 OnObjectSpilled(requested_objects_to_spill, r);
-  //               }
-  //               if (callback) {
-  //                 callback(status);
-  //               }
-  //             });
-  //         });
+                if (!status.ok()) {
+                  RAY_LOG(ERROR) << "Failed to send object spilling request: "
+                                << status.ToString();
+                } else {
+                  /// RSTODO: Delete this later
+                  RAY_LOG(INFO) << "Spilling to disk was successful";
+                  OnObjectSpilled(requested_objects_to_spill, r);
+                }
+                if (callback) {
+                  callback(status);
+                }
+              });
+          });
   }
 
   // Deleting spilled objects can fall behind when there is a lot
@@ -752,6 +752,10 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
 //     // Object id is either spilled or not spilled at this point.
 //     const auto spilled_objects_url_it = spilled_objects_url_.find(object_id);
 //     if (spilled_objects_url_it != spilled_objects_url_.end()) {
+
+//       /// RSTODO: Delete later
+//       RAY_LOG(INFO) << "Object is spilled locally: " << object_id;
+
 //       // If the object was spilled, see if we can delete it. We should first check the
 //       // ref count.
 //       std::string &object_url = spilled_objects_url_it->second;
@@ -767,6 +771,9 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
 
 //       // If there's no more refs, delete the object.
 //       if (url_ref_count_it->second == 0) {
+//         /// RSTODO: Delete later
+//         RAY_LOG(DEBUG) << "There are no more refs and the object can be deleted: " << object_id;
+
 //         url_ref_count_.erase(url_ref_count_it);
 //         RAY_LOG(DEBUG) << "The URL " << object_url
 //                        << " is deleted because the references are out of scope.";
@@ -821,8 +828,11 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       /// RSTODO: Delete later
       RAY_LOG(DEBUG) << "Checking if spilled object can be deleted: " << object_id;
 
-      /// RSTODO: Have trivial case for now and then later figure out how to check if spilled remote or to disk
-      if (false) {
+      if (spilled_objects_url_it->second != "remotelyspilled") {
+
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Object is spilled locally: " << object_id;
+
         std::string &object_url = spilled_objects_url_it->second;
         // Note that here, we need to parse the object url to obtain the base_url.
         auto parsed_url = ParseURL(object_url);

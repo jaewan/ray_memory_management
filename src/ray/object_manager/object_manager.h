@@ -324,7 +324,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  bool FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback);
+  std::vector<ObjectID> FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback);
 
   /// RSCODE:
   void RemoteSpillDecrementRefCount(const ObjectID &object_id);

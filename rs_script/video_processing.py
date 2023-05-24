@@ -59,10 +59,10 @@ def flow(prev_frame, frame, p0):
     with profile("flow"):
         if p0 is None or p0.shape[0] < 100:
             p0 = cv2.goodFeaturesToTrack(prev_frame,
-                                            maxCorners=200,
-                                            qualityLevel=0.01,
-                                            minDistance=30,
-                                            blockSize=3)
+                                         maxCorners=200,
+                                         qualityLevel=0.01,
+                                         minDistance=30,
+                                         blockSize=3)
 
         # Calculate optical flow (i.e. track feature points)
         p1, status, err = cv2.calcOpticalFlowPyrLK(prev_frame, frame, p0, None) 
@@ -76,14 +76,14 @@ def flow(prev_frame, frame, p0):
 
         #Find transformation matrix
         m, _ = cv2.estimateAffinePartial2D(good_old, good_new)
-            
+         
         # Extract translation
         dx = m[0,2]
         dy = m[1,2]
 
         # Extract rotation angle
         da = np.arctan2(m[1,0], m[0,0])
-            
+         
         # Store transformation
         transform = [dx,dy,da]
         # Update features to track. 
@@ -155,8 +155,8 @@ class Viewer:
         if(frame_out.shape[1] > 1920): 
             frame_out = cv2.resize(frame_out, (frame_out.shape[1]//2, frame_out.shape[0]//2));
         
-        cv2.imshow("Before and After", frame_out)
-        cv2.waitKey(1)
+        # cv2.imshow("Before and After", frame_out)
+        # cv2.waitKey(1)
         #out.write(frame_out)
 
     def ready(self):
@@ -229,7 +229,7 @@ def process_chunk(video_index, video_pathname, sink, num_frames, fps, resource, 
     # Check for a checkpoint.
     start_frame = 0
     radius = fps
-    checkpoint_frame = ray.experimental.internal_kv._internal_kv_get(video_index)
+    checkpoint_frame = ray.experimental.internal_kv._internal_kv_get(str(video_index))
     trajectory = []
     if checkpoint_frame is not None:
         checkpoint_frame = int(checkpoint_frame)
@@ -358,7 +358,6 @@ def process_videos(video_pathname, num_videos, output_filename, view,
     # Give the actors some time to start up.
     start_timestamp = time.time() + offset_seconds
     start_time = perf_counter()
-
     for sink_resource in sink_resources:
         print("Placing sink(s) on node with resource", sink_resource)
     for i in range(num_videos):
@@ -385,13 +384,14 @@ def process_videos(video_pathname, num_videos, output_filename, view,
         with open(output_filename, 'w') as f:
             for t, l in latencies:
                 f.write("{} {}\n".format(t, l))
-    else:
-        for latency in latencies:
-            print(latency)
+    # else:
+    #     for latency in latencies:
+    #         print(latency)
     latencies = [l for _, l in latencies]
     print("Mean latency:", np.mean(latencies))
     print("Max latency:", np.max(latencies))
     runtime = perf_counter() - start_time
+    print("Runtime:", runtime)
 
 def kill_node(fail_at, kill_script, worker_ip):
     start = time.time()
@@ -444,11 +444,10 @@ def main(args):
     head_ip = socket.gethostbyname(socket.gethostname())
     head_node_resource = "node:{}".format(head_ip)
 
-    if args.local:
-        ray.init(resources={head_node_resource: 1})
-    else:
-        # ray.init(address="auto")
-        ray.init()
+    # if args.local:
+    #     ray.init(resources={head_node_resource: 1})
+    # else:
+    #     ray.init(address="auto")
 
     # Assign all tasks and actors resources.
     if args.local:
