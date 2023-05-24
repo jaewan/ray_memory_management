@@ -427,7 +427,6 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 
 /// RSCODE: Function to identify remote node with available memory
 std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
-  std::unordered_map<NodeID, int64_t> node_to_available_memory;
   std::vector<ObjectID> objects_to_spill_to_disk;
 
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
@@ -444,12 +443,14 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 
     rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
     rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
-      [this, &node_to_available_memory, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+      [this, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
         if (status.ok()) {
           /// RSTODO: Delete later
           RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
-
-          node_to_available_memory[node_id] = reply.available_memory();
+          {
+            absl::MutexLock lock(&mutex_);
+            node_to_available_memory_.emplace(node_id, reply.available_memory());
+          }
 
           RAY_LOG(INFO) << "Finishing adding available memory to hashmap for node: " << node_id;
         }
@@ -462,7 +463,7 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
   }
 
   // Print contents of node_to_available_memory
-  for (const auto &pair : node_to_available_memory) {
+  for (const auto &pair : node_to_available_memory_) {
     RAY_LOG(INFO) << "Node: " << pair.first << " has available memory: " << pair.second;
   }
 
@@ -470,7 +471,7 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
   NodeID node_id;
   int64_t max_available_memory = 0;
   for(size_t i = 0; i < requested_objects_to_spill.size(); i++) {
-    for (const auto &pair : node_to_available_memory) {
+    for (const auto &pair : node_to_available_memory_) {
       if (pair.second > max_available_memory) {
         node_id = pair.first;
         max_available_memory = pair.second;
@@ -482,8 +483,12 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
     if (data_size > max_available_memory) {
       objects_to_spill_to_disk.push_back(requested_objects_to_spill[i]);
     } else {
+      /// RSTODO: Only update available memory if spill is successful in case of fault tolerance
+      {
+        absl::MutexLock lock(&mutex_);
+        node_to_available_memory_[node_id] -= data_size;
+      }
       SpillRemote(requested_objects_to_spill[i], node_id, callback);
-      node_to_available_memory[node_id] -= data_size;
     }
   }
 

@@ -656,6 +656,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   absl::flat_hash_map<ObjectID, NodeID> pulled_objects_from_remote_;
 
+  /// RSCODE:
+  absl::flat_hash_map<NodeID, int64_t> node_to_available_memory_;
+
+  /// RSCODE:
+  mutable absl::Mutex mutex_;
+
   /// This is used as the callback identifier in Pull for
   /// SubscribeObjectLocations. We only need one identifier because we never need to
   /// subscribe multiple times to the same object during Pull.
