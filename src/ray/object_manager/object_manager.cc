@@ -15,7 +15,6 @@
 #include "ray/object_manager/object_manager.h"
 
 #include <chrono>
-#include <atomic>
 
 #include "ray/common/common_protocol.h"
 #include "ray/stats/metric_defs.h"
@@ -429,7 +428,6 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 /// RSCODE: Function to identify remote node with available memory
 std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
   std::vector<ObjectID> objects_to_spill_to_disk;
-  std::atomic<int> count = 0;
 
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
 
@@ -451,7 +449,7 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 
       rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
       rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
-        [this, node_id, &count] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+        [this, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
           if (status.ok()) {
             /// RSTODO: Delete later
             RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
@@ -460,8 +458,6 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
               node_to_available_memory_.emplace(node_id, reply.available_memory());
             }
 
-            count--;
-
             RAY_LOG(INFO) << "Finishing adding available memory to hashmap for node: " << node_id;
           }
         };
@@ -469,13 +465,7 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
       /// RSTODO: Delete later
       RAY_LOG(INFO) << "About to call CheckAvailableRemoteMemory RPC on node: " << node_id;
 
-      count++;
-
       rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, callback);   
-    }
-
-    while (count > 0) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     // Print contents of node_to_available_memory
