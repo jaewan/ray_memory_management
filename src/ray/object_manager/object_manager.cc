@@ -428,7 +428,7 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 /// RSCODE: Function to identify remote node with available memory
 std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
   std::vector<ObjectID> objects_to_spill_to_disk;
-  absl::flat_hash_map<NodeID, int64_t> node_to_available_memory;
+  absl::flat_hash_map<NodeID, int64_t> node_to_available_memory = absl::flat_hash_map<NodeID, int64_t>();
 
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
 
