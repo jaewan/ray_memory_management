@@ -451,7 +451,7 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 
       rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
       rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
-        [this, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+        [this, node_id, &count] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
           if (status.ok()) {
             /// RSTODO: Delete later
             RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
