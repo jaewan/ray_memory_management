@@ -428,6 +428,7 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 /// RSCODE: Function to identify remote node with available memory
 std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
   std::vector<ObjectID> objects_to_spill_to_disk;
+  absl::flat_hash_map<NodeID, int64_t> node_to_available_memory;
 
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
 
@@ -449,13 +450,13 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 
       rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
       rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
-        [this, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+        [this, node_id, &node_to_available_memory] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
           if (status.ok()) {
             /// RSTODO: Delete later
             RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
             {
               absl::MutexLock lock(&mutex_);
-              node_to_available_memory_.emplace(node_id, reply.available_memory());
+              node_to_available_memory.emplace(node_id, reply.available_memory());
             }
 
             RAY_LOG(INFO) << "Finishing adding available memory to hashmap for node: " << node_id;
@@ -469,13 +470,13 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
     }
 
     // Print contents of node_to_available_memory
-    for (const auto &pair : node_to_available_memory_) {
+    for (const auto &pair : node_to_available_memory) {
       RAY_LOG(INFO) << "Node: " << pair.first << " has available memory: " << pair.second;
     }
 
     NodeID node_id;
     int64_t max_available_memory = 0;
-    for (const auto &pair : node_to_available_memory_) {
+    for (const auto &pair : node_to_available_memory) {
       if (pair.second > max_available_memory) {
         node_id = pair.first;
         max_available_memory = pair.second;
