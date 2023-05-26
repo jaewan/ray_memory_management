@@ -15,6 +15,7 @@
 #include "ray/object_manager/object_manager.h"
 
 #include <chrono>
+#include <atomic>
 
 #include "ray/common/common_protocol.h"
 #include "ray/stats/metric_defs.h"
@@ -428,49 +429,59 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
 /// RSCODE: Function to identify remote node with available memory
 std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback) {
   std::vector<ObjectID> objects_to_spill_to_disk;
+  std::atomic<int> count = 0;
 
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
-  for (const auto &connection_info : remote_connections) {
-    /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Iterating through remote connections";
-
-    const NodeID node_id = connection_info.node_id;
-
-    auto rpc_client = GetRpcClient(node_id);
-    if (!rpc_client) {
-      RAY_LOG(INFO) << "Failed to establish connection for FindNodeToSpill with remote object manager.";
-    }
-
-    rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
-    rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
-      [this, node_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
-        if (status.ok()) {
-          /// RSTODO: Delete later
-          RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
-          {
-            absl::MutexLock lock(&mutex_);
-            node_to_available_memory_.emplace(node_id, reply.available_memory());
-          }
-
-          RAY_LOG(INFO) << "Finishing adding available memory to hashmap for node: " << node_id;
-        }
-      };
-
-    /// RSTODO: Delete later
-    RAY_LOG(INFO) << "About to call CheckAvailableRemoteMemory RPC on node: " << node_id;
-
-    rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, callback);   
-  }
-
-  // Print contents of node_to_available_memory
-  for (const auto &pair : node_to_available_memory_) {
-    RAY_LOG(INFO) << "Node: " << pair.first << " has available memory: " << pair.second;
-  }
 
   // Iterate through node_to_available_memory to find node with most available memory
   for(size_t i = 0; i < requested_objects_to_spill.size(); i++) {
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "We are finding available memory for object: " << requested_objects_to_spill[i];
+
+    for (const auto &connection_info : remote_connections) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Iterating through remote connections";
+
+      const NodeID node_id = connection_info.node_id;
+
+      auto rpc_client = GetRpcClient(node_id);
+      if (!rpc_client) {
+        RAY_LOG(INFO) << "Failed to establish connection for FindNodeToSpill with remote object manager.";
+      }
+
+      rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
+      rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> callback =
+        [this, node_id, &count] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+          if (status.ok()) {
+            /// RSTODO: Delete later
+            RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
+            {
+              absl::MutexLock lock(&mutex_);
+              node_to_available_memory_.emplace(node_id, reply.available_memory());
+            }
+
+            count--;
+
+            RAY_LOG(INFO) << "Finishing adding available memory to hashmap for node: " << node_id;
+          }
+        };
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "About to call CheckAvailableRemoteMemory RPC on node: " << node_id;
+
+      count++;
+
+      rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, callback);   
+    }
+
+    while (count > 0) {
+      // Stay here until all futures are done
+    }
+
+    // Print contents of node_to_available_memory
+    for (const auto &pair : node_to_available_memory_) {
+      RAY_LOG(INFO) << "Node: " << pair.first << " has available memory: " << pair.second;
+    }
 
     NodeID node_id;
     int64_t max_available_memory = 0;
@@ -493,11 +504,6 @@ std::vector<ObjectID> ObjectManager::FindNodeToSpill(const std::vector<ObjectID>
 
       objects_to_spill_to_disk.push_back(requested_objects_to_spill[i]);
     } else {
-      /// RSTODO: Only update available memory if spill is successful in case of fault tolerance
-      {
-        absl::MutexLock lock(&mutex_);
-        node_to_available_memory_[node_id] -= data_size;
-      }
       SpillRemote(requested_objects_to_spill[i], node_id, callback);
     }
   }
