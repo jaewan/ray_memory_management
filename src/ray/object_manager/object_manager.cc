@@ -470,7 +470,7 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
 
 /// RSCODE: Function to identify remote node with available memory
 void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
-  uint64_t count = 0;  
+  int count = 0;  
   
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
 
