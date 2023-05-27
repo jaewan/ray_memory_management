@@ -324,7 +324,10 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  std::vector<ObjectID> FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback);
+  void FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback);
+
+  /// RSCODE:
+  void PickMostAvailableNode(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback);
 
   /// RSCODE:
   void RemoteSpillDecrementRefCount(const ObjectID &object_id);
