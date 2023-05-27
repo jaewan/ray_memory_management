@@ -399,6 +399,11 @@ void LocalObjectManager::SpillObjectsInternal(
       }
     }
   }, [this, callback](std::vector<ObjectID> objects_to_spill) {
+    /// RSTODO: Delete this later
+    for (size_t i = 0; i < objects_to_spill.size(); i++) {
+      RAY_LOG(INFO) << "Object to spill to disk: " << objects_to_spill[i];
+    }
+
     // /// RSTODO: Comment this out for now
     if (!objects_to_spill.empty()) {
       {
