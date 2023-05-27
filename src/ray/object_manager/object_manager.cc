@@ -497,9 +497,18 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
             node_to_available_memory_.emplace(node_id, reply.available_memory());
           }
 
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "Count before decrement: " << count;
+
           count--;
 
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "Count after decrement: " << count;
+
           if (count == 0) {
+            /// RSTODO: Delete later
+            RAY_LOG(INFO) << "Count is 0 and we are picking most available node";
+            
             PickMostAvailableNode(requested_objects_to_spill, callback, local_disk_spill_callback);
           }
 
