@@ -456,10 +456,7 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
 
       objects_to_spill_to_disk.push_back(requested_objects_to_spill[i]);
     } else {
-      {
-        absl::MutexLock lock(&mutex_);
-        node_to_available_memory_[node_id] -= data_size;
-      }
+      node_to_available_memory_[node_id] -= data_size;
 
       SpillRemote(requested_objects_to_spill[i], node_id, callback);
     }
@@ -469,9 +466,7 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
 }
 
 /// RSCODE: Function to identify remote node with available memory
-void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
-  int count = 0;  
-  
+void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {  
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
 
   for (const auto &connection_info : remote_connections) {
@@ -486,31 +481,29 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
     }
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Count test 1: " << count;
+    RAY_LOG(INFO) << "Count test 1: " << check_available_memory_count_;
 
     rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
     rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> check_available_memory_callback =
-      [this, node_id, &count, requested_objects_to_spill, callback, local_disk_spill_callback] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+      [this, node_id, requested_objects_to_spill, callback, local_disk_spill_callback] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
         if (status.ok()) {
           /// RSTODO: Delete later
           RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
+
+          node_to_available_memory_.emplace(node_id, reply.available_memory());
+
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "Count before decrement: " << check_available_memory_count_;
+
           {
             absl::MutexLock lock(&mutex_);
-            node_to_available_memory_.emplace(node_id, reply.available_memory());
+            check_available_memory_count_--;
           }
 
           /// RSTODO: Delete later
-          RAY_LOG(INFO) << "Count before decrement: " << count;
+          RAY_LOG(INFO) << "Count after decrement: " << check_available_memory_count_;
 
-          {
-            absl::MutexLock lock(&mutex_);
-            count--;
-          }
-
-          /// RSTODO: Delete later
-          RAY_LOG(INFO) << "Count after decrement: " << count;
-
-          if (count == 0) {
+          if (check_available_memory_count_ == 0) {
             /// RSTODO: Delete later
             RAY_LOG(INFO) << "Count is 0 and we are picking most available node";
             
@@ -525,15 +518,15 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
     RAY_LOG(INFO) << "About to call CheckAvailableRemoteMemory RPC on node: " << node_id;
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Count test 2: " << count;
+    RAY_LOG(INFO) << "Count test 2: " << check_available_memory_count_;
 
     {
       absl::MutexLock lock(&mutex_);
-      count++;
+      check_available_memory_count_++;
     }
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Count test 3: " << count;
+    RAY_LOG(INFO) << "Count test 3: " << check_available_memory_count_;
 
     rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, check_available_memory_callback);
   }

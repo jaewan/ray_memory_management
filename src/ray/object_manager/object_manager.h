@@ -731,6 +731,9 @@ class ObjectManager : public ObjectManagerInterface,
   /// Running total of received chunks.
   size_t num_chunks_received_total_ = 0;
 
+  /// RSCODE:
+  size_t check_available_memory_count_ = 0;
+
   /// RSTODO: (RSCOMMENT)
   /*
   /// Total number of remote chunks received.
