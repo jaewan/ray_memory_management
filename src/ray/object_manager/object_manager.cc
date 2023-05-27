@@ -15,7 +15,6 @@
 #include "ray/object_manager/object_manager.h"
 
 #include <chrono>
-#include <atomic>
 
 #include "ray/common/common_protocol.h"
 #include "ray/stats/metric_defs.h"
@@ -471,7 +470,7 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
 
 /// RSCODE: Function to identify remote node with available memory
 void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
-  std::atomic<int> count = 0;  
+  uint64_t count = 0;  
   
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
 
@@ -500,7 +499,10 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
           /// RSTODO: Delete later
           RAY_LOG(INFO) << "Count before decrement: " << count;
 
-          count--;
+          {
+            absl::MutexLock lock(&mutex_);
+            count--;
+          }
 
           /// RSTODO: Delete later
           RAY_LOG(INFO) << "Count after decrement: " << count;
@@ -519,7 +521,10 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "About to call CheckAvailableRemoteMemory RPC on node: " << node_id;
 
-    count++;
+    {
+      absl::MutexLock lock(&mutex_);
+      count++;
+    }
 
     rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, check_available_memory_callback);
   }
