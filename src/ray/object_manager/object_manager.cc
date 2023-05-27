@@ -485,6 +485,9 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
       RAY_LOG(INFO) << "Failed to establish connection for FindNodeToSpill with remote object manager.";
     }
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Count test 1: " << count;
+
     rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
     rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> check_available_memory_callback =
       [this, node_id, &count, requested_objects_to_spill, callback, local_disk_spill_callback] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
@@ -521,10 +524,16 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "About to call CheckAvailableRemoteMemory RPC on node: " << node_id;
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Count test 2: " << count;
+
     {
       absl::MutexLock lock(&mutex_);
       count++;
     }
+
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Count test 3: " << count;
 
     rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, check_available_memory_callback);
   }
