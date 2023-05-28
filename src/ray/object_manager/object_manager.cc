@@ -539,10 +539,10 @@ void ObjectManager::HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRe
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Starting call HandleCheckAvailableRemoteMemory RPC";
 
-  RAY_LOG(INFO) << "Available memory: " << config_.object_store_memory - used_memory_;  
+  RAY_LOG(INFO) << "Available memory: " << config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();  
 
   // Something like this
-  reply->set_available_memory(config_.object_store_memory - used_memory_);
+  reply->set_available_memory(config_.object_store_memory - plasma::plasma_store_runner->GetAllocated());
 
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Finishing call HandleCheckAvailableRemoteMemory RPC";

@@ -205,8 +205,9 @@ class LocalObjectManager {
   /// 2. Update the spilled URL to the owner.
   /// 3. Update the spilled URL to the local directory if it doesn't
   ///    use the external storages like S3.
+  /// RSCODE: Arguments changed here
   void OnObjectSpilled(const std::vector<ObjectID> &object_ids,
-                       const rpc::SpillObjectsReply &worker_reply);
+                       size_t spilled_objects_tracker_id);
 
   /// Delete spilled objects stored in given urls.
   ///
@@ -253,10 +254,10 @@ class LocalObjectManager {
   absl::flat_hash_map<ObjectID, rpc::Address> object_to_worker_address_;
 
   /// RSCODE:
-  absl::flat_hash_map<size_t, absl::flat_hash_map<ObjectID, size_t>> spilled_remote_objects_tracker_;
+  absl::flat_hash_map<size_t, absl::flat_hash_map<ObjectID, std::string>> spilled_objects_tracker_;
 
   /// RSCODE:
-  size_t spilled_remote_objects_tracker_id_ = 0;
+  size_t spilled_objects_tracker_id_ = 0;
 
   // Objects that are pinned on this node.
   absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject>> pinned_objects_;

@@ -148,6 +148,12 @@ int64_t PlasmaStoreRunner::GetFallbackAllocated() const {
   return allocator_ ? allocator_->FallbackAllocated() : 0;
 }
 
+/// RSCODE:
+int64_t PlasmaStoreRunner::GetAllocated() const {
+  absl::MutexLock lock(&store_runner_mutex_);
+  return allocator_ ? allocator_->Allocated() : 0;
+}
+
 std::unique_ptr<PlasmaStoreRunner> plasma_store_runner;
 
 }  // namespace plasma
