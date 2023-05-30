@@ -328,6 +328,9 @@ void LocalObjectManager::SpillObjectsInternal(
     return;
   }
 
+  /// RSCODE: Toggle spilling in progress
+  object_manager_.ToggleSpillingInProgress(true);
+
   /// RSTODO: Might be useful later
   // {
   //   absl::MutexLock lock(&mutex_);
@@ -610,6 +613,11 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> objec
     // Decrease ref count
     // object_manager_.RemoteSpillDecrementRefCount(object_id);
   }
+
+  if (objects_pending_spill_.size() == 0) {
+    /// RSCODE: Toggle spilling in progress
+    object_manager_.ToggleSpillingInProgress(false);
+  }
 }
 
 /// RSCODE: Arguments of this changed
@@ -655,6 +663,11 @@ void LocalObjectManager::OnObjectSpilled(const std::vector<ObjectID> &object_ids
     const auto &worker_addr = freed_it->second.first;
     object_directory_->ReportObjectSpilled(
         object_id, self_node_id_, worker_addr, object_url, is_external_storage_type_fs_);
+  }
+
+  if (objects_pending_spill_.size() == 0) {
+    /// RSCODE: Toggle spilling in progress
+    object_manager_.ToggleSpillingInProgress(false);
   }
 }
 

@@ -421,6 +421,9 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteFreeMapping() { return spilled_remote_objects_to_free_; }
 
+  /// RSCODE:
+  void ToggleSpillingInProgress(bool is_spilling_in_progress) { spilling_in_progress_ = is_spilling_in_progress; }
+
  private:
   friend class TestObjectManager;
 
@@ -733,6 +736,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE:
   size_t check_available_memory_count_ = 0;
+
+  /// RSCODE:
+  bool spilling_in_progress_ = false;
 
   /// RSTODO: (RSCOMMENT)
   /*

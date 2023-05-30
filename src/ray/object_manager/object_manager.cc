@@ -539,13 +539,19 @@ void ObjectManager::HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRe
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Starting call HandleCheckAvailableRemoteMemory RPC";
 
-  RAY_LOG(INFO) << "Available memory: " << config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();  
+  if (spilling_in_progress_ == false) {
+    RAY_LOG(INFO) << "Available memory: " << config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();  
 
-  // Something like this
-  reply->set_available_memory(config_.object_store_memory - plasma::plasma_store_runner->GetAllocated());
+    // Something like this
+    reply->set_available_memory(config_.object_store_memory - plasma::plasma_store_runner->GetAllocated());
 
-  /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Finishing call HandleCheckAvailableRemoteMemory RPC";
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Finishing call HandleCheckAvailableRemoteMemory RPC";
+  } else {
+    RAY_LOG(INFO) << "Node is currently out of memory and spilling is in progress";
+
+    reply->set_available_memory(0);
+  }
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
