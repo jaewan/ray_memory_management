@@ -1055,6 +1055,9 @@ Status CoreWorker::CreateExisting(const std::shared_ptr<Buffer> &metadata,
 Status CoreWorker::SealOwned(const ObjectID &object_id,
                              bool pin_object,
                              const std::unique_ptr<rpc::Address> &owner_address) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling SealOwned on object id: " << object_id;
+  
   auto status = SealExisting(object_id, pin_object, std::move(owner_address));
   if (status.ok()) return status;
   RemoveLocalReference(object_id);
@@ -1069,6 +1072,9 @@ Status CoreWorker::SealOwned(const ObjectID &object_id,
 Status CoreWorker::SealExisting(const ObjectID &object_id,
                                 bool pin_object,
                                 const std::unique_ptr<rpc::Address> &owner_address) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling SealExisting";
+                            
   RAY_RETURN_NOT_OK(plasma_store_provider_->Seal(object_id));
   if (pin_object) {
     // Tell the raylet to pin the object **after** it is created.
@@ -1438,12 +1444,16 @@ void CoreWorker::SpillOwnedObject(const ObjectID &object_id,
       object_id,
       [object_id, callback](const Status &status,
                             const rpc::RequestObjectSpillageReply &reply) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Callback in core worker 1";
         if (!status.ok() || !reply.success()) {
           RAY_LOG(ERROR) << "Failed to spill object " << object_id
                          << ", raylet unreachable or object could not be spilled.";
         }
         // TODO(Clark): Provide spilled URL and spilled node ID to callback so it can
         // added them to the reference.
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Callback in core worker 2";
         callback();
       });
 }
@@ -2823,12 +2833,20 @@ void CoreWorker::HandleUpdateObjectLocationBatch(
     const rpc::UpdateObjectLocationBatchRequest &request,
     rpc::UpdateObjectLocationBatchReply *reply,
     rpc::SendReplyCallback send_reply_callback) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 1";
+
   const auto &worker_id = request.intended_worker_id();
   if (HandleWrongRecipient(WorkerID::FromBinary(worker_id), send_reply_callback)) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 2";  
     return;
   }
   const auto &node_id = NodeID::FromBinary(request.node_id());
   const auto &object_location_updates = request.object_location_updates();
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 3";
 
   for (const auto &object_location_update : object_location_updates) {
     const auto &object_id = ObjectID::FromBinary(object_location_update.object_id());
@@ -2856,6 +2874,9 @@ void CoreWorker::HandleUpdateObjectLocationBatch(
       }
     }
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "HandleUpdateObjectLocationBatch test 4";
 
   send_reply_callback(Status::OK(),
                       /*success_callback_on_reply*/ nullptr,

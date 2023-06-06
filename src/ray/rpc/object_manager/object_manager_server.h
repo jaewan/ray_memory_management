@@ -26,7 +26,12 @@ namespace rpc {
 #define RAY_OBJECT_MANAGER_RPC_HANDLERS               \
   RPC_SERVICE_HANDLER(ObjectManagerService, Push, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, Pull, -1) \
-  RPC_SERVICE_HANDLER(ObjectManagerService, FreeObjects, -1)
+  RPC_SERVICE_HANDLER(ObjectManagerService, FreeObjects, -1) \
+  RPC_SERVICE_HANDLER(ObjectManagerService, DeleteRemoteSpilledObject, -1) \
+  RPC_SERVICE_HANDLER(ObjectManagerService, IncrementRemoteObjectRefCount, -1) \
+  RPC_SERVICE_HANDLER(ObjectManagerService, CheckAvailableRemoteMemory, -1) \
+  /// RSGRPC: *create new GRPC for SpillRemote, DeleteRemoteSpilledObject, IncrementRemoteObjectRefCount, and CheckAvailableRemoteMemory
+  
 
 /// Implementations of the `ObjectManagerGrpcService`, check interface in
 /// `src/ray/protobuf/object_manager.proto`.
@@ -49,6 +54,22 @@ class ObjectManagerServiceHandler {
   /// Handle a `FreeObjects` request
   virtual void HandleFreeObjects(const FreeObjectsRequest &request,
                                  FreeObjectsReply *reply,
+                                 SendReplyCallback send_reply_callback) = 0;
+  /// RSGRPC: Handle a `SpillRemote` request (GRPC)
+  // virtual void HandleSpillRemote(const SpillRemoteRequest &request,
+  //                                SpillRemoteReply *reply,
+  //                                SendReplyCallback send_reply_callback) = 0;
+  /// RSGRPC: Handle a `DeleteRemoteSpilledObject` request (GRPC)
+  virtual void HandleDeleteRemoteSpilledObject(const DeleteRemoteSpilledObjectRequest &request,
+                                 DeleteRemoteSpilledObjectReply *reply,
+                                 SendReplyCallback send_reply_callback) = 0;
+  /// RSGRPC: Handle a `HandleIncrementRemoteObjectRefCount` request (GRPC)
+  virtual void HandleIncrementRemoteObjectRefCount(const IncrementRemoteObjectRefCountRequest &request,
+                                 IncrementRemoteObjectRefCountReply *reply,
+                                 SendReplyCallback send_reply_callback) = 0;
+  /// RSGRPC: Handle a `HandleCheckAvailableRemoteMemory` request (GRPC)
+  virtual void HandleCheckAvailableRemoteMemory(const CheckAvailableRemoteMemoryRequest &request,
+                                 CheckAvailableRemoteMemoryReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
 };
 

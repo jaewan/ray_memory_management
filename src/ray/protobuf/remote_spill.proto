@@ -1,0 +1,44 @@
+/// RSCODE: proto file for remote spill
+
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package ray.rpc;
+
+import "src/ray/protobuf/common.proto";
+
+// RSGRPC: create same RPC as PushRequest above. (GRPC)
+// RSTODO: might need to modify fields later. 
+// prototype below:
+message SpillRemoteRequest {
+  // WE MIGHT WANT TO CHANGE THIS PART. 
+  // The spill ID to allow the receiver to differentiate different spill attempts
+  // from the same sender.
+  bytes spill_id = 1;
+  // The object ID being transferred.
+  bytes object_id = 2;
+  // The node ID of client sending this object
+  bytes node_id = 3;
+  // The owner address (seems unnecessary)
+  Address owner_address = 4;
+  // The index of the chunk being transferred.
+  // (not implementing chunks for now)
+  uint32 chunk_index = 5;
+  // The data_size include object_size and metadata_size
+  uint64 data_size = 6;
+  // The metadata size.
+  uint64 metadata_size = 7;
+  // The chunk data (actual data for now)
+  bytes data = 8;
+}
+
+// RSGRPC: reply for SpillRemote RPC (GRPC)
+// RSTODO: might need to add reply field later (for protocol)
+// prototype below:
+message SpillRemoteReply {
+}
+
+service RemoteSpillService {
+  // RSGRPC: (GRPC)
+  rpc SpillRemote(SpillRemoteRequest) returns (SpillRemoteReply);
+}

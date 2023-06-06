@@ -171,6 +171,19 @@ python_grpc_compile(
     deps = [":test_service_proto"],
 )
 
+# RSTODO: Delete later?
+proto_library(
+    name = "remote_spill_proto",
+    srcs = ["remote_spill.proto"],
+    deps = [":common_proto"],
+)
+
+# RSTODO: Delete later?
+cc_proto_library(
+    name = "remote_spill_cc_proto",
+    deps = [":remote_spill_proto"],
+)
+
 proto_library(
     name = "object_manager_proto",
     srcs = ["object_manager.proto"],

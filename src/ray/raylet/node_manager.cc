@@ -237,11 +237,20 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
                  int64_t object_size,
                  const std::string &object_url,
                  std::function<void(const ray::Status &)> callback) {
+            /// RSTODO: Delete later
+            RAY_LOG(INFO) << "AsyncRestoreSpilledObject is being called!";
+            /// RSTODO: entering phase for spill restoration.
             GetLocalObjectManager().AsyncRestoreSpilledObject(
                 object_id, object_size, object_url, callback);
           },
+          /// RSTODO: Code to restore remote spilled object
+          [this](const ObjectID &object_id, int64_t object_size) {
+            /// RSTODO: entering phase for spill restoration.
+            return GetLocalObjectManager().RestoreRemoteSpilledObject(object_id, object_size);
+          },
           /*get_spilled_object_url=*/
           [this](const ObjectID &object_id) {
+            /// RSTODO: accomodate so that you check for remote spilled. 
             return GetLocalObjectManager().GetLocalSpilledObjectURL(object_id);
           },
           /*spill_objects_callback=*/
@@ -308,6 +317,8 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
           RayConfig::instance().free_objects_period_milliseconds(),
           worker_pool_,
           worker_rpc_pool_,
+          /// RSCODE: pass in object maanager
+          object_manager_,
           /*max_io_workers*/ config.max_io_workers,
           /*min_spilling_size*/ config.min_spilling_size,
           /*is_external_storage_type_fs*/
@@ -681,7 +692,12 @@ void NodeManager::HandleRequestObjectSpillage(
   RAY_LOG(DEBUG) << "Received RequestObjectSpillage for object " << object_id;
   local_object_manager_.SpillObjects(
       {object_id}, [object_id, reply, send_reply_callback](const ray::Status &status) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Node manager callback test";
         if (status.ok()) {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "Node manager status ok test";
+
           RAY_LOG(DEBUG) << "Object " << object_id
                          << " has been spilled, replying to owner";
           reply->set_success(true);
@@ -1444,11 +1460,15 @@ void NodeManager::DisconnectClient(const std::shared_ptr<ClientConnection> &clie
   bool is_worker = false, is_driver = false;
   if (worker) {
     // The client is a worker.
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Client is a worker";
     is_worker = true;
   } else {
     worker = worker_pool_.GetRegisteredDriver(client);
     if (worker) {
       // The client is a driver.
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Client is a driver";
       is_driver = true;
     } else {
       RAY_LOG(INFO) << "Ignoring client disconnect because the client has already "
@@ -1584,14 +1604,24 @@ void NodeManager::ProcessDisconnectClientMessage(
 
 void NodeManager::ProcessFetchOrReconstructMessage(
     const std::shared_ptr<ClientConnection> &client, const uint8_t *message_data) {
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling ProcessFetchOrReconstructMessage";
+
   auto message = flatbuffers::GetRoot<protocol::FetchOrReconstruct>(message_data);
   const auto refs =
       FlatbufferToObjectReference(*message->object_ids(), *message->owner_addresses());
   // TODO(ekl) we should be able to remove the fetch only flag along with the legacy
   // non-direct call support.
   if (message->fetch_only()) {
+
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 1";
+
     std::shared_ptr<WorkerInterface> worker = worker_pool_.GetRegisteredWorker(client);
     if (!worker) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 2";
       worker = worker_pool_.GetRegisteredDriver(client);
     }
     // Fetch requests can get re-ordered after the worker finishes, so make sure to
@@ -1599,6 +1629,9 @@ void NodeManager::ProcessFetchOrReconstructMessage(
     if (worker && !worker->GetAssignedTaskId().IsNil()) {
       // This will start a fetch for the objects that gets canceled once the
       // objects are local, or if the worker dies.
+      
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 3";
       dependency_manager_.StartOrUpdateGetRequest(worker->WorkerId(), refs);
     }
   } else {
@@ -1606,6 +1639,9 @@ void NodeManager::ProcessFetchOrReconstructMessage(
     // subscribe to in the task dependency manager. These objects will be
     // pulled from remote node managers. If an object's owner dies, an error
     // will be stored as the object's value.
+    
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 4";
     const TaskID task_id = from_flatbuf<TaskID>(*message->task_id());
     AsyncResolveObjects(client,
                         refs,
@@ -2148,6 +2184,10 @@ void NodeManager::AsyncResolveObjects(
     bool ray_get,
     bool mark_worker_blocked) {
   std::shared_ptr<WorkerInterface> worker = worker_pool_.GetRegisteredWorker(client);
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling AsyncResolveObjects";
+
   if (!worker) {
     // The client is a driver. Drivers do not hold resources, so we simply mark
     // the task as blocked.

@@ -141,6 +141,9 @@ class PlasmaClientInterface {
   /// \param object_ids The list of IDs of the objects to delete.
   /// \return The return status. If all the objects are non-existent, return OK.
   virtual Status Delete(const std::vector<ObjectID> &object_ids) = 0;
+
+  /// RSCODE:
+  virtual void RemoteSpillIncreaseObjectCount(const ObjectID &object_id) = 0;
 };
 
 class PlasmaClient : public PlasmaClientInterface {
@@ -254,6 +257,15 @@ class PlasmaClient : public PlasmaClientInterface {
              int64_t timeout_ms,
              std::vector<ObjectBuffer> *object_buffers,
              bool is_from_worker);
+
+  /// RSCODE:
+  void RemoteSpillDecreaseObjectCount(const ObjectID &object_id);
+
+  /// RSCODE:
+  void RemoteSpillIncreaseObjectCount(const ObjectID &object_id);
+
+  /// RSTODO: Delete later
+  void RemoteSpillViewObjectCount(const ObjectID &object_id);
 
   /// Tell Plasma that the client no longer needs the object. This should be
   /// called after Get() or Create() when the client is done with the object.

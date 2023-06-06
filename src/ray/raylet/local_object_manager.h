@@ -28,6 +28,8 @@
 #include "ray/rpc/worker/core_worker_client_pool.h"
 #include "ray/util/util.h"
 #include "src/ray/protobuf/node_manager.pb.h"
+/// RSCODE: add in object manager
+#include "ray/object_manager/object_manager.h"
 
 namespace ray {
 
@@ -45,6 +47,8 @@ class LocalObjectManager {
       int64_t free_objects_period_ms,
       IOWorkerPoolInterface &io_worker_pool,
       rpc::CoreWorkerClientPool &owner_client_pool,
+      /// RSCODE: passing in object manager,
+      ObjectManager &object_manager,
       int max_io_workers,
       int64_t min_spilling_size,
       bool is_external_storage_type_fs,
@@ -60,6 +64,8 @@ class LocalObjectManager {
         free_objects_batch_size_(free_objects_batch_size),
         io_worker_pool_(io_worker_pool),
         owner_client_pool_(owner_client_pool),
+        /// RSCODE:
+        object_manager_(object_manager),
         on_objects_freed_(on_objects_freed),
         last_free_objects_at_ms_(current_time_ms()),
         min_spilling_size_(min_spilling_size),
@@ -98,6 +104,9 @@ class LocalObjectManager {
   /// there is an error.
   void SpillObjects(const std::vector<ObjectID> &objects_ids,
                     std::function<void(const ray::Status &)> callback);
+
+  /// RSTODO: Function to fetch remote object
+  bool RestoreRemoteSpilledObject(const ObjectID &object_id, int64_t object_size);
 
   /// Restore a spilled object from external storage back into local memory.
   /// Note: This is no-op if the same restoration request is in flight or the requested
@@ -159,7 +168,7 @@ class LocalObjectManager {
   bool HasLocallySpilledObjects() const;
 
   std::string DebugString() const;
-
+  
  private:
   FRIEND_TEST(LocalObjectManagerTest, TestSpillObjectsOfSizeZero);
   FRIEND_TEST(LocalObjectManagerTest, TestSpillUptoMaxFuseCount);
@@ -184,20 +193,29 @@ class LocalObjectManager {
                             std::function<void(const ray::Status &)> callback);
 
   /// Release an object that has been freed by its owner.
-  void ReleaseFreedObject(const ObjectID &object_id);
+  /// RSTODO: Revert to void later
+  bool ReleaseFreedObject(const ObjectID &object_id);
+
+
+  /// RSTODO:
+  void OnObjectRemoteSpilled(const std::vector<ObjectID> object_ids);
 
   /// Do operations that are needed after spilling objects such as
   /// 1. Unpin the pending spilling object.
   /// 2. Update the spilled URL to the owner.
   /// 3. Update the spilled URL to the local directory if it doesn't
   ///    use the external storages like S3.
+  /// RSCODE: Arguments changed here
   void OnObjectSpilled(const std::vector<ObjectID> &object_ids,
-                       const rpc::SpillObjectsReply &worker_reply);
+                       size_t spilled_objects_tracker_id);
 
   /// Delete spilled objects stored in given urls.
   ///
   /// \param urls_to_delete List of urls to delete from external storages.
   void DeleteSpilledObjects(std::vector<std::string> &urls_to_delete);
+
+  /// RSCODE:
+  void DeleteRemoteSpilledObjects(std::vector<ObjectID> &spilled_objects_to_delete);
 
   const NodeID self_node_id_;
   const std::string self_node_address_;
@@ -216,6 +234,10 @@ class LocalObjectManager {
   /// this node.
   rpc::CoreWorkerClientPool &owner_client_pool_;
 
+  /// RSCODE:
+  /// The object manager, used to fetch required objects from remote nodes.
+  ObjectManager &object_manager_;
+
   /// A callback to call when an object has been freed.
   std::function<void(const std::vector<ObjectID> &)> on_objects_freed_;
 
@@ -227,6 +249,15 @@ class LocalObjectManager {
   /// - objects_pending_spill_: objects pinned and waiting for spill to complete
   /// - spilled_objects_url_: objects already spilled
   absl::flat_hash_map<ObjectID, std::pair<rpc::Address, bool>> local_objects_;
+
+  /// RSCODE:
+  absl::flat_hash_map<ObjectID, rpc::Address> object_to_worker_address_;
+
+  /// RSCODE:
+  absl::flat_hash_map<size_t, absl::flat_hash_map<ObjectID, std::string>> spilled_objects_tracker_;
+
+  /// RSCODE:
+  size_t spilled_objects_tracker_id_ = 0;
 
   // Objects that are pinned on this node.
   absl::flat_hash_map<ObjectID, std::unique_ptr<RayObject>> pinned_objects_;

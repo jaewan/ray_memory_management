@@ -145,6 +145,15 @@ class PlasmaClient::Impl : public std::enable_shared_from_this<PlasmaClient::Imp
              ObjectBuffer *object_buffers,
              bool is_from_worker);
 
+  /// RSCODE:
+  void RemoteSpillDecreaseObjectCount(const ObjectID &object_id);
+
+  /// RSCODE:
+  void RemoteSpillIncreaseObjectCount(const ObjectID &object_id);
+  
+  /// RSTODO: Delete later
+  void RemoteSpillViewObjectCount(const ObjectID &object_id);
+
   Status Release(const ObjectID &object_id);
 
   Status Contains(const ObjectID &object_id, bool *has_object);
@@ -574,20 +583,100 @@ Status PlasmaClient::Impl::MarkObjectUnused(const ObjectID &object_id) {
   return Status::OK();
 }
 
+/// RSCODE: Decrease ref count
+void PlasmaClient::Impl::RemoteSpillDecreaseObjectCount(const ObjectID &object_id) {
+  auto elem = objects_in_use_.find(object_id);
+  ObjectInUseEntry *object_entry;
+  if (elem == objects_in_use_.end()) {
+    object_entry = objects_in_use_[object_id].get();
+  } else {
+    object_entry = elem->second.get();
+    RAY_CHECK(object_entry->count > 0);
+  }
+  // object_entry->count -= 1;
+  if(object_entry == nullptr){
+  }
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "About to delete from remote spill dec object count";
+
+  auto l = Release(object_id);
+  RAY_LOG(DEBUG) << l;
+}
+
+/// RSCODE: Increase ref count
+void PlasmaClient::Impl::RemoteSpillIncreaseObjectCount(const ObjectID &object_id) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "About to increase ref count in RemoteSpillIncreaseObjectCount";
+
+  auto elem = objects_in_use_.find(object_id);
+  ObjectInUseEntry *object_entry;
+  if (elem == objects_in_use_.end()) {
+    object_entry = objects_in_use_[object_id].get();
+  } else {
+    object_entry = elem->second.get();
+    RAY_CHECK(object_entry->count > 0);
+  }
+  object_entry->count += 1;
+}
+
+/// RSTODO: (Delete later) View ref count
+void PlasmaClient::Impl::RemoteSpillViewObjectCount(const ObjectID &object_id) {
+  RAY_LOG(INFO) << "Calling RemoteSpillViewObjectCount";
+
+  auto elem = objects_in_use_.find(object_id);
+
+  RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 1";
+
+  ObjectInUseEntry *object_entry;
+  if (elem == objects_in_use_.end()) {
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 2";
+    object_entry = objects_in_use_[object_id].get();
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 3";
+  } else {
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 4";
+    object_entry = elem->second.get();
+    RAY_LOG(INFO) << "RemoteSpillViewObjectCount test 5";
+    RAY_CHECK(object_entry->count > 0);
+  }
+
+  RAY_LOG(INFO) << "Object current ref count: " << object_entry->count;
+}
+
 Status PlasmaClient::Impl::Release(const ObjectID &object_id) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Release is being called";
+
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
   // If the client is already disconnected, ignore release requests.
   if (!store_conn_) {
     return Status::OK();
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Release test 1";
+
   auto object_entry = objects_in_use_.find(object_id);
   RAY_CHECK(object_entry != objects_in_use_.end());
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Release test 2";
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO)<< "Object ref count before release: " << object_entry->second->count << "for object: " << object_id;
 
   object_entry->second->count -= 1;
   RAY_CHECK(object_entry->second->count >= 0);
   // Check if the client is no longer using this object.
+
+  RAY_LOG(INFO)<< "Object ref count after release: " << object_entry->second->count << "for object: " << object_id;
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Release test 3";
+
   if (object_entry->second->count == 0) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "object in release is no longer in use";
     // Tell the store that the client no longer needs the object.
     RAY_RETURN_NOT_OK(MarkObjectUnused(object_id));
     RAY_RETURN_NOT_OK(SendReleaseRequest(store_conn_, object_id));
@@ -682,12 +771,19 @@ Status PlasmaClient::Impl::Abort(const ObjectID &object_id) {
 Status PlasmaClient::Impl::Delete(const std::vector<ObjectID> &object_ids) {
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
+  /// RSTODO: Delete later
+  RAY_LOG(DEBUG) << "About to delete objects in client";
+
   std::vector<ObjectID> not_in_use_ids;
   for (auto &object_id : object_ids) {
     // If the object is in used, skip it.
     if (objects_in_use_.count(object_id) == 0) {
+      /// RSTODO: Delete later
+      RAY_LOG(DEBUG) << "Object is not in use in client: " << object_id;
       not_in_use_ids.push_back(object_id);
     } else {
+      /// RSTODO: Delete later
+      RAY_LOG(DEBUG) << "Object is in use in client: " << object_id;
       deletion_cache_.emplace(object_id);
     }
   }
@@ -819,6 +915,21 @@ Status PlasmaClient::Get(const std::vector<ObjectID> &object_ids,
                          std::vector<ObjectBuffer> *object_buffers,
                          bool is_from_worker) {
   return impl_->Get(object_ids, timeout_ms, object_buffers, is_from_worker);
+}
+
+/// RSCODE:
+void PlasmaClient::RemoteSpillDecreaseObjectCount(const ObjectID &object_id) {
+  return impl_->RemoteSpillDecreaseObjectCount(object_id);
+}
+
+/// RSCODE:
+void PlasmaClient::RemoteSpillIncreaseObjectCount(const ObjectID &object_id) {
+  return impl_->RemoteSpillIncreaseObjectCount(object_id);
+}
+
+/// RSTODO: Delete later
+void PlasmaClient::RemoteSpillViewObjectCount(const ObjectID &object_id) {
+  return impl_->RemoteSpillViewObjectCount(object_id);
 }
 
 Status PlasmaClient::Release(const ObjectID &object_id) {

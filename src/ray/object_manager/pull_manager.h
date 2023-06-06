@@ -66,6 +66,8 @@ class PullManager {
       const std::function<void(const ObjectID &)> cancel_pull_request,
       const std::function<void(const ObjectID &, rpc::ErrorType)> fail_pull_request,
       const RestoreSpilledObjectCallback restore_spilled_object,
+      /// RSCODE:
+      std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
       const std::function<double()> get_time_seconds,
       int pull_timeout_ms,
       int64_t num_bytes_available,
@@ -271,7 +273,13 @@ class PullManager {
     // state. The caller must explicitly activate it if needed.
     void AddBundlePullRequest(uint64_t request_id, BundlePullRequest request) {
       requests.emplace(request_id, request);
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "About to emplace in inactive requests";
+
       if (request.IsPullable()) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Emplacing in inactive requests";
+
         inactive_requests.emplace(request_id);
       }
     }
@@ -282,6 +290,9 @@ class PullManager {
     }
 
     void DeactivateBundlePullRequest(uint64_t request_id) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "About to emplace in inactive_requests in DeactivateBundlePullRequest";
+      
       RAY_CHECK_EQ(active_requests.erase(request_id), 1u);
       inactive_requests.emplace(request_id);
     }
@@ -399,6 +410,7 @@ class PullManager {
   const std::function<void(const ObjectID &, const NodeID &)> send_pull_request_;
   const std::function<void(const ObjectID &)> cancel_pull_request_;
   const RestoreSpilledObjectCallback restore_spilled_object_;
+  const std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object_;
   const std::function<double()> get_time_seconds_;
   uint64_t pull_timeout_ms_;
 

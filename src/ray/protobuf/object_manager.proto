@@ -37,25 +37,90 @@ message PushRequest {
   uint64 metadata_size = 7;
   // The chunk data
   bytes data = 8;
+  /// RSGRPC:
+  bool from_remote = 9;
 }
+
+// RSGRPC: create same RPC as PushRequest above. (GRPC)
+// RSTODO: might need to modify fields later. 
+// prototype below:
+// message SpillRemoteRequest {
+//   // WE MIGHT WANT TO CHANGE THIS PART. 
+//   // The spill ID to allow the receiver to differentiate different spill attempts
+//   // from the same sender.
+//   bytes spill_id = 1;
+//   // The object ID being transferred.
+//   bytes object_id = 2;
+//   // The node ID of client sending this object
+//   bytes node_id = 3;
+//   // The owner address (seems unnecessary)
+//   Address owner_address = 4;
+//   // The index of the chunk being transferred.
+//   // (not implementing chunks for now)
+//   uint32 chunk_index = 5;
+//   // The data_size include object_size and metadata_size
+//   uint64 data_size = 6;
+//   // The metadata size.
+//   uint64 metadata_size = 7;
+//   // The chunk data (actual data for now)
+//   bytes data = 8;
+// }
 
 message PullRequest {
   // Node ID of the requesting client.
   bytes node_id = 1;
   // Requested ObjectID.
   bytes object_id = 2;
+  /// RSGRPC: New argument to pull request
+  // Boolean to check whether request is for remote object
+  bool from_remote = 3;
 }
 
 message FreeObjectsRequest {
   repeated bytes object_ids = 1;
 }
 
+/// RSGRPC:
+message DeleteRemoteSpilledObjectRequest {
+  // The object id of spilled object.
+  bytes remote_spilled_object_id = 1;
+}
+
+/// RSGRPC:
+message IncrementRemoteObjectRefCountRequest {
+  // The object id of spilled object.
+  bytes remote_spilled_object_id = 1;
+}
+
+/// RSGRPC:
+message CheckAvailableRemoteMemoryRequest {
+
+}
+
 // Reply for request
 message PushReply {
 }
+// RSGRPC: reply for SpillRemote RPC (GRPC)
+// RSTODO: might need to add reply field later (for protocol)
+// prototype below:
+// message SpillRemoteReply {
+// }
+
 message PullReply {
 }
 message FreeObjectsReply {
+}
+
+/// RSGRPC:
+message DeleteRemoteSpilledObjectReply {}
+
+/// RSGRPC:
+message IncrementRemoteObjectRefCountReply {}
+
+/// RSGRPC:
+message CheckAvailableRemoteMemoryReply {
+  // The available memory in bytes.
+  int64 available_memory = 1;
 }
 
 service ObjectManagerService {
@@ -65,4 +130,12 @@ service ObjectManagerService {
   rpc Pull(PullRequest) returns (PullReply);
   // Tell remote object manager to free some objects
   rpc FreeObjects(FreeObjectsRequest) returns (FreeObjectsReply);
+  // RSGRPC: (GRPC)
+  // rpc SpillRemote(SpillRemoteRequest) returns (SpillRemoteReply);
+  // RSGRPC: (GRPC)
+  rpc DeleteRemoteSpilledObject(DeleteRemoteSpilledObjectRequest) returns (DeleteRemoteSpilledObjectReply);
+  // RSGRPC: (GRPC)
+  rpc IncrementRemoteObjectRefCount(IncrementRemoteObjectRefCountRequest) returns (IncrementRemoteObjectRefCountReply);
+  // RSGRPC: (GRPC)
+  rpc CheckAvailableRemoteMemory(CheckAvailableRemoteMemoryRequest) returns (CheckAvailableRemoteMemoryReply);
 }

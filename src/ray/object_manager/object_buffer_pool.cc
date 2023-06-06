@@ -118,7 +118,9 @@ void ObjectBufferPool::WriteChunk(const ObjectID &object_id,
                                   uint64_t data_size,
                                   uint64_t metadata_size,
                                   const uint64_t chunk_index,
-                                  const std::string &data) {
+                                  const std::string &data,
+                                  /// RSCODE:
+                                  const bool from_remote_spill) {
   absl::MutexLock lock(&pool_mutex_);
   auto it = create_buffer_state_.find(object_id);
   if (it == create_buffer_state_.end() || chunk_index >= it->second.chunk_state.size() ||
@@ -145,6 +147,11 @@ void ObjectBufferPool::WriteChunk(const ObjectID &object_id,
     create_buffer_state_.erase(it);
     RAY_LOG(DEBUG) << "Have received all chunks for object " << object_id
                    << ", last chunk index: " << chunk_index;
+    
+    /// RSCODE:
+    // if (from_remote_spill) {
+    //   store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    // }
   }
 }
 
@@ -238,6 +245,7 @@ ray::Status ObjectBufferPool::EnsureBufferExists(const ObjectID &object_id,
 
   // Release pool_mutex_ during the blocking create call.
   pool_mutex_.Unlock();
+  /// RSCOMMENT: this is where createrequestqueue is entered. 
   Status s = store_client_->CreateAndSpillIfNeeded(
       object_id,
       owner_address,

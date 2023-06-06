@@ -29,6 +29,9 @@ class PlasmaStoreRunner {
   int64_t GetConsumedBytes();
   int64_t GetFallbackAllocated() const;
 
+  /// RSCODE:
+  int64_t GetAllocated() const;
+
   void GetAvailableMemoryAsync(std::function<void(size_t)> callback) const {
     main_service_.post([this, callback]() { store_->GetAvailableMemory(callback); },
                        "PlasmaStoreRunner.GetAvailableMemory");

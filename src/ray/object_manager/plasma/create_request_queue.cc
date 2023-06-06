@@ -15,6 +15,8 @@
 #include "ray/object_manager/plasma/create_request_queue.h"
 
 #include <stdlib.h>
+/// RSTODO: Delete later
+// #include <limits.h>
 
 #include <memory>
 
@@ -121,6 +123,8 @@ Status CreateRequestQueue::ProcessRequests() {
         oom_start_time_ns_ = now;
       }
       auto grace_period_ns = oom_grace_period_ns_;
+      /// RSTODO: Delete later
+      // grace_period_ns = LONG_MAX;
       auto spill_pending = spill_objects_callback_();
       if (spill_pending) {
         RAY_LOG(DEBUG) << "Reset grace period " << status << " " << spill_pending;
@@ -134,6 +138,9 @@ Status CreateRequestQueue::ProcessRequests() {
         return Status::ObjectStoreFull("Waiting for grace period.");
       } else {
         // Trigger the fallback allocator.
+
+        /// RSTODO: Delete later
+        RAY_LOG(DEBUG) << "Triggering fallback allocation.";
         status = ProcessRequest(/*fallback_allocator=*/true,
                                 *request_it,
                                 /*spilling_required=*/nullptr);

@@ -180,6 +180,9 @@ void OwnershipBasedObjectDirectory::ReportObjectSpilled(
     return;
   }
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "ReportObjectSpilled test 1 for object: " << object_id;
+
   const bool existing_object = location_buffers_[worker_id].second.contains(object_id);
   rpc::ObjectLocationUpdate &update = location_buffers_[worker_id].second[object_id];
   update.set_object_id(object_id.Binary());
@@ -189,6 +192,10 @@ void OwnershipBasedObjectDirectory::ReportObjectSpilled(
   if (!existing_object) {
     location_buffers_[worker_id].first.emplace_back(object_id);
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "ReportObjectSpilled test 2 for object: " << object_id;
+
   SendObjectLocationUpdateBatchIfNeeded(worker_id, node_id, owner_address);
 }
 
@@ -206,6 +213,9 @@ void OwnershipBasedObjectDirectory::SendObjectLocationUpdateBatchIfNeeded(
     return;
   }
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "SendObjectLocationUpdateBatchIfNeeded test 1";
+
   auto &object_queue = location_buffer_it->second.first;
   auto &object_map = location_buffer_it->second.second;
   RAY_CHECK_EQ(object_queue.size(), object_map.size());
@@ -220,6 +230,8 @@ void OwnershipBasedObjectDirectory::SendObjectLocationUpdateBatchIfNeeded(
          batch_size < kMaxObjectReportBatchSize) {
     auto update = request.add_object_location_updates();
     const auto &object_id = *object_queue_it;
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Calling SendObjectLocationUpdateBatchIfNeeded on object: " << object_id;
     *update = std::move(object_map.at(object_id));
     object_map.erase(object_id);
     batch_size++;
@@ -242,6 +254,9 @@ void OwnershipBasedObjectDirectory::SendObjectLocationUpdateBatchIfNeeded(
         RAY_CHECK(in_flight_request_it != in_flight_requests_.end());
         in_flight_requests_.erase(in_flight_request_it);
 
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "SendObjectLocationUpdateBatchIfNeeded test 2";
+
         // TODO(sang): Handle network failures.
         if (!status.ok()) {
           // Currently we consider the owner is dead if the network is failed.
@@ -259,6 +274,9 @@ void OwnershipBasedObjectDirectory::SendObjectLocationUpdateBatchIfNeeded(
           return;
         }
 
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "SendObjectLocationUpdateBatchIfNeeded test 3";
+
         SendObjectLocationUpdateBatchIfNeeded(worker_id, node_id, owner_address);
       });
 }
@@ -270,7 +288,13 @@ void OwnershipBasedObjectDirectory::ObjectLocationSubscriptionCallback(
   // Objects are added to this map in SubscribeObjectLocations.
   auto it = listeners_.find(object_id);
   // Do nothing for objects we are not listening for.
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling ObjectLocationSubscriptionCallback on object: " << object_id;
+
   if (it == listeners_.end()) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "ObjectLocationSubscriptionCallback test 1 on object: " << object_id;
     return;
   }
   // Once this flag is set to true, it should never go back to false.
@@ -327,31 +351,53 @@ ray::Status OwnershipBasedObjectDirectory::SubscribeObjectLocations(
     const ObjectID &object_id,
     const rpc::Address &owner_address,
     const OnLocationsFound &callback) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling SubscribeObjectLocations";
+
   auto it = listeners_.find(object_id);
   if (it == listeners_.end()) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Calling SubscribeObjectLocations test 1 for object: " << object_id;
+
     // Create an object eviction subscription message.
     auto request = std::make_unique<rpc::WorkerObjectLocationsSubMessage>();
     request->set_intended_worker_id(owner_address.worker_id());
     request->set_object_id(object_id.Binary());
 
     auto msg_published_callback = [this, object_id](const rpc::PubMessage &pub_message) {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "About to call ObjectLocationSubscriptionCallback test 1 for object: " << object_id;
+
       RAY_CHECK(pub_message.has_worker_object_locations_message());
       const auto &location_info = pub_message.worker_object_locations_message();
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "About to call ObjectLocationSubscriptionCallback test 2 for object: " << object_id;
+
       ObjectLocationSubscriptionCallback(
           location_info,
           object_id,
           /*location_lookup_failed*/ !location_info.ref_removed());
     };
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Calling SubscribeObjectLocations test 2 for object: " << object_id;
+
     auto failure_callback = [this, owner_address](const std::string &object_id_binary,
                                                   const Status &status) {
       const auto object_id = ObjectID::FromBinary(object_id_binary);
       rpc::WorkerObjectLocationsPubMessage location_info;
       if (!status.ok()) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Calling SubscribeObjectLocations test 3 for object: " << object_id;
+
         RAY_LOG(INFO) << "Failed to get the location for " << object_id
                       << status.ToString();
         mark_as_failed_(object_id, rpc::ErrorType::OWNER_DIED);
       } else {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Calling SubscribeObjectLocations test 4 for object: " << object_id;
+
         // Owner is still alive but published a failure because the ref was
         // deleted.
         RAY_LOG(INFO)
@@ -379,6 +425,9 @@ ray::Status OwnershipBasedObjectDirectory::SubscribeObjectLocations(
         /*Success callback=*/msg_published_callback,
         /*Failure callback=*/failure_callback));
 
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Calling SubscribeObjectLocations test 5 for object: " << object_id;
+
     auto location_state = LocationListenerState();
     location_state.owner_address = owner_address;
     it = listeners_.emplace(object_id, std::move(location_state)).first;
@@ -393,6 +442,9 @@ ray::Status OwnershipBasedObjectDirectory::SubscribeObjectLocations(
   // If we previously received some notifications about the object's locations,
   // immediately notify the caller of the current known locations.
   if (listener_state.subscribed) {
+    /// RSTODO: Delete later
+    RAY_LOG(INFO) << "Calling SubscribeObjectLocations test 6 for object: " << object_id;
+
     auto &locations = listener_state.current_object_locations;
     auto &spilled_url = listener_state.spilled_url;
     auto &spilled_node_id = listener_state.spilled_node_id;
@@ -424,6 +476,10 @@ ray::Status OwnershipBasedObjectDirectory::SubscribeObjectLocations(
         },
         "ObjectDirectory.SubscribeObjectLocations");
   }
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling SubscribeObjectLocations test 7 for object: " << object_id;
+
   return Status::OK();
 }
 

@@ -41,8 +41,12 @@
 #include "ray/object_manager/plasma/store_runner.h"
 #include "ray/object_manager/pull_manager.h"
 #include "ray/object_manager/push_manager.h"
+#include "ray/object_manager/spill_remote_manager.h"
 #include "ray/rpc/object_manager/object_manager_client.h"
 #include "ray/rpc/object_manager/object_manager_server.h"
+/// RSCODE:
+#include "ray/rpc/remote_spill/remote_spill_client.h"
+#include "ray/rpc/remote_spill/remote_spill_server.h"
 #include "src/ray/protobuf/common.pb.h"
 #include "src/ray/protobuf/node_manager.pb.h"
 
@@ -110,10 +114,92 @@ class ObjectManagerInterface {
   virtual ~ObjectManagerInterface(){};
 };
 
+// class RemoteSpill : public rpc::RemoteSpillServiceHandler {
+//   public: 
+//     /// RSGRPC: (GRPC)
+//     /// Handle spill remote request
+//     ///
+//     /// \param request Spill remote request
+//     /// \param reply Reply
+//     /// \param send_reply_callback
+//     void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+//                           rpc::SpillRemoteReply *reply,
+//                           rpc::SendReplyCallback send_reply_callback) override;
+
+//     /// RSCODE:
+//     /// \param object_id The object's object id.
+//     /// \return Void.
+//     void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback);
+
+//   public: 
+//     RemoteSpill();
+//     /// The gPRC server.
+//     // rpc::GrpcServer remote_spill_server_;
+    
+//     /// RSCODE: Keep rpc service running when no task in rpc service.
+//     boost::asio::io_service::work remote_spill_rpc_work_;
+
+//     /// RSCODE: Multi-thread asio service, deal with all outgoing and incoming RPC request.
+//     instrumented_io_context remote_spill_rpc_service_;
+
+//     /// The gRPC service.
+//     rpc::RemoteSpillGrpcService remote_spill_service_;
+
+//     /// The thread pool used for running `rpc_service`.
+//     /// Data copy operations during request are done in this thread pool.
+//     std::vector<std::thread> remote_spill_rpc_threads_;
+// };
+
+/// RSCODE:
+class RemoteSpill : public rpc::RemoteSpillServiceHandler {
+ public:
+  explicit RemoteSpill(const ObjectManagerConfig &config)
+      : buffer_pool_store_client_(std::make_shared<plasma::PlasmaClient>()),
+        buffer_pool_(buffer_pool_store_client_, config.object_chunk_size) {
+    
+    RAY_CHECK_OK(
+      buffer_pool_store_client_->Connect(config.store_socket_name.c_str(), "", 0, 300));
+  }
+
+  /// RSGRPC: (GRPC)
+  /// Handle spill remote request
+  ///
+  /// \param request Spill remote request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+                        rpc::SpillRemoteReply *reply,
+                        rpc::SendReplyCallback send_reply_callback) override;
+
+  /// RSCODE: add getter function for the flat_hash_map.
+  absl::flat_hash_map<ObjectID, NodeID> GetObjectsFromRemote() { return received_remote_objects_origin_; }
+
+ private:
+  bool RemoteSpillReceiveObjectChunk(const NodeID &node_id,
+                                     const ObjectID &object_id,
+                                     const rpc::Address &owner_address,
+                                     uint64_t data_size,
+                                     uint64_t metadata_size,
+                                     uint64_t chunk_index,
+                                     const std::string &data,
+                                     const bool from_remote = false,
+                                     const bool from_remote_spill = false);
+
+  // Used by the buffer pool to read and write objects in the local store
+  /// during object transfers.
+  std::shared_ptr<plasma::PlasmaClient> buffer_pool_store_client_;
+
+  /// Manages accesses to local objects for object transfers.
+  ObjectBufferPool buffer_pool_;
+
+  /// RSCODE:
+  absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
+};
+
 // TODO(hme): Add success/failure callbacks for push and pull.
 class ObjectManager : public ObjectManagerInterface,
                       public rpc::ObjectManagerServiceHandler {
- public:
+ public: 
   /// Implementation of object manager service
 
   /// Handle push request from remote object manager
@@ -127,6 +213,16 @@ class ObjectManager : public ObjectManagerInterface,
   void HandlePush(const rpc::PushRequest &request,
                   rpc::PushReply *reply,
                   rpc::SendReplyCallback send_reply_callback) override;
+
+  // /// RSGRPC: (GRPC)
+  // /// Handle spill remote request
+  // ///
+  // /// \param request Spill remote request
+  // /// \param reply Reply
+  // /// \param send_reply_callback
+  // void HandleSpillRemote(const rpc::SpillRemoteRequest &request,
+  //                       rpc::SpillRemoteReply *reply,
+  //                       rpc::SendReplyCallback send_reply_callback) override;
 
   /// Handle pull request from remote object manager
   ///
@@ -146,6 +242,36 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::FreeObjectsReply *reply,
                          rpc::SendReplyCallback send_reply_callback) override;
 
+  /// RSGRPC: (GRPC)
+  /// Handle delete remote object request
+  ///
+  /// \param request Delete remote object request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpilledObjectRequest &request,
+                         rpc::DeleteRemoteSpilledObjectReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;
+
+  /// RSGRPC: (GRPC)
+  /// Handle increment remote object ref count request
+  ///
+  /// \param request Increment remote object ref count request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemoteObjectRefCountRequest &request,
+                         rpc::IncrementRemoteObjectRefCountReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;
+
+  /// RSGRPC: (GRPC)
+  /// Handle check available remote memory request
+  ///
+  /// \param request Check available remote memory
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRemoteMemoryRequest &request,
+                         rpc::CheckAvailableRemoteMemoryReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;
+  
   /// Get the port of the object manager rpc server.
   int GetServerPort() const { return object_manager_server_.GetPort(); }
 
@@ -167,6 +293,8 @@ class ObjectManager : public ObjectManagerInterface,
       const ObjectManagerConfig &config,
       IObjectDirectory *object_directory,
       RestoreSpilledObjectCallback restore_spilled_object,
+      /// RSCODE:
+      std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
       SpillObjectsCallback spill_objects_callback,
       std::function<void()> object_store_full_callback,
@@ -188,6 +316,46 @@ class ObjectManager : public ObjectManagerInterface,
   /// local object manager. False otherwise.
   bool IsPlasmaObjectSpillable(const ObjectID &object_id);
 
+  /// RSCODE:
+  /// \param object_id The object's object id.
+  /// \return Void.
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback);
+
+  /// RSCODE:
+  /// \param object_id The object's object id.
+  /// \return Void.
+  void FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback);
+
+  /// RSCODE:
+  void PickMostAvailableNode(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback);
+
+  /// RSCODE:
+  void RemoteSpillDecrementRefCount(const ObjectID &object_id);
+
+  /// RSCODE:
+  void RemoteSpillIncrementRefCount(const ObjectID &object_id);
+
+  /// RSTODO: Delete later
+  void RemoteSpillViewRefCount(const ObjectID &object_id);
+
+  /// RSCODE:
+  void DeleteRemoteSpilledObject(const ObjectID &object_id);
+
+  /// RSCODE: 
+  void DeleteRemoteSpilledObjectRequest(const ObjectID &object_id, const NodeID &node_id);
+
+  /// RSCODE:
+  void IncrementRemoteObjectRefCount(const ObjectID &object_id);
+
+  /// RSCODE: 
+  void IncrementRemoteObjectRefCountRequest(const ObjectID &object_id, const NodeID &node_id);
+
+  /// RSTODO: Refactor and delete this later
+  /// \param object_id The object's object id.
+  /// \param node_id The remote node's id.
+  /// \return Void.
+  void TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback);
+
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
   /// on the same object, the second one might be ignored).
@@ -195,7 +363,8 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param object_id The object's object id.
   /// \param node_id The remote node's id.
   /// \return Void.
-  void Push(const ObjectID &object_id, const NodeID &node_id);
+  /// RSTODO: Delete from_remote arg later
+  void Push(const ObjectID &object_id, const NodeID &node_id, const bool from_remote = false);
 
   /// Pull a bundle of objects. This will attempt to make all objects in the
   /// bundle local until the request is canceled with the returned ID.
@@ -246,6 +415,15 @@ class ObjectManager : public ObjectManagerInterface,
 
   bool PullManagerHasPullsQueued() const { return pull_manager_->HasPullsQueued(); }
 
+  /// RSCODE: add getter function for the flat_hash_map.
+  absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteMapping() { return spilled_remote_objects_url_; }
+
+  /// RSCODE:
+  absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteFreeMapping() { return spilled_remote_objects_to_free_; }
+
+  /// RSCODE:
+  void ToggleSpillingInProgress(bool is_spilling_in_progress) { spilling_in_progress_ = is_spilling_in_progress; }
+
  private:
   friend class TestObjectManager;
 
@@ -261,7 +439,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param object_id The object's object id.
   /// \param node_id The remote node's id.
   /// \return Void.
-  void PushLocalObject(const ObjectID &object_id, const NodeID &node_id);
+  void PushLocalObject(const ObjectID &object_id, const NodeID &node_id, const bool from_remote = false);
 
   /// Pushing a known spilled object to a remote object manager.
   /// \param object_id The object's object id.
@@ -271,6 +449,18 @@ class ObjectManager : public ObjectManagerInterface,
   void PushFromFilesystem(const ObjectID &object_id,
                           const NodeID &node_id,
                           const std::string &spilled_url);
+
+  /// RSCODE: The internal implementation of spilling an object
+  ///
+  /// \param object_id The object's id.
+  /// \param node_id The remote node's id.
+  /// \param chunk_reader Chunk reader used to read a chunk of the object
+  /// Status::OK() if the read succeeded.
+  void SpillRemoteInternal(const ObjectID &object_id,
+                          const NodeID &node_id,
+                          std::shared_ptr<ChunkObjectReader> chunk_reader,
+                          const std::function<void(ObjectID)> callback);
+
 
   /// The internal implementation of pushing an object.
   ///
@@ -283,7 +473,8 @@ class ObjectManager : public ObjectManagerInterface,
   void PushObjectInternal(const ObjectID &object_id,
                           const NodeID &node_id,
                           std::shared_ptr<ChunkObjectReader> chunk_reader,
-                          bool from_disk);
+                          bool from_disk,
+                          const bool from_remote = false);
 
   /// Send one chunk of the object to remote object manager
   ///
@@ -305,11 +496,33 @@ class ObjectManager : public ObjectManagerInterface,
                        std::shared_ptr<rpc::ObjectManagerClient> rpc_client,
                        std::function<void(const Status &)> on_complete,
                        std::shared_ptr<ChunkObjectReader> chunk_reader,
-                       bool from_disk);
+                       bool from_disk,
+                       const bool from_remote = false);
+
+  /// RSCODE: Spill one chunk of the object to remote object manager
+  ///
+  /// Object will be transfered as a sequence of chunks, small object(defined in config)
+  /// contains only one chunk
+  /// \param spill_id Unique spill id to indicate this spill remote request
+  /// \param object_id Object id
+  /// \param node_id The id of the receiver.
+  /// \param chunk_index Chunk index of this object chunk, start with 0
+  /// \param rpc_client Rpc client used to send message to remote object manager
+  /// \param on_complete Callback when the chunk is sent
+  /// \param chunk_reader Chunk reader used to read a chunk of the object
+  void SpillObjectChunk(const UniqueID &push_id,
+                       const ObjectID &object_id,
+                       const NodeID &node_id,
+                       uint64_t chunk_index,
+                       std::shared_ptr<rpc::RemoteSpillClient> rpc_client,
+                       std::function<void(const Status &)> on_complete,
+                       std::shared_ptr<ChunkObjectReader> chunk_reader);
 
   /// Handle starting, running, and stopping asio rpc_service.
   void StartRpcService();
   void RunRpcService(int index);
+  /// RSCODE:
+  void RunRemoteSpillRpcService(int index);
   void StopRpcService();
 
   /// Handle an object being added to this node. This adds the object to the
@@ -370,18 +583,26 @@ class ObjectManager : public ObjectManagerInterface,
                           uint64_t data_size,
                           uint64_t metadata_size,
                           uint64_t chunk_index,
-                          const std::string &data);
+                          const std::string &data,
+                          const bool from_remote = false,
+                          const bool from_remote_spill = false);
 
-  /// Send pull request
+  /// Send pull request RSCODE: modified adding from_remote param and callback
   ///
   /// \param object_id Object id
   /// \param client_id Remote server client id
-  void SendPullRequest(const ObjectID &object_id, const NodeID &client_id);
+  void SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const std::function<void()> callback = [](){}, const bool from_remote = false);
 
   /// Get the rpc client according to the node ID
   ///
   /// \param node_id Remote node id, will send rpc request to it
   std::shared_ptr<rpc::ObjectManagerClient> GetRpcClient(const NodeID &node_id);
+
+  /// RSCODE:
+  /// Get the rpc client according to the node ID
+  ///
+  /// \param node_id Remote node id, will send rpc request to it
+  std::shared_ptr<rpc::RemoteSpillClient> GetRemoteSpillRpcClient(const NodeID &node_id);
 
   /// Weak reference to main service. We ensure this object is destroyed before
   /// main_service_ is stopped.
@@ -405,16 +626,47 @@ class ObjectManager : public ObjectManagerInterface,
   /// Multi-thread asio service, deal with all outgoing and incoming RPC request.
   instrumented_io_context rpc_service_;
 
+  /// RSCODE: Multi-thread asio service, deal with all outgoing and incoming RPC request.
+  instrumented_io_context remote_spill_rpc_service_;
+
   /// Keep rpc service running when no task in rpc service.
   boost::asio::io_service::work rpc_work_;
+
+  /// RSCODE: Keep rpc service running when no task in rpc service.
+  boost::asio::io_service::work remote_spill_rpc_work_;
 
   /// The thread pool used for running `rpc_service`.
   /// Data copy operations during request are done in this thread pool.
   std::vector<std::thread> rpc_threads_;
 
+  /// The thread pool used for running `rpc_service`.
+  /// Data copy operations during request are done in this thread pool.
+  std::vector<std::thread> remote_spill_rpc_threads_;
+
   /// Mapping from locally available objects to information about those objects
   /// including when the object was last pushed to other object managers.
   absl::flat_hash_map<ObjectID, LocalObjectInfo> local_objects_;
+
+  /// RSCODE: Mapping from object ids to rpc node addresses for remotely spilled objects.
+  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
+
+  /// RSCODE: Map to keep track of when spills are finished
+  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_tracker_;
+
+  /// RSCODE: Mapping from object ids to rpc origin node addresses.
+  // absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
+
+  /// RSCODE: Mapping from object ids to rpc node addresses to free later
+  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_to_free_;
+
+  /// RSCODE:
+  absl::flat_hash_map<ObjectID, NodeID> pulled_objects_from_remote_;
+
+  /// RSCODE:
+  absl::flat_hash_map<NodeID, int64_t> node_to_available_memory_;
+
+  /// RSCODE:
+  mutable absl::Mutex mutex_;
 
   /// This is used as the callback identifier in Pull for
   /// SubscribeObjectLocations. We only need one identifier because we never need to
@@ -434,6 +686,10 @@ class ObjectManager : public ObjectManagerInterface,
   /// The gRPC service.
   rpc::ObjectManagerGrpcService object_manager_service_;
 
+  /// RSCODE:
+  std::unique_ptr<rpc::RemoteSpillServiceHandler> remote_spill_service_handler_;
+  rpc::RemoteSpillGrpcService remote_spill_service_;
+
   /// The client call manager used to deal with reply.
   rpc::ClientCallManager client_call_manager_;
 
@@ -441,8 +697,15 @@ class ObjectManager : public ObjectManagerInterface,
   absl::flat_hash_map<NodeID, std::shared_ptr<rpc::ObjectManagerClient>>
       remote_object_manager_clients_;
 
+  /// RSCODE:
+  absl::flat_hash_map<NodeID, std::shared_ptr<rpc::RemoteSpillClient>>
+      remote_spill_clients_;
+
   /// Callback to trigger direct restoration of an object.
   const RestoreSpilledObjectCallback restore_spilled_object_;
+
+  /// RSCODE:
+  const std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object_;
 
   /// Callback to get the URL of a locally spilled object.
   /// This returns the empty string if the object was not spilled locally.
@@ -450,6 +713,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// Pull manager retry timer .
   boost::asio::deadline_timer pull_retry_timer_;
+
+  /// RSCODE: Object spill remote manager.
+  std::unique_ptr<SpillRemoteManager> spill_remote_manager_;
 
   /// Object push manager.
   std::unique_ptr<PushManager> push_manager_;
@@ -467,6 +733,21 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// Running total of received chunks.
   size_t num_chunks_received_total_ = 0;
+
+  /// RSCODE:
+  size_t check_available_memory_count_ = 0;
+
+  /// RSCODE:
+  bool spilling_in_progress_ = false;
+
+  /// RSTODO: (RSCOMMENT)
+  /*
+  /// Total number of remote chunks received.
+  size_t num_remote_chunks_received_ = 0;
+
+  /// Total number of remote chunks failed. 
+  size_t num_remote_chunks_failed_ = 0;
+  */
 
   /// Running total of received chunks that failed. A finer-grained breakdown
   /// is recorded below.
