@@ -15,6 +15,9 @@
 #include "ray/object_manager/object_manager.h"
 
 #include <chrono>
+#include <fstream>
+#include <sstream>
+#include <iostream>
 
 #include "ray/common/common_protocol.h"
 #include "ray/stats/metric_defs.h"
@@ -193,6 +196,39 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   RAY_CHECK(local_objects_.count(object_id) == 0);
   local_objects_[object_id].object_info = object_info;
   used_memory_ += object_info.data_size + object_info.metadata_size;
+  /// RSTODO: START
+  /// 1. add (time, used_memory_) tuple to csv file
+  /// 2. Time can be calculated using "double start_time = absl::GetCurrentTimeNanos() / 1e9;"
+  // std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
+  // std::string fp = dir + "/" + "memory_usage.csv";
+  // static std::ofstream file(fp, std::ios::app);
+  
+  // if (!file.is_open()) {
+  //   file.open(fp);
+  //   if (file.is_open()) {
+  //     file << "Timestamp, Memory Usage\n";
+  //   } else {
+  //     RAY_LOG(DEBUG) << "DEBUG 0: File opening is wrong if this message can be seen";
+  //   }
+  // }
+
+  // double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  // std::string curr_mem = std::to_string(used_memory_);
+  // std::string curr_time = std::to_string(start_time);
+  // std::stringstream data;
+  // data << curr_time << ", " << curr_mem;
+  // RAY_LOG(DEBUG) << "DEBUG 1 data: " << data.str();
+
+  // if (file.is_open()) {
+  //   file << data.str() << "\n";
+  //   if (used_memory_ == 0) {
+  //     file.close();
+  //   }
+  // } else {
+  //   RAY_LOG(DEBUG) << "DEBUG 2: File opening is wrong if this message can be seen";
+  // }
+  /// RSTODO: END
+
   object_directory_->ReportObjectAdded(object_id, self_node_id_, object_info);
 
   // Give the pull manager a chance to pin actively pulled objects.
@@ -221,6 +257,39 @@ void ObjectManager::HandleObjectDeleted(const ObjectID &object_id) {
   auto object_info = it->second.object_info;
   local_objects_.erase(it);
   used_memory_ -= object_info.data_size + object_info.metadata_size;
+  /// RSTODO: START
+  /// 1. add (time, used_memory_) tuple to csv file
+  /// 2. Time can be calculated using "double start_time = absl::GetCurrentTimeNanos() / 1e9;"
+  // std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
+  // std::string fp = dir + "/" + "memory_usage.csv";
+  // static std::ofstream file(fp, std::ios::app);
+  
+  // if (!file.is_open()) {
+  //   file.open(fp);
+  //   if (file.is_open()) {
+  //     file << "Timestamp, Memory Usage\n";
+  //   } else {
+  //     RAY_LOG(DEBUG) << "DEBUG 0: File opening is wrong if this message can be seen";
+  //   }
+  // }
+
+  // double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  // std::string curr_mem = std::to_string(used_memory_);
+  // std::string curr_time = std::to_string(start_time);
+  // std::stringstream data;
+  // data << curr_time << ", " << curr_mem;
+  // RAY_LOG(DEBUG) << "DEBUG 1 data: " << data.str();
+
+  // if (file.is_open()) {
+  //   file << data.str() << "\n";
+  //   if (used_memory_ == 0) {
+  //     file.close();
+  //   }
+  // } else {
+  //   RAY_LOG(DEBUG) << "DEBUG 2: File opening is wrong if this message can be seen";
+  // }
+  /// RSTODO: END
+
   RAY_CHECK(!local_objects_.empty() || used_memory_ == 0);
   object_directory_->ReportObjectRemoved(object_id, self_node_id_, object_info);
 
@@ -787,6 +856,9 @@ void ObjectManager::Tick(const boost::system::error_code &e) {
 
   // Request the current available memory from the object
   // store.
+
+  /// RSCODE: Logs for video processing
+  RAY_LOG(INFO) << "Testing testing";
   plasma::plasma_store_runner->GetAvailableMemoryAsync([this](size_t available_memory) {
     main_service_->post(
         [this, available_memory]() {
