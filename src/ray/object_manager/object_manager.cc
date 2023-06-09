@@ -262,7 +262,7 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   RAY_CHECK(local_objects_.count(object_id) == 0);
   local_objects_[object_id].object_info = object_info;
   used_memory_ += object_info.data_size + object_info.metadata_size;
-  
+
   /// RSTODO: START
   /// 1. add (time, used_memory_) tuple to csv file
   /// 2. Time can be calculated using "double start_time = absl::GetCurrentTimeNanos() / 1e9;"
@@ -516,7 +516,7 @@ void ObjectManager::TrySpillingToNode(const ObjectID &object_id, const NodeID &n
   owner_address.set_ip_address(object_info.owner_ip_address);
   owner_address.set_port(object_info.owner_port);
   owner_address.set_worker_id(object_info.owner_worker_id.Binary());
-  allocate_memory_request.set_allocated_owner_address(&owner_address);
+  allocate_memory_request.mutable_owner_address()->CopyFrom(owner_address);
 
   auto rpc_client = GetRpcClient(node_id);
   if (!rpc_client) {
