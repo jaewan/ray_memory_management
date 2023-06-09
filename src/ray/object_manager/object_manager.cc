@@ -262,6 +262,7 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   RAY_CHECK(local_objects_.count(object_id) == 0);
   local_objects_[object_id].object_info = object_info;
   used_memory_ += object_info.data_size + object_info.metadata_size;
+  
   /// RSTODO: START
   /// 1. add (time, used_memory_) tuple to csv file
   /// 2. Time can be calculated using "double start_time = absl::GetCurrentTimeNanos() / 1e9;"
