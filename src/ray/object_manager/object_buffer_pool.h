@@ -152,7 +152,8 @@ class ObjectBufferPool {
                                  const rpc::Address &owner_address,
                                  uint64_t data_size,
                                  uint64_t metadata_size,
-                                 uint64_t chunk_index);
+                                 uint64_t chunk_index)
+      EXCLUSIVE_LOCKS_REQUIRED(pool_mutex_);;
                               
  private:
   /// Splits an object into ceil(data_size/chunk_size) chunks, which will
