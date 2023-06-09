@@ -1929,8 +1929,6 @@ void ObjectManager::Tick(const boost::system::error_code &e) {
   // Request the current available memory from the object
   // store.
 
-  /// RSCODE: Logs for video processing
-  RAY_LOG(INFO) << "Testing testing";
   plasma::plasma_store_runner->GetAvailableMemoryAsync([this](size_t available_memory) {
     main_service_->post(
         [this, available_memory]() {
