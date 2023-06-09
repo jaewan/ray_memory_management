@@ -155,7 +155,8 @@ class RemoteSpill : public rpc::RemoteSpillServiceHandler {
  public:
   explicit RemoteSpill(const ObjectManagerConfig &config)
       : buffer_pool_store_client_(std::make_shared<plasma::PlasmaClient>()),
-        buffer_pool_(buffer_pool_store_client_, config.object_chunk_size) {
+        buffer_pool_(buffer_pool_store_client_, config.object_chunk_size),
+        config_(config) {
     
     RAY_CHECK_OK(
       buffer_pool_store_client_->Connect(config.store_socket_name.c_str(), "", 0, 300));
@@ -194,6 +195,8 @@ class RemoteSpill : public rpc::RemoteSpillServiceHandler {
 
   /// RSCODE:
   absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
+
+  const ObjectManagerConfig config_;
 };
 
 // TODO(hme): Add success/failure callbacks for push and pull.
@@ -253,6 +256,26 @@ class ObjectManager : public ObjectManagerInterface,
                          rpc::SendReplyCallback send_reply_callback) override;
 
   /// RSGRPC: (GRPC)
+  /// Handle update origin node request
+  ///
+  /// \param request Update origin node request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleUpdateOriginNode(const rpc::UpdateOriginNodeRequest &request,
+                         rpc::UpdateOriginNodeReply *reply,
+                         rpc::SendReplyCallback send_reply_callback) override;  
+
+  /// RSGRPC: (GRPC)
+  /// Handle allocate memory request
+  ///
+  /// \param request Allocate memory request
+  /// \param reply Reply
+  /// \param send_reply_callback
+  void HandleAllocateMemory(const rpc::AllocateMemoryRequest &request,
+                        rpc::AllocateMemoryReply *reply,
+                        rpc::SendReplyCallback send_reply_callback) override;
+
+  /// RSGRPC: (GRPC)
   /// Handle increment remote object ref count request
   ///
   /// \param request Increment remote object ref count request
@@ -296,6 +319,8 @@ class ObjectManager : public ObjectManagerInterface,
       /// RSCODE:
       std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
+      /// RSCODE:
+      std::function<void(const ObjectID &)> pin_object_post_remote_spill_cancel,
       SpillObjectsCallback spill_objects_callback,
       std::function<void()> object_store_full_callback,
       AddObjectCallback add_object_callback,
@@ -355,6 +380,15 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param node_id The remote node's id.
   /// \return Void.
   void TempAccessPullRequest(const ObjectID &object_id, const NodeID &node_id, const std::function<void()> callback);
+
+  /// RSCODE:
+  void TrySpillingToNode(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback);
+
+  /// RSCODE:
+  bool CheckIsOriginNode(const ObjectID &object_id);
+
+  /// RSCODE:
+  void UpdateOriginNodeRequest(const ObjectID &object_id);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
@@ -650,12 +684,6 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE: Mapping from object ids to rpc node addresses for remotely spilled objects.
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_url_;
 
-  /// RSCODE: Map to keep track of when spills are finished
-  absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_tracker_;
-
-  /// RSCODE: Mapping from object ids to rpc origin node addresses.
-  // absl::flat_hash_map<ObjectID, NodeID> received_remote_objects_origin_;
-
   /// RSCODE: Mapping from object ids to rpc node addresses to free later
   absl::flat_hash_map<ObjectID, NodeID> spilled_remote_objects_to_free_;
 
@@ -665,6 +693,12 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   absl::flat_hash_map<NodeID, int64_t> node_to_available_memory_;
 
+  /// RSCODE:
+  absl::flat_hash_map<size_t, size_t> find_node_to_spill_tracker_;
+
+  /// RSCODE:
+  size_t find_node_to_spill_tracker_id_ = 0;
+  
   /// RSCODE:
   mutable absl::Mutex mutex_;
 
@@ -710,6 +744,9 @@ class ObjectManager : public ObjectManagerInterface,
   /// Callback to get the URL of a locally spilled object.
   /// This returns the empty string if the object was not spilled locally.
   std::function<std::string(const ObjectID &)> get_spilled_object_url_;
+
+  /// RSCODE:
+  std::function<void(const ObjectID &)> pin_object_post_remote_spill_cancel_;
 
   /// Pull manager retry timer .
   boost::asio::deadline_timer pull_retry_timer_;

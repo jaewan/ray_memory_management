@@ -40,7 +40,7 @@ class ObjectManagerClient {
   ObjectManagerClient(const std::string &address,
                       const int port,
                       ClientCallManager &client_call_manager,
-                      int num_connections = 7 /*RSCODE: original=4*/)
+                      int num_connections = 9 /*RSCODE: original=4*/)
       : num_connections_(num_connections) {
     push_rr_index_ = rand() % num_connections_;
     pull_rr_index_ = rand() % num_connections_;
@@ -58,6 +58,12 @@ class ObjectManagerClient {
 
     /// RSGRPC:
     check_available_remote_memory_rr_index_ = rand() % num_connections_;
+  
+    /// RSGRPC:
+    update_origin_node_rr_index_ = rand() % num_connections_;
+
+    /// RSGRPC:
+    allocate_memory_rr_index_ = rand() % num_connections_;
     
     grpc_clients_.reserve(num_connections_);
     for (int i = 0; i < num_connections_; i++) {
@@ -132,6 +138,26 @@ class ObjectManagerClient {
                          CheckAvailableRemoteMemory,
                          grpc_clients_[check_available_remote_memory_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, )  
+                    
+  /// RSGRPC: (GRPC)
+  /// Tell remote object manager to accept update origin node
+  ///
+  /// \param request The request message
+  /// \param callback  The callback function that handles reply
+  VOID_RPC_CLIENT_METHOD(ObjectManagerService,
+                         UpdateOriginNode,
+                         grpc_clients_[update_origin_node_rr_index_ ++ % num_connections_],
+                         /*method_timeout_ms*/ -1, )  
+
+  /// RSGRPC: (GRPC)
+  /// Tell remote object manager to allocate memory
+  ///
+  /// \param request The request message
+  /// \param callback  The callback function that handles reply
+  VOID_RPC_CLIENT_METHOD(ObjectManagerService,
+                         AllocateMemory,
+                         grpc_clients_[allocate_memory_rr_index_ ++ % num_connections_],
+                         /*method_timeout_ms*/ -1, )  
 
  private:
   /// To optimize object manager performance we create multiple concurrent
@@ -161,6 +187,13 @@ class ObjectManagerClient {
   // Current connection index for `CheckAvailableRemoteMemory`.
   std::atomic<unsigned int> check_available_remote_memory_rr_index_;
 
+  /// RSGRPC: (GRPC)
+  // Current connection index for `UpdateOriginNode`.
+  std::atomic<unsigned int> update_origin_node_rr_index_;
+
+  /// RSGRPC: (GRPC)
+  // Current connection index for `AllocateMemory`.
+  std::atomic<unsigned int> allocate_memory_rr_index_;
 
   /// The RPC clients.
   std::vector<std::unique_ptr<GrpcClient<ObjectManagerService>>> grpc_clients_;

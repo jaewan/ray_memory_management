@@ -30,6 +30,8 @@ namespace rpc {
   RPC_SERVICE_HANDLER(ObjectManagerService, DeleteRemoteSpilledObject, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, IncrementRemoteObjectRefCount, -1) \
   RPC_SERVICE_HANDLER(ObjectManagerService, CheckAvailableRemoteMemory, -1) \
+  RPC_SERVICE_HANDLER(ObjectManagerService, UpdateOriginNode, -1) \
+  RPC_SERVICE_HANDLER(ObjectManagerService, AllocateMemory, -1) \
   /// RSGRPC: *create new GRPC for SpillRemote, DeleteRemoteSpilledObject, IncrementRemoteObjectRefCount, and CheckAvailableRemoteMemory
   
 
@@ -70,6 +72,21 @@ class ObjectManagerServiceHandler {
   /// RSGRPC: Handle a `HandleCheckAvailableRemoteMemory` request (GRPC)
   virtual void HandleCheckAvailableRemoteMemory(const CheckAvailableRemoteMemoryRequest &request,
                                  CheckAvailableRemoteMemoryReply *reply,
+                                 SendReplyCallback send_reply_callback) = 0;
+  /// RSGRPC: Handle a `UpdateOriginNode` request (GRPC)
+  virtual void HandleUpdateOriginNode(const UpdateOriginNodeRequest &request,
+                                 UpdateOriginNodeReply *reply,
+                                 SendReplyCallback send_reply_callback) = 0;
+  /// Handle a `Allocate memory` request.
+  /// The implementation can handle this request asynchronously. When handling is done,
+  /// the `send_reply_callback` should be called.
+  ///
+  /// \param[in] request The request message.
+  /// \param[out] reply The reply message.
+  /// \param[in] send_reply_callback The callback to be called when the request is done.
+  /// RSGRPC: Handle a `AllocateMemory` request (GRPC)
+  virtual void HandleAllocateMemory(const AllocateMemoryRequest &request,
+                                 AllocateMemoryReply *reply,
                                  SendReplyCallback send_reply_callback) = 0;
 };
 

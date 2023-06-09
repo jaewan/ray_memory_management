@@ -61,6 +61,9 @@ ObjectStoreRunner::~ObjectStoreRunner() {
 
 // }
 
+/// RSCODE:
+absl::flat_hash_map<ObjectID, NodeID> object_to_origin_node_;
+
 ObjectManager::ObjectManager(
     instrumented_io_context &main_service,
     const NodeID &self_node_id,
@@ -71,6 +74,8 @@ ObjectManager::ObjectManager(
     /// RSCODE:
     std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
+    /// RSCODE:
+    std::function<void(const ObjectID &)> pin_object_post_remote_spill_cancel,
     SpillObjectsCallback spill_objects_callback,
     std::function<void()> object_store_full_callback,
     AddObjectCallback add_object_callback,
@@ -129,6 +134,8 @@ ObjectManager::ObjectManager(
       /// RSCODE:
       restore_remote_spilled_object_(restore_remote_spilled_object),
       get_spilled_object_url_(get_spilled_object_url),
+      /// RSCODE:
+      pin_object_post_remote_spill_cancel_(pin_object_post_remote_spill_cancel),
       pull_retry_timer_(*main_service_,
                         boost::posix_time::milliseconds(config.timer_freq_ms)) {
   RAY_CHECK(config_.rpc_service_threads_number > 0);
@@ -425,11 +432,68 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
   SendPullRequest(object_id, node_id, callback, true);
 }
 
+void ObjectManager::TrySpillingToNode(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
+  // Call RPC to first allocate memory of object
+  const ObjectInfo &object_info = local_objects_[object_id].object_info;
+  int64_t data_size = object_info.data_size;
+  rpc::AllocateMemoryRequest allocate_memory_request;
+  allocate_memory_request.set_object_id(object_id.Binary());
+  allocate_memory_request.set_data_size(data_size);
+  allocate_memory_request.set_metadata_size(object_info.metadata_size);
+
+  rpc::Address owner_address;
+  owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
+  owner_address.set_ip_address(object_info.owner_ip_address);
+  owner_address.set_port(object_info.owner_port);
+  owner_address.set_worker_id(object_info.owner_worker_id.Binary());
+  allocate_memory_request.set_allocated_owner_address(&owner_address);
+
+  auto rpc_client = GetRpcClient(node_id);
+  if (!rpc_client) {
+    RAY_LOG(INFO)
+        << "Failed to establish connection for AllocateMemory with object manager.";
+    return;
+  }
+
+  rpc::ClientCallback<rpc::AllocateMemoryReply> allocate_memory_callback =
+      [this, object_id, node_id, callback, local_disk_spill_callback] (const Status &status, const rpc::AllocateMemoryReply &reply) {
+        node_to_available_memory_[node_id] = reply.available_memory();
+        if (!reply.success()) {
+          RAY_LOG(INFO) << "Failed to allocate memory for object " << object_id << " on node " << node_id;
+          // Call PickMostAvailableNode after updating the node's available memory
+          PickMostAvailableNode({object_id}, callback, local_disk_spill_callback);
+        } else {
+          SpillRemote(object_id, node_id, callback);
+        }
+      };
+
+  rpc_client->AllocateMemory(allocate_memory_request, allocate_memory_callback);  
+}
+
 void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
   std::vector<ObjectID> objects_to_spill_to_disk;
 
   // Iterate through node_to_available_memory to find node with most available memory
   for(size_t i = 0; i < requested_objects_to_spill.size(); i++) {
+    auto object_id = requested_objects_to_spill[i];
+    const ObjectInfo &object_info = local_objects_[object_id].object_info;
+    int64_t data_size = object_info.data_size;
+    NodeID origin_node_id;
+
+    // First check if we can spill to origin node if it exists
+    if (object_to_origin_node_.contains(object_id)) {
+      origin_node_id = object_to_origin_node_[object_id];
+
+      int64_t available_memory = node_to_available_memory_[origin_node_id];
+
+      if (data_size <= available_memory) {
+        node_to_available_memory_[origin_node_id] -= data_size;
+
+        TrySpillingToNode(object_id, origin_node_id, callback, local_disk_spill_callback);
+        continue;
+      }
+    } 
+
     // Print contents of node_to_available_memory
     for (const auto &pair : node_to_available_memory_) {
       RAY_LOG(INFO) << "Node: " << pair.first << " has available memory: " << pair.second;
@@ -438,13 +502,11 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
     NodeID node_id;
     int64_t max_available_memory = 0;
     for (const auto &pair : node_to_available_memory_) {
-      if (pair.second > max_available_memory) {
+      if (pair.second > max_available_memory && pair.first != origin_node_id) {
         node_id = pair.first;
         max_available_memory = pair.second;
       }
     }
-    const ObjectInfo &object_info = local_objects_[requested_objects_to_spill[i]].object_info;
-    int64_t data_size = object_info.data_size;
 
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "Max available memory: " << max_available_memory << " for node: " << node_id;
@@ -452,13 +514,13 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
     if (data_size > max_available_memory) {
       /// RSTODO: Delete later
       RAY_LOG(INFO) << "Data size: " << data_size << " is greater than max available memory: " << max_available_memory 
-        << " for node: " << node_id << " and we will spill to disk instead for object: " << requested_objects_to_spill[i];
+        << " for node: " << node_id << " and we will spill to disk instead for object: " << object_id;
 
-      objects_to_spill_to_disk.push_back(requested_objects_to_spill[i]);
+      objects_to_spill_to_disk.push_back(object_id);
     } else {
       node_to_available_memory_[node_id] -= data_size;
 
-      SpillRemote(requested_objects_to_spill[i], node_id, callback);
+      TrySpillingToNode(object_id, node_id, callback, local_disk_spill_callback);
     }
   }
 
@@ -468,6 +530,18 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
 /// RSCODE: Function to identify remote node with available memory
 void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {  
   const auto remote_connections = object_directory_->LookupAllRemoteConnections();
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Calling FindNodeToSpill";
+
+  size_t find_node_to_spill_tracker_id;
+  {
+    absl::MutexLock lock(&mutex_);
+    find_node_to_spill_tracker_id = find_node_to_spill_tracker_id_;
+    find_node_to_spill_tracker_id_ += 1;
+  }
+
+  find_node_to_spill_tracker_.emplace(find_node_to_spill_tracker_id, remote_connections.size());
 
   for (const auto &connection_info : remote_connections) {
     /// RSTODO: Delete later
@@ -485,29 +559,36 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
 
     rpc::CheckAvailableRemoteMemoryRequest check_available_remote_memory_request;
     rpc::ClientCallback<rpc::CheckAvailableRemoteMemoryReply> check_available_memory_callback =
-      [this, node_id, requested_objects_to_spill, callback, local_disk_spill_callback] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
+      [this, node_id, requested_objects_to_spill, callback, local_disk_spill_callback, find_node_to_spill_tracker_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
         if (status.ok()) {
           /// RSTODO: Delete later
           RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
 
-          node_to_available_memory_.emplace(node_id, reply.available_memory());
+          node_to_available_memory_[node_id] = reply.available_memory();
 
           /// RSTODO: Delete later
           RAY_LOG(INFO) << "Count before decrement: " << check_available_memory_count_;
 
           {
             absl::MutexLock lock(&mutex_);
-            check_available_memory_count_--;
+            find_node_to_spill_tracker_[find_node_to_spill_tracker_id]--;
           }
+
+          // {
+          //   absl::MutexLock lock(&mutex_);
+          //   check_available_memory_count_--;
+          // }
 
           /// RSTODO: Delete later
           RAY_LOG(INFO) << "Count after decrement: " << check_available_memory_count_;
 
-          if (check_available_memory_count_ == 0) {
+          if (find_node_to_spill_tracker_[find_node_to_spill_tracker_id] == 0) {
             /// RSTODO: Delete later
             RAY_LOG(INFO) << "Count is 0 and we are picking most available node";
             
             PickMostAvailableNode(requested_objects_to_spill, callback, local_disk_spill_callback);
+
+            find_node_to_spill_tracker_.erase(find_node_to_spill_tracker_id);
           }
 
           RAY_LOG(INFO) << "Finishing adding available memory to hashmap for node: " << node_id;
@@ -520,10 +601,10 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "Count test 2: " << check_available_memory_count_;
 
-    {
-      absl::MutexLock lock(&mutex_);
-      check_available_memory_count_++;
-    }
+    // {
+    //   absl::MutexLock lock(&mutex_);
+    //   check_available_memory_count_++;
+    // }
 
     /// RSTODO: Delete later
     RAY_LOG(INFO) << "Count test 3: " << check_available_memory_count_;
@@ -531,6 +612,54 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
     rpc_client->CheckAvailableRemoteMemory(check_available_remote_memory_request, check_available_memory_callback);
   }
 }
+
+/// RSCODE:
+// void ObjectManager::CancelSpillRemote(const ObjectID &object_id) {
+//   /// RSTODO: Delete later
+//   RAY_LOG(INFO) << "Starting call CancelSpillRemote";
+
+//   /// RSTODO: Ideally cancel actual spill remote process here
+
+//   // Fetch node id from spilled_remote_objects_url_
+//   auto node_id = spilled_remote_objects_url_[object_id];
+//   auto rpc_client = GetRpcClient(node_id);
+//   rpc::CancelSpillRemoteRequest cancel_spill_remote_request;
+//   cancel_spill_remote_request.set_object_id(object_id.Binary());
+
+//   rpc::ClientCallback<rpc::CancelSpillRemoteReply> callback =
+//       [this, object_id, node_id] (const Status &status, const rpc::CancelSpillRemoteReply &reply) {
+//         if (status.ok()) {
+//           RAY_LOG(INFO) << "Successfully canceled " << object_id << " from spilling to node " << node_id;
+
+//           spilled_remote_objects_url_.erase(object_id);
+//           spilled_remote_objects_to_free_.erase(object_id);
+
+//           pin_object_post_remote_spill_cancel_(object_id);
+//         }
+//       };
+
+//   rpc_client->CancelSpillRemote(cancel_spill_remote_request, callback);  
+
+//   /// RSTODO: Delete later
+//   RAY_LOG(INFO) << "Finishing call CancelSpillRemote";
+// }
+
+// /// RSGRPC:
+// void ObjectManager::HandleCancelSpillRemote(const rpc::CancelSpillRemoteRequest &request,
+//                                       rpc::CancelSpillRemoteReply *reply,
+//                                       rpc:: SendReplyCallback send_reply_callback) {
+//   /// RSTODO: Delete later
+//   RAY_LOG(INFO) << "Starting call HandleCancelSpillRemote RPC";
+
+//   auto object_id = ObjectID::FromBinary(request.object_id());
+
+//   buffer_pool_.AbortCreate(object_id);
+
+//   /// RSTODO: Delete later
+//   RAY_LOG(INFO) << "Finishing call HandleCancelSpillRemote RPC";
+
+//   send_reply_callback(Status::OK(), nullptr, nullptr);
+// }
 
 /// RSGRPC:
 void ObjectManager::HandleCheckAvailableRemoteMemory(const rpc::CheckAvailableRemoteMemoryRequest &request,
@@ -674,13 +803,68 @@ void ObjectManager::HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemo
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
+
+/// RSCODE:
+bool ObjectManager::CheckIsOriginNode(const ObjectID &object_id) {
+  if (object_to_origin_node_.contains(object_id)) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
+/// RSCODE:
+void ObjectManager::UpdateOriginNodeRequest(const ObjectID &object_id) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Starting call UpdateOriginNodeRequest";
+
+  // Fetch node id from spilled_remote_objects_url_
+  auto new_node_id = spilled_remote_objects_url_[object_id];
+
+  // Fetch node id from object_to_origin_node_
+  auto origin_node_id = object_to_origin_node_[object_id];
+  auto rpc_client = GetRpcClient(origin_node_id);
+  rpc::UpdateOriginNodeRequest update_origin_node_request;
+  update_origin_node_request.set_object_id(object_id.Binary());
+  update_origin_node_request.set_new_node_id(new_node_id.Binary());
+
+  rpc::ClientCallback<rpc::UpdateOriginNodeReply> callback =
+      [this, object_id] (const Status &status, const rpc::UpdateOriginNodeReply &reply) {
+        if (status.ok()) {
+          RAY_LOG(INFO) << "Successfully updated origin node id ";
+        }
+      };
+
+  rpc_client->UpdateOriginNode(update_origin_node_request, callback);  
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Finishing call UpdateOriginNodeRequest";
+}
+
+/// RSGRPC:
+void ObjectManager::HandleUpdateOriginNode(const rpc::UpdateOriginNodeRequest &request,
+                                      rpc::UpdateOriginNodeReply *reply,
+                                      rpc:: SendReplyCallback send_reply_callback) {
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Starting call HandleUpdateOriginNode RPC";
+
+  ObjectID object_id = ObjectID::FromBinary(request.object_id());
+  NodeID new_node_id = NodeID::FromBinary(request.new_node_id());
+
+  spilled_remote_objects_url_[object_id] = new_node_id;
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Finishing call HandleUpdateOriginNode RPC";
+
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
 /// RSCODE: Implement spill function to spill object to remote memory
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback) {
   /// RSCODE: Add code to add object id to node id mapping
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
   spilled_remote_objects_to_free_.emplace(object_id, node_id);
-  spilled_remote_objects_tracker_.emplace(object_id, node_id);
 
   if (pulled_objects_from_remote_.contains(object_id)) {
     pulled_objects_from_remote_.erase(object_id );
@@ -1020,7 +1204,11 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   rpc::SpillRemoteRequest spill_remote_request;
   spill_remote_request.set_spill_id(spill_id.Binary());
   spill_remote_request.set_object_id(object_id.Binary());
-  spill_remote_request.set_node_id(node_id.Binary());
+  if (object_to_origin_node_.contains(object_id)) {
+    spill_remote_request.set_node_id(object_to_origin_node_[object_id].Binary());
+  } else {
+    spill_remote_request.set_node_id(self_node_id_.Binary());
+  }
   spill_remote_request.mutable_owner_address()->CopyFrom(
       chunk_reader->GetObject().GetOwnerAddress());
   spill_remote_request.set_chunk_index(chunk_index);
@@ -1052,6 +1240,13 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
           
           /// RSTODO: Delete this later
           RAY_LOG(INFO) << "Spill to remote failed on object: " << object_id;
+
+          // Stop the spilling process here
+
+          spilled_remote_objects_url_.erase(object_id);
+          spilled_remote_objects_to_free_.erase(object_id);
+
+          pin_object_post_remote_spill_cancel_(object_id);
         }
         /// RSTODO: Delete this later
         RAY_LOG(INFO) << "Successfully spilled to remote for object: " << object_id;
@@ -1172,6 +1367,46 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
 }
 
 /// RSGRPC: (GRPC)
+void ObjectManager::HandleAllocateMemory(const rpc::AllocateMemoryRequest &request,
+                                    rpc::AllocateMemoryReply *reply,
+                                    rpc::SendReplyCallback send_reply_callback) {
+  ObjectID object_id = ObjectID::FromBinary(request.object_id());
+  uint64_t data_size = request.data_size();
+  uint64_t metadata_size = request.metadata_size();
+  const rpc::Address &owner_address = request.owner_address();
+
+  // First check if node is OOM
+  if (spilling_in_progress_) {
+    RAY_LOG(INFO) << "Spilling is currently in progress";
+
+    reply->set_success(false);
+    reply->set_available_memory(0);
+
+    send_reply_callback(Status::IOError("Spilling is currently in progress"), nullptr, nullptr);
+    return;
+  }
+
+  // Check if data size fits in memory
+  uint64_t available_memory = config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();
+  if (data_size > available_memory) {
+    RAY_LOG(INFO) << "Not enough memory to spill object " << object_id << " of size " << data_size;
+
+    reply->set_success(false);
+    reply->set_available_memory(available_memory);
+
+    send_reply_callback(Status::IOError("Not enough memory to spill object"), nullptr, nullptr);
+    return;
+  }
+
+  // If so allocate memory
+  buffer_pool_.EnsureBufferExistsRequest(object_id, owner_address, data_size, metadata_size, 0);
+
+  reply->set_success(true);
+  reply->set_available_memory(config_.object_store_memory - plasma::plasma_store_runner->GetAllocated());
+  send_reply_callback(Status::OK(), nullptr, nullptr);
+}
+
+/// RSGRPC: (GRPC)
 void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                                     rpc::SpillRemoteReply *reply,
                                     rpc::SendReplyCallback send_reply_callback) {
@@ -1185,6 +1420,13 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   uint64_t metadata_size = request.metadata_size();
   const std::string &data = request.data();
   const rpc::Address &owner_address = request.owner_address();
+
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "Chunk index: " << chunk_index << " for object: " << object_id;
+
+  if (!object_to_origin_node_.contains(object_id)) {
+    object_to_origin_node_.emplace(object_id, node_id);
+  }
 
   /// RSTODO: Comment out for now
   // auto chunk_status = buffer_pool_.CreateChunk(

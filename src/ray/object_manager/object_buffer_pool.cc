@@ -191,6 +191,15 @@ std::vector<ObjectBufferPool::ChunkInfo> ObjectBufferPool::BuildChunks(
   return chunks;
 }
 
+/// RSCODE:
+void ObjectBufferPool::EnsureBufferExistsRequest(const ObjectID &object_id,
+                                                 const rpc::Address &owner_address,
+                                                 uint64_t data_size,
+                                                 uint64_t metadata_size,
+                                                 uint64_t chunk_index) {
+  EnsureBufferExists(object_id, owner_address, data_size, metadata_size, chunk_index);
+}
+
 ray::Status ObjectBufferPool::EnsureBufferExists(const ObjectID &object_id,
                                                  const rpc::Address &owner_address,
                                                  uint64_t data_size,

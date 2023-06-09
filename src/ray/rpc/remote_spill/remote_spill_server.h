@@ -13,6 +13,7 @@ namespace rpc {
 
 #define RAY_REMOTE_SPILL_RPC_HANDLERS               \
   RPC_SERVICE_HANDLER(RemoteSpillService, SpillRemote, -1) \
+  /// RSGRPC:
 
 /// Implementations of the `RemoteSpillGrpcService`, check interface in
 /// `src/ray/protobuf/object_manager.proto`.

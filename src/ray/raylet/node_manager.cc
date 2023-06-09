@@ -253,6 +253,10 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
             /// RSTODO: accomodate so that you check for remote spilled. 
             return GetLocalObjectManager().GetLocalSpilledObjectURL(object_id);
           },
+          /// RSCODE:
+          [this](const ObjectID &object_id) {
+            GetLocalObjectManager().PinObject(object_id);
+          },
           /*spill_objects_callback=*/
           [this]() {
             // This callback is called from the plasma store thread.

@@ -147,6 +147,13 @@ class ObjectBufferPool {
   /// \return string.
   std::string DebugString() const LOCKS_EXCLUDED(pool_mutex_);
 
+  /// RSCODE:
+  void EnsureBufferExistsRequest(const ObjectID &object_id,
+                                 const rpc::Address &owner_address,
+                                 uint64_t data_size,
+                                 uint64_t metadata_size,
+                                 uint64_t chunk_index);
+                              
  private:
   /// Splits an object into ceil(data_size/chunk_size) chunks, which will
   /// either be read or written to in parallel.

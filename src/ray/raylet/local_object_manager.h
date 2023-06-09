@@ -92,6 +92,9 @@ class LocalObjectManager {
                                 std::vector<std::unique_ptr<RayObject>> &&objects,
                                 const rpc::Address &owner_address);
 
+  /// RSCODE:
+  void PinObject(const ObjectID &object_id);
+
   /// Spill objects as much as possible as fast as possible up to the max throughput.
   ///
   /// \return True if spilling is in progress.
@@ -194,10 +197,10 @@ class LocalObjectManager {
 
   /// Release an object that has been freed by its owner.
   /// RSTODO: Revert to void later
-  bool ReleaseFreedObject(const ObjectID &object_id);
+  void ReleaseFreedObject(const ObjectID &object_id);
 
 
-  /// RSTODO:
+  /// RSCODE:
   void OnObjectRemoteSpilled(const std::vector<ObjectID> object_ids);
 
   /// Do operations that are needed after spilling objects such as

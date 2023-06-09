@@ -28,9 +28,11 @@ class RemoteSpillClient {
   RemoteSpillClient(const std::string &address,
                       const int port,
                       ClientCallManager &client_call_manager,
-                      int num_connections = 2)
+                      int num_connections = 3)
       : num_connections_(num_connections) {
-    spillremote_rr_index_ = rand() % num_connections_;
+
+    /// RSGRPC:
+    spill_remote_rr_index_ = rand() % num_connections_;
     
     grpc_clients_.reserve(num_connections_);
     for (int i = 0; i < num_connections_; i++) {
@@ -46,7 +48,7 @@ class RemoteSpillClient {
   /// \param callback  The callback function that handles reply
   VOID_RPC_CLIENT_METHOD(RemoteSpillService,
                          SpillRemote,
-                         grpc_clients_[spillremote_rr_index_++ % num_connections_],
+                         grpc_clients_[spill_remote_rr_index_++ % num_connections_],
                          /*method_timeout_ms*/ -1, ) 
 
  private:
@@ -56,7 +58,7 @@ class RemoteSpillClient {
 
   /// RSGRPC: (GRPC)
   // Current connection index for `SpillRemote`.
-  std::atomic<unsigned int> spillremote_rr_index_;
+  std::atomic<unsigned int> spill_remote_rr_index_;
 
   /// The RPC clients.
   std::vector<std::unique_ptr<GrpcClient<RemoteSpillService>>> grpc_clients_;

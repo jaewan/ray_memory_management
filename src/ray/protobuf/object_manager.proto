@@ -97,6 +97,20 @@ message CheckAvailableRemoteMemoryRequest {
 
 }
 
+/// RSGRPC:
+message UpdateOriginNodeRequest {
+  bytes object_id = 1;
+  bytes new_node_id = 2;
+}
+
+// RSGRPC:
+message AllocateMemoryRequest {
+  bytes object_id = 1;
+  uint64 data_size = 2;
+  Address owner_address = 3;
+  uint64 metadata_size = 4;
+}
+
 // Reply for request
 message PushReply {
 }
@@ -123,6 +137,15 @@ message CheckAvailableRemoteMemoryReply {
   int64 available_memory = 1;
 }
 
+/// RSGRPC:
+message UpdateOriginNodeReply {}
+
+// RSGRPC:
+message AllocateMemoryReply {
+  int64 available_memory = 1;
+  bool success = 2;
+}
+
 service ObjectManagerService {
   // Push service used to send object chunks
   rpc Push(PushRequest) returns (PushReply);
@@ -138,4 +161,8 @@ service ObjectManagerService {
   rpc IncrementRemoteObjectRefCount(IncrementRemoteObjectRefCountRequest) returns (IncrementRemoteObjectRefCountReply);
   // RSGRPC: (GRPC)
   rpc CheckAvailableRemoteMemory(CheckAvailableRemoteMemoryRequest) returns (CheckAvailableRemoteMemoryReply);
+  // RSGRPC: (GRPC)
+  rpc UpdateOriginNode(UpdateOriginNodeRequest) returns (UpdateOriginNodeReply);
+  // RSGRPC: (GRPC)
+  rpc AllocateMemory(AllocateMemoryRequest) returns (AllocateMemoryReply);
 }
