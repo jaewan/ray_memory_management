@@ -1567,13 +1567,13 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   }
 
   /// RSTODO: Maybe delete later
-  if (from_remote_spill) {
-    if (!received_remote_objects_origin_.contains(object_id)) {
-      RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
-      received_remote_objects_origin_.emplace(object_id, node_id);
-      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    }
-  }
+  // if (from_remote_spill) {
+  //   if (!received_remote_objects_origin_.contains(object_id)) {
+  //     RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
+  //     received_remote_objects_origin_.emplace(object_id, node_id);
+  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+  //   }
+  // }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {
@@ -1628,11 +1628,11 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                 << " of object " << object_id;
   /// RSCODE: current solution: add default from_remote param so that
   /// pull manager checking is not invoked. 
-  if (!from_remote && !pull_manager_->IsObjectActive(object_id)) {
-    num_chunks_received_cancelled_++;
-    // This object is no longer being actively pulled. Do not create the object.
-    return false;
-  }
+  // if (!from_remote && !pull_manager_->IsObjectActive(object_id)) {
+  //   num_chunks_received_cancelled_++;
+  //   // This object is no longer being actively pulled. Do not create the object.
+  //   return false;
+  // }
   auto chunk_status = buffer_pool_.CreateChunk(
       object_id, owner_address, data_size, metadata_size, chunk_index);
   if (!from_remote && !pull_manager_->IsObjectActive(object_id)) {
