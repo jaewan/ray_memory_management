@@ -198,9 +198,7 @@ void ObjectBufferPool::EnsureBufferExistsRequest(const ObjectID &object_id,
                                                  uint64_t metadata_size,
                                                  uint64_t chunk_index) {
   absl::MutexLock lock(&pool_mutex_);
-  RAY_RETURN_NOT_OK(EnsureBufferExists(
-      object_id, owner_address, data_size, metadata_size, chunk_index));
-  auto &state = create_buffer_state_.at(object_id);
+  EnsureBufferExists(object_id, owner_address, data_size, metadata_size, chunk_index);
 }
 
 ray::Status ObjectBufferPool::EnsureBufferExists(const ObjectID &object_id,
