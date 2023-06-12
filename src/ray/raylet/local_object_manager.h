@@ -92,9 +92,6 @@ class LocalObjectManager {
                                 std::vector<std::unique_ptr<RayObject>> &&objects,
                                 const rpc::Address &owner_address);
 
-  /// RSCODE:
-  void PinObject(const ObjectID &object_id);
-
   /// Spill objects as much as possible as fast as possible up to the max throughput.
   ///
   /// \return True if spilling is in progress.

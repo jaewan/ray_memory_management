@@ -36,6 +36,8 @@ message SpillRemoteRequest {
 // RSTODO: might need to add reply field later (for protocol)
 // prototype below:
 message SpillRemoteReply {
+  int64 available_memory = 1;
+  bool success = 2;
 }
 
 service RemoteSpillService {

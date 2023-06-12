@@ -147,11 +147,6 @@ void ObjectBufferPool::WriteChunk(const ObjectID &object_id,
     create_buffer_state_.erase(it);
     RAY_LOG(DEBUG) << "Have received all chunks for object " << object_id
                    << ", last chunk index: " << chunk_index;
-    
-    /// RSCODE:
-    // if (from_remote_spill) {
-    //   store_client_->RemoteSpillIncreaseObjectCount(object_id);
-    // }
   }
 }
 

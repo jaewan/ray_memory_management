@@ -319,8 +319,6 @@ class ObjectManager : public ObjectManagerInterface,
       /// RSCODE:
       std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
       std::function<std::string(const ObjectID &)> get_spilled_object_url,
-      /// RSCODE:
-      std::function<void(const ObjectID &)> pin_object_post_remote_spill_cancel,
       SpillObjectsCallback spill_objects_callback,
       std::function<void()> object_store_full_callback,
       AddObjectCallback add_object_callback,
@@ -344,7 +342,7 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   /// \param object_id The object's object id.
   /// \return Void.
-  void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback);
+  void SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback);
 
   /// RSCODE:
   /// \param object_id The object's object id.
@@ -389,6 +387,9 @@ class ObjectManager : public ObjectManagerInterface,
 
   /// RSCODE:
   void UpdateOriginNodeRequest(const ObjectID &object_id);
+
+  /// RSCODE:
+  void ToggleSpillingInProgress(bool is_spilling_in_progress);
 
   /// Consider pushing an object to a remote object manager. This object manager
   /// may choose to ignore the Push call (e.g., if Push is called twice in a row
@@ -455,9 +456,6 @@ class ObjectManager : public ObjectManagerInterface,
   /// RSCODE:
   absl::flat_hash_map<ObjectID, NodeID> GetSpillRemoteFreeMapping() { return spilled_remote_objects_to_free_; }
 
-  /// RSCODE:
-  void ToggleSpillingInProgress(bool is_spilling_in_progress) { spilling_in_progress_ = is_spilling_in_progress; }
-
  private:
   friend class TestObjectManager;
 
@@ -493,7 +491,8 @@ class ObjectManager : public ObjectManagerInterface,
   void SpillRemoteInternal(const ObjectID &object_id,
                           const NodeID &node_id,
                           std::shared_ptr<ChunkObjectReader> chunk_reader,
-                          const std::function<void(ObjectID)> callback);
+                          const std::function<void(ObjectID)> callback,
+                          const std::function<void(ObjectID)> find_node_to_spill_callback);
 
 
   /// The internal implementation of pushing an object.
@@ -549,8 +548,9 @@ class ObjectManager : public ObjectManagerInterface,
                        const NodeID &node_id,
                        uint64_t chunk_index,
                        std::shared_ptr<rpc::RemoteSpillClient> rpc_client,
-                       std::function<void(const Status &)> on_complete,
-                       std::shared_ptr<ChunkObjectReader> chunk_reader);
+                       std::function<void(const Status &, const bool)> on_complete,
+                       std::shared_ptr<ChunkObjectReader> chunk_reader,
+                       const std::function<void(ObjectID)> callback);
 
   /// Handle starting, running, and stopping asio rpc_service.
   void StartRpcService();
@@ -697,6 +697,9 @@ class ObjectManager : public ObjectManagerInterface,
   absl::flat_hash_map<size_t, size_t> find_node_to_spill_tracker_;
 
   /// RSCODE:
+  absl::flat_hash_map<ObjectID, bool> object_to_cancel_spill_remote_;
+
+  /// RSCODE:
   size_t find_node_to_spill_tracker_id_ = 0;
   
   /// RSCODE:
@@ -745,9 +748,6 @@ class ObjectManager : public ObjectManagerInterface,
   /// This returns the empty string if the object was not spilled locally.
   std::function<std::string(const ObjectID &)> get_spilled_object_url_;
 
-  /// RSCODE:
-  std::function<void(const ObjectID &)> pin_object_post_remote_spill_cancel_;
-
   /// Pull manager retry timer .
   boost::asio::deadline_timer pull_retry_timer_;
 
@@ -775,7 +775,7 @@ class ObjectManager : public ObjectManagerInterface,
   size_t check_available_memory_count_ = 0;
 
   /// RSCODE:
-  bool spilling_in_progress_ = false;
+  // bool spilling_in_progress_ = false;
 
   /// RSTODO: (RSCOMMENT)
   /*

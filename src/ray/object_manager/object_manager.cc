@@ -57,15 +57,14 @@ ObjectStoreRunner::~ObjectStoreRunner() {
 }
 
 /// RSCODE:
-// RemoteSpill::RemoteSpill()
-//   : remote_spill_rpc_work_(remote_spill_rpc_service_),
-//     remote_spill_service_(remote_spill_rpc_service_, *this) {
-
-
-// }
+absl::flat_hash_map<ObjectID, NodeID> object_to_origin_node_;
 
 /// RSCODE:
-absl::flat_hash_map<ObjectID, NodeID> object_to_origin_node_;
+bool spilling_in_progress_ = false;
+
+void ObjectManager::ToggleSpillingInProgress(bool is_spilling_in_progress) { 
+  spilling_in_progress_ = is_spilling_in_progress; 
+}
 
 ObjectManager::ObjectManager(
     instrumented_io_context &main_service,
@@ -77,8 +76,6 @@ ObjectManager::ObjectManager(
     /// RSCODE:
     std::function<bool(const ObjectID &, int64_t)> restore_remote_spilled_object,
     std::function<std::string(const ObjectID &)> get_spilled_object_url,
-    /// RSCODE:
-    std::function<void(const ObjectID &)> pin_object_post_remote_spill_cancel,
     SpillObjectsCallback spill_objects_callback,
     std::function<void()> object_store_full_callback,
     AddObjectCallback add_object_callback,
@@ -137,8 +134,6 @@ ObjectManager::ObjectManager(
       /// RSCODE:
       restore_remote_spilled_object_(restore_remote_spilled_object),
       get_spilled_object_url_(get_spilled_object_url),
-      /// RSCODE:
-      pin_object_post_remote_spill_cancel_(pin_object_post_remote_spill_cancel),
       pull_retry_timer_(*main_service_,
                         boost::posix_time::milliseconds(config.timer_freq_ms)) {
   RAY_CHECK(config_.rpc_service_threads_number > 0);
@@ -502,43 +497,44 @@ void ObjectManager::TempAccessPullRequest(const ObjectID &object_id, const NodeI
   SendPullRequest(object_id, node_id, callback, true);
 }
 
-void ObjectManager::TrySpillingToNode(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
-  // Call RPC to first allocate memory of object
-  const ObjectInfo &object_info = local_objects_[object_id].object_info;
-  int64_t data_size = object_info.data_size;
-  rpc::AllocateMemoryRequest allocate_memory_request;
-  allocate_memory_request.set_object_id(object_id.Binary());
-  allocate_memory_request.set_data_size(data_size);
-  allocate_memory_request.set_metadata_size(object_info.metadata_size);
+/// RSTODO: Delete this and everything it calls later it doesn't really work
+// void ObjectManager::TrySpillingToNode(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
+//   // Call RPC to first allocate memory of object
+//   const ObjectInfo &object_info = local_objects_[object_id].object_info;
+//   int64_t data_size = object_info.data_size;
+//   rpc::AllocateMemoryRequest allocate_memory_request;
+//   allocate_memory_request.set_object_id(object_id.Binary());
+//   allocate_memory_request.set_data_size(data_size);
+//   allocate_memory_request.set_metadata_size(object_info.metadata_size);
 
-  rpc::Address owner_address;
-  owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
-  owner_address.set_ip_address(object_info.owner_ip_address);
-  owner_address.set_port(object_info.owner_port);
-  owner_address.set_worker_id(object_info.owner_worker_id.Binary());
-  allocate_memory_request.mutable_owner_address()->CopyFrom(owner_address);
+//   rpc::Address owner_address;
+//   owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
+//   owner_address.set_ip_address(object_info.owner_ip_address);
+//   owner_address.set_port(object_info.owner_port);
+//   owner_address.set_worker_id(object_info.owner_worker_id.Binary());
+//   allocate_memory_request.mutable_owner_address()->CopyFrom(owner_address);
 
-  auto rpc_client = GetRpcClient(node_id);
-  if (!rpc_client) {
-    RAY_LOG(INFO)
-        << "Failed to establish connection for AllocateMemory with object manager.";
-    return;
-  }
+//   auto rpc_client = GetRpcClient(node_id);
+//   if (!rpc_client) {
+//     RAY_LOG(INFO)
+//         << "Failed to establish connection for AllocateMemory with object manager.";
+//     return;
+//   }
 
-  rpc::ClientCallback<rpc::AllocateMemoryReply> allocate_memory_callback =
-      [this, object_id, node_id, callback, local_disk_spill_callback] (const Status &status, const rpc::AllocateMemoryReply &reply) {
-        node_to_available_memory_[node_id] = reply.available_memory();
-        if (!reply.success()) {
-          RAY_LOG(INFO) << "Failed to allocate memory for object " << object_id << " on node " << node_id;
-          // Call PickMostAvailableNode after updating the node's available memory
-          PickMostAvailableNode({object_id}, callback, local_disk_spill_callback);
-        } else {
-          SpillRemote(object_id, node_id, callback);
-        }
-      };
+//   rpc::ClientCallback<rpc::AllocateMemoryReply> allocate_memory_callback =
+//       [this, object_id, node_id, callback, local_disk_spill_callback] (const Status &status, const rpc::AllocateMemoryReply &reply) {
+//         node_to_available_memory_[node_id] = reply.available_memory();
+//         if (!reply.success()) {
+//           RAY_LOG(INFO) << "Failed to allocate memory for object " << object_id << " on node " << node_id;
+//           // Call PickMostAvailableNode after updating the node's available memory
+//           PickMostAvailableNode({object_id}, callback, local_disk_spill_callback);
+//         } else {
+//           SpillRemote(object_id, node_id, callback);
+//         }
+//       };
 
-  rpc_client->AllocateMemory(allocate_memory_request, allocate_memory_callback);  
-}
+//   rpc_client->AllocateMemory(allocate_memory_request, allocate_memory_callback);  
+// }
 
 void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_objects_to_spill, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
   std::vector<ObjectID> objects_to_spill_to_disk;
@@ -559,7 +555,7 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
       if (data_size <= available_memory) {
         node_to_available_memory_[origin_node_id] -= data_size;
 
-        TrySpillingToNode(object_id, origin_node_id, callback, local_disk_spill_callback);
+        SpillRemote(object_id, origin_node_id, callback, local_disk_spill_callback);
         continue;
       }
     } 
@@ -590,7 +586,7 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
     } else {
       node_to_available_memory_[node_id] -= data_size;
 
-      TrySpillingToNode(object_id, node_id, callback, local_disk_spill_callback);
+      SpillRemote(object_id, node_id, callback, local_disk_spill_callback);
     }
   }
 
@@ -930,11 +926,12 @@ void ObjectManager::HandleUpdateOriginNode(const rpc::UpdateOriginNodeRequest &r
 }
 
 /// RSCODE: Implement spill function to spill object to remote memory
-void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback) {
+void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
   /// RSCODE: Add code to add object id to node id mapping
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
   spilled_remote_objects_url_.emplace(object_id, node_id);
   spilled_remote_objects_to_free_.emplace(object_id, node_id);
+  object_to_cancel_spill_remote_[object_id] = false;
 
   if (pulled_objects_from_remote_.contains(object_id)) {
     pulled_objects_from_remote_.erase(object_id );
@@ -972,55 +969,20 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
 
   auto object_reader = std::move(reader_status.first);
   RAY_CHECK(object_reader) << "object_reader can't be null";
+  
+  std::function<void(ObjectID)> find_node_to_spill_callback =
+      [this, callback, local_disk_spill_callback] (const ObjectID &object_id) {
+        if (object_to_cancel_spill_remote_[object_id] == true) {
+          PickMostAvailableNode({object_id}, callback, local_disk_spill_callback);
+        }
+      };
 
-  /// RSTODO: Comment out for now
-  // if (object_reader->GetDataSize() != data_size ||
-  //     object_reader->GetMetadataSize() != metadata_size) {
-  //   // TODO(scv119): handle object size changes in a more graceful way.
-  //   RAY_LOG(WARNING) << "Object id:" << object_id
-  //                    << "'s size mismatches our record. Expected data size: " << data_size
-  //                    << ", expected metadata size: " << metadata_size
-  //                    << ", actual data size: " << object_reader->GetDataSize()
-  //                    << ", actual metadata size: " << object_reader->GetMetadataSize()
-  //                    << ". This is likely due to a race condition."
-  //                    << " We will update the object size and proceed sending the object.";
-  //   local_objects_[object_id].object_info.data_size = 0;
-  //   local_objects_[object_id].object_info.metadata_size = 1;
-  // }
-
-  /// RSTODO: Comment this code if you want to test spilling
   SpillRemoteInternal(object_id,
                      node_id,
                      std::make_shared<ChunkObjectReader>(std::move(object_reader),
                      config_.object_chunk_size),
-                     callback);
-
-  /// RSTODO: Original code but doesn't work with remote spill
-  // std::string result(data_size, '\0');
-  // RAY_LOG(INFO) << "test1";
-  // object_reader->ReadFromDataSection(offset, data_size, &result[0]);
-
-  // RAY_LOG(INFO) << "test2";
-
-  // rpc::SpillRemoteRequest spill_remote_request;
-  // auto spill_id = UniqueID::FromRandom();
-  // spill_remote_request.set_spill_id(spill_id.Binary());
-  // spill_remote_request.set_object_id(object_id.Binary());
-  // spill_remote_request.set_node_id(node_id.Binary());
-  // spill_remote_request.set_allocated_owner_address(&owner_address);
-  // spill_remote_request.set_chunk_index(0);
-  // spill_remote_request.set_data_size(data_size);
-  // spill_remote_request.set_metadata_size(metadata_size);
-  // spill_remote_request.set_data(std::move(result));  
-
-  // rpc::ClientCallback<rpc::SpillRemoteReply> callback =
-  //     [] (const Status &status, const rpc::SpillRemoteReply &reply) {
-  //       std::cout << "hello";
-  //     };
-
-  // RAY_LOG(INFO) << "test3";
-  // rpc_client->SpillRemote(spill_remote_request, callback);
-  // RAY_LOG(INFO) << "test4";
+                     callback,
+                     find_node_to_spill_callback);
 }
 
 /// RSTODO: Delete from_remote arg later
@@ -1167,7 +1129,8 @@ void ObjectManager::PushFromFilesystem(const ObjectID &object_id,
 void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                                        const NodeID &node_id,
                                        std::shared_ptr<ChunkObjectReader> chunk_reader,
-                                       const std::function<void(ObjectID)> callback) {
+                                       const std::function<void(ObjectID)> callback,
+                                       const std::function<void(ObjectID)> find_node_to_spill_callback) {
   auto rpc_client = GetRemoteSpillRpcClient(node_id);
   if (!rpc_client) {
     RAY_LOG(INFO)
@@ -1198,16 +1161,17 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
                   node_id,
                   chunk_id,
                   rpc_client,
-                  [=](const Status &status) {
+                  [=](const Status &status, const bool cancel_spill) {
                     // Post back to the main event loop because the
                     // PushManager is thread-safe.
                     main_service_->post(
-                        [this, node_id, object_id, callback]() {
-                          spill_remote_manager_->OnChunkComplete(node_id, object_id, callback);
+                        [this, node_id, object_id, callback, find_node_to_spill_callback, cancel_spill]() {
+                          spill_remote_manager_->OnChunkComplete(node_id, object_id, callback, find_node_to_spill_callback, cancel_spill);
                         },
                         "ObjectManager.SpillRemote");
                   },
-                  chunk_reader);
+                  chunk_reader,
+                  callback);
             },
             "ObjectManager.SpillRemote");
       }); 
@@ -1268,8 +1232,9 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
                                     const NodeID &node_id,
                                     uint64_t chunk_index,
                                     std::shared_ptr<rpc::RemoteSpillClient> rpc_client,
-                                    std::function<void(const Status &)> on_complete,
-                                    std::shared_ptr<ChunkObjectReader> chunk_reader) {
+                                    std::function<void(const Status &, const bool)> on_complete,
+                                    std::shared_ptr<ChunkObjectReader> chunk_reader,
+                                    const std::function<void(ObjectID)> callback) {
   double start_time = absl::GetCurrentTimeNanos() / 1e9;
   rpc::SpillRemoteRequest spill_remote_request;
   spill_remote_request.set_spill_id(spill_id.Binary());
@@ -1301,8 +1266,8 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_ << " for current object: " << object_id;
 
-  rpc::ClientCallback<rpc::SpillRemoteReply> callback =
-      [this, start_time, object_id, node_id, chunk_index, on_complete] (const Status &status, const rpc::SpillRemoteReply &reply) {
+  rpc::ClientCallback<rpc::SpillRemoteReply> spill_remote_callback =
+      [this, start_time, object_id, node_id, chunk_index, on_complete, callback] (const Status &status, const rpc::SpillRemoteReply &reply) {
         if (!status.ok()) {
           RAY_LOG(WARNING) << "Send object " << object_id << " g " << node_id
                            << " failed due to" << status.message()
@@ -1310,26 +1275,33 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
           
           /// RSTODO: Delete this later
           RAY_LOG(INFO) << "Spill to remote failed on object: " << object_id;
+        } else {
+          // Update available memory
+          node_to_available_memory_[node_id] = reply.available_memory();
 
-          // Stop the spilling process here
+          if (!reply.success()) {
+            // Toggle to stop the spilling process here
+            object_to_cancel_spill_remote_[object_id] = true;
+          } else {
+            /// RSTODO: Delete this later
+            RAY_LOG(INFO) << "Successfully spilled to remote for object: " << object_id;
 
-          spilled_remote_objects_url_.erase(object_id);
-          spilled_remote_objects_to_free_.erase(object_id);
+            double end_time = absl::GetCurrentTimeNanos() / 1e9;
+            HandleSendFinished(object_id, node_id, chunk_index, start_time, end_time, status);
 
-          pin_object_post_remote_spill_cancel_(object_id);
+            /// RSTODO: Delete this later
+            RAY_LOG(INFO) << "Finished calling on_complete for object: " << object_id;
+          }
+
+          on_complete(status, object_to_cancel_spill_remote_[object_id]);
         }
-        /// RSTODO: Delete this later
-        RAY_LOG(INFO) << "Successfully spilled to remote for object: " << object_id;
-
-        double end_time = absl::GetCurrentTimeNanos() / 1e9;
-        HandleSendFinished(object_id, node_id, chunk_index, start_time, end_time, status);
-        on_complete(status);
-
-        /// RSTODO: Delete this later
-        RAY_LOG(INFO) << "Finished calling on_complete for object: " << object_id;
       };
 
-  rpc_client->SpillRemote(spill_remote_request, callback);  
+  if (object_to_cancel_spill_remote_[object_id]) {
+    on_complete(Status::OK(), object_to_cancel_spill_remote_[object_id]);
+  } else {
+    rpc_client->SpillRemote(spill_remote_request, spill_remote_callback); 
+  } 
 }
 
 void ObjectManager::SendObjectChunk(const UniqueID &push_id,
@@ -1494,34 +1466,44 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "Chunk index: " << chunk_index << " for object: " << object_id;
 
+  // First check if node is OOM
+  if (spilling_in_progress_) {
+    RAY_LOG(INFO) << "Spilling is currently in progress";
+
+    reply->set_success(false);
+    reply->set_available_memory(0);
+
+    buffer_pool_.AbortCreate(object_id);
+
+    send_reply_callback(Status::IOError("Spilling is currently in progress"), nullptr, nullptr);
+    return;
+  }
+
+  // Check if data size fits in memory
+  uint64_t available_memory = config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();
+  if (data_size > available_memory && !received_remote_objects_origin_.contains(object_id)) {
+    RAY_LOG(INFO) << "Not enough memory to spill object " << object_id << " of size " << data_size;
+
+    reply->set_success(false);
+    reply->set_available_memory(available_memory);
+
+    /// Probably not necessary here but just in case
+    buffer_pool_.AbortCreate(object_id);
+
+    send_reply_callback(Status::IOError("Not enough memory to spill object"), nullptr, nullptr);
+    return;
+  }
+
   if (!object_to_origin_node_.contains(object_id)) {
     object_to_origin_node_.emplace(object_id, node_id);
   }
 
-  /// RSTODO: Comment out for now
-  // auto chunk_status = buffer_pool_.CreateChunk(
-  //   object_id, owner_address, data_size, metadata_size, chunk_index);
-
-  // if (chunk_status.ok()) {
-  //   // Avoid handling this chunk if it's already being handled by another process.
-  //   buffer_pool_.WriteChunk(object_id, data_size, metadata_size, chunk_index, data);
-  // }
-
-  /// RSTODO: Delete this later
-  // Jaewon -> num_bytes_received_total is increasing the remote node (confirmed through logs)
-  // RAY_LOG(INFO) << "ToTr of bytes received: " << num_bytes_received_total_;
-
-  /// RSTODO: Delete this later
-  // Jaewon -> "self_node_id" and "node_id" are the same, and "chunk index" is always 0
-  // RAY_LOG(INFO) << "SpillToRemote on " << self_node_id_ << " from " << node_id
-  //               << " of object " << object_id << " chunk index: " << chunk_index
-  //               << ", chunk data size: " << data.size()
-  //               << ", object size: " << data_size;
-
-  /// RSTODO: Tony -> potentially delete this later
   RemoteSpillReceiveObjectChunk(node_id, object_id, owner_address, 
                      data_size, metadata_size, chunk_index, 
                      data, true /* from_remote */, true /* from remote spill */);
+
+  reply->set_success(true);
+  reply->set_available_memory(config_.object_store_memory - plasma::plasma_store_runner->GetAllocated());
 
   send_reply_callback(Status::OK(), nullptr, nullptr);
 }
@@ -1544,7 +1526,7 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   
   /// RSTODO: Delete later
   RAY_LOG(INFO) << "ReceiveObjectChunk on " << node_id
-                << " of object " << object_id;
+                << " of object " << object_id << " for chunk index: " << chunk_index;
   /// RSCODE: current solution: add default from_remote param so that
   /// pull manager checking is not invoked. 
   if (!from_remote) {
@@ -1567,13 +1549,13 @@ bool RemoteSpill::RemoteSpillReceiveObjectChunk(const NodeID &node_id,
   }
 
   /// RSTODO: Maybe delete later
-  // if (from_remote_spill) {
-  //   if (!received_remote_objects_origin_.contains(object_id)) {
-  //     RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
-  //     received_remote_objects_origin_.emplace(object_id, node_id);
-  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  //   }
-  // }
+  if (from_remote_spill) {
+    if (!received_remote_objects_origin_.contains(object_id)) {
+      RAY_LOG(INFO) << "Increasing ref count of object for remote spill for object: " << object_id;
+      received_remote_objects_origin_.emplace(object_id, node_id);
+      buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
+    }
+  }
 
   /// RSCODE: Try incrementing object count before write chunk
   // if (from_remote_spill) {
@@ -1646,20 +1628,6 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
     buffer_pool_.AbortCreate(object_id);
     return false;
   }
-
-  // keep track of received objects. 
-  // doesn't care about fault tolerance. 
-  // if (from_remote_spill) {
-  //   if (!received_remote_objects_origin_.contains(object_id)) {
-  //     received_remote_objects_origin_.emplace(object_id, node_id);
-  //     buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  //   }
-  // }
-
-  /// RSCODE: Try incrementing object count before write chunk
-  // if (from_remote_spill) {
-  //   buffer_pool_store_client_->RemoteSpillIncreaseObjectCount(object_id);
-  // }
 
   if (chunk_status.ok()) {
     // Avoid handling this chunk if it's already being handled by another process.

@@ -842,15 +842,6 @@ std::string LocalObjectManager::GetLocalSpilledObjectURL(const ObjectID &object_
   }
 }
 
-void LocalObjectManager::PinObject(const ObjectID &object_id) {
-  auto it = objects_pending_spill_.find(object_id);
-  RAY_CHECK(it != objects_pending_spill_.end());
-  pinned_objects_size_ += it->second->GetSize();
-  num_bytes_pending_spill_ -= it->second->GetSize();
-  pinned_objects_.emplace(object_id, std::move(it->second));
-  objects_pending_spill_.erase(it);
-}
-
 bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id, int64_t object_size) {
   /// RSCODE: check for remote spill and restore.
   /// NVM: keeping this here, but this comment is obsolete.  
