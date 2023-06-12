@@ -1480,19 +1480,19 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   }
 
   // Check if data size fits in memory
-  uint64_t available_memory = config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();
-  if (data_size > available_memory && !received_remote_objects_origin_.contains(object_id)) {
-    RAY_LOG(INFO) << "Not enough memory to spill object " << object_id << " of size " << data_size << " with available memory " << available_memory;
+  // uint64_t available_memory = config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();
+  // if (data_size > available_memory && !received_remote_objects_origin_.contains(object_id)) {
+  //   RAY_LOG(INFO) << "Not enough memory to spill object " << object_id << " of size " << data_size << " with available memory " << available_memory;
 
-    reply->set_success(false);
-    reply->set_available_memory(available_memory);
+  //   reply->set_success(false);
+  //   reply->set_available_memory(available_memory);
 
-    /// Probably not necessary here but just in case
-    buffer_pool_.AbortCreate(object_id);
+  //   /// Probably not necessary here but just in case
+  //   buffer_pool_.AbortCreate(object_id);
 
-    send_reply_callback(Status::IOError("Not enough memory to spill object"), nullptr, nullptr);
-    return;
-  }
+  //   send_reply_callback(Status::IOError("Not enough memory to spill object"), nullptr, nullptr);
+  //   return;
+  // }
 
   if (!object_to_origin_node_.contains(object_id)) {
     object_to_origin_node_.emplace(object_id, node_id);
