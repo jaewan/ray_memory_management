@@ -1482,7 +1482,7 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   // Check if data size fits in memory
   uint64_t available_memory = config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();
   if (data_size > available_memory && !received_remote_objects_origin_.contains(object_id)) {
-    RAY_LOG(INFO) << "Not enough memory to spill object " << object_id << " of size " << data_size;
+    RAY_LOG(INFO) << "Not enough memory to spill object " << object_id << " of size " << data_size << " with available memory " << available_memory;
 
     reply->set_success(false);
     reply->set_available_memory(available_memory);
