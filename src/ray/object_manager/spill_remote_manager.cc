@@ -56,6 +56,8 @@ void SpillRemoteManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &
       RAY_LOG(INFO) << "Cancelling spill remote";
       find_node_to_spill_callback(obj_id);
     } else {
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Not cancelling spill remote";
       callback(obj_id);
     }
   }

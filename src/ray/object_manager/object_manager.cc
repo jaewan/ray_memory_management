@@ -578,7 +578,7 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
     }
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Max available memory: " << max_available_memory << " for node: " << node_id;
+    RAY_LOG(INFO) << "Max available memory: " << max_available_memory << " for node: " << node_id << " for object size: " << data_size;
 
     if (data_size > max_available_memory) {
       /// RSTODO: Delete later
@@ -588,6 +588,9 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
       objects_to_spill_to_disk.push_back(object_id);
     } else {
       node_to_available_memory_[node_id] -= data_size;
+
+      /// RSTODO: Delete later
+      RAY_LOG(INFO) << "Available memory for node: " << node_id << " is now: " << node_to_available_memory_[node_id] << " after subtracting data size: " << data_size;
 
       SpillRemote(object_id, node_id, callback, local_disk_spill_callback);
     }
@@ -631,7 +634,7 @@ void ObjectManager::FindNodeToSpill(const std::vector<ObjectID> requested_object
       [this, node_id, requested_objects_to_spill, callback, local_disk_spill_callback, find_node_to_spill_tracker_id] (const Status &status, const rpc::CheckAvailableRemoteMemoryReply &reply) {
         if (status.ok()) {
           /// RSTODO: Delete later
-          RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id;
+          RAY_LOG(INFO) << "Starting to add available memory to hashmap for node: " << node_id << " with available memory: " << reply.available_memory();
 
           node_to_available_memory_[node_id] = reply.available_memory();
 
@@ -976,6 +979,8 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   std::function<void(ObjectID)> find_node_to_spill_callback =
       [this, callback, local_disk_spill_callback] (const ObjectID &object_id) {
         if (object_to_cancel_spill_remote_[object_id] == true) {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "Finding another to spill for object: " << object_id;
           PickMostAvailableNode({object_id}, callback, local_disk_spill_callback);
         }
       };
@@ -1282,7 +1287,9 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
           if (!reply.success()) {
             // Toggle to stop the spilling process here
             object_to_cancel_spill_remote_[object_id] = true;
-            //node_to_available_memory_[node_id] = reply.available_memory();
+
+            /// RSTODO: Maybe put this back later
+            node_to_available_memory_[node_id] = reply.available_memory();
           } else {
             /// RSTODO: Delete this later
             RAY_LOG(INFO) << "Successfully spilled to remote for object: " << object_id;
@@ -1299,6 +1306,8 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
       };
 
   if (object_to_cancel_spill_remote_[object_id]) {
+    /// RSTODO: Delete this later
+    RAY_LOG(INFO) << "Spill to remote canceled on object: " << object_id;
     on_complete(Status::OK(), object_to_cancel_spill_remote_[object_id]);
   } else {
     rpc_client->SpillRemote(spill_remote_request, spill_remote_callback); 
