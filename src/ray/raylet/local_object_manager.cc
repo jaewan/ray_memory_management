@@ -374,6 +374,8 @@ void LocalObjectManager::SpillObjectsInternal(
     spilled_objects_tracker_id_ += 1;
   }
 
+  /// RSTODO: Delete later
+  RAY_LOG(INFO) << "We are emplacing spilled_objects_tracker_id: " << spilled_objects_tracker_id;
   spilled_objects_tracker_.emplace(spilled_objects_tracker_id, spill_remote_tracker_mapping);
 
   /// RSTODO: Delete this later (Original Disk Spill)
@@ -494,7 +496,11 @@ void LocalObjectManager::SpillObjectsInternal(
       std::vector<ObjectID> objects_spilled_locally;
 
       for (auto const& [key, val] : spilled_objects_tracker_[spilled_objects_tracker_id]) {
+        /// RSTODO: Delete later
+        RAY_LOG(INFO) << "Iterating through spilled_objects_tracker_";
         if (val == "remotelyspilled") {
+          /// RSTODO: Delete later
+          RAY_LOG(INFO) << "About to add to objects_spilled_remotely vector";
           objects_spilled_remotely.push_back(key);
         } else {
           objects_spilled_locally.push_back(key);
@@ -695,10 +701,10 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> objec
     // Asynchronously Update the spilled URL.
     auto freed_it = local_objects_.find(object_id);
     if (freed_it == local_objects_.end() || freed_it->second.second) {
-      RAY_LOG(DEBUG) << "Spilled object already freed, skipping send of spilled URL to "
+      RAY_LOG(DEBUG) << "Remotely spilled object already freed, skipping send of spilled URL to "
                         "object directory for object "
                       << object_id;
-      return;
+      continue;
     }
     
     // auto worker_it = object_to_worker_address_.find(object_id);
