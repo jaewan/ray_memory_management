@@ -102,7 +102,7 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
           &is_infeasible);
 
       /// RSTODO: Revert later
-      NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
+      // NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
 
       /// RSTODO: Delete later
       RAY_LOG(INFO) << "Node id should be consistent: " << node_id;
@@ -134,6 +134,7 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
         break;
       }
 
+      NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
       ScheduleOnNode(node_id, work);
       work_it = work_queue.erase(work_it);
     }
@@ -311,7 +312,8 @@ void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
                                         const std::shared_ptr<internal::Work> &work) {
   // if (spillback_to == self_node_id_ && local_task_manager_) {
   /// RSTODO: Revert later
-  if (true){
+  // if (true){
+  if (spillback_to == self_node_id_ && local_task_manager_) {
     local_task_manager_->QueueAndScheduleTask(work);
     return;
   }
