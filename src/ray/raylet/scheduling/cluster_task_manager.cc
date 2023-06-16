@@ -105,7 +105,7 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
       // NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
 
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Node id should be consistent: " << node_id;
+      // RAY_LOG(INFO) << "Node id should be consistent: " << node_id;
 
       // There is no node that has available resources to run the request.
       // Move on to the next shape.

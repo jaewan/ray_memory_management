@@ -261,34 +261,27 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   /// RSTODO: START
   /// 1. add (time, used_memory_) tuple to csv file
   /// 2. Time can be calculated using "double start_time = absl::GetCurrentTimeNanos() / 1e9;"
-  // std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
-  // std::string fp = dir + "/" + "memory_usage.csv";
-  // static std::ofstream file(fp, std::ios::app);
-  
-  // if (!file.is_open()) {
-  //   file.open(fp);
-  //   if (file.is_open()) {
-  //     file << "Timestamp, Memory Usage\n";
-  //   } else {
-  //     RAY_LOG(DEBUG) << "DEBUG 0: File opening is wrong if this message can be seen";
-  //   }
-  // }
+  std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
+  std::string fp = dir + "/" + "memory_usage.csv";
 
-  // double start_time = absl::GetCurrentTimeNanos() / 1e9;
-  // std::string curr_mem = std::to_string(used_memory_);
-  // std::string curr_time = std::to_string(start_time);
-  // std::stringstream data;
-  // data << curr_time << ", " << curr_mem;
-  // RAY_LOG(DEBUG) << "DEBUG 1 data: " << data.str();
+  double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  std::string curr_mem = std::to_string(used_memory_);
+  std::string curr_time = std::to_string(start_time);
+  std::stringstream data;
+  data << curr_time << ", " << curr_mem;
+  RAY_LOG(DEBUG) << "DEBUG 1 data: " << data.str();
 
-  // if (file.is_open()) {
-  //   file << data.str() << "\n";
-  //   if (used_memory_ == 0) {
-  //     file.close();
-  //   }
-  // } else {
-  //   RAY_LOG(DEBUG) << "DEBUG 2: File opening is wrong if this message can be seen";
-  // }
+  std::ofstream file(fp, std::ios::app);  // Open the file in append mode
+
+  if (file.is_open()) {
+    if (file.tellp() == 0) {
+      file << "Timestamp, Memory Usage\n";  // Write the header line if the file is empty
+    }
+    file << data.str() << "\n";  // Write the data to the file
+    file.close();  // Close the file
+  } else {
+    RAY_LOG(DEBUG) << "DEBUG 2: File opening failed";
+  }
   /// RSTODO: END
 
   object_directory_->ReportObjectAdded(object_id, self_node_id_, object_info);
@@ -322,34 +315,27 @@ void ObjectManager::HandleObjectDeleted(const ObjectID &object_id) {
   /// RSTODO: START
   /// 1. add (time, used_memory_) tuple to csv file
   /// 2. Time can be calculated using "double start_time = absl::GetCurrentTimeNanos() / 1e9;"
-  // std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
-  // std::string fp = dir + "/" + "memory_usage.csv";
-  // static std::ofstream file(fp, std::ios::app);
-  
-  // if (!file.is_open()) {
-  //   file.open(fp);
-  //   if (file.is_open()) {
-  //     file << "Timestamp, Memory Usage\n";
-  //   } else {
-  //     RAY_LOG(DEBUG) << "DEBUG 0: File opening is wrong if this message can be seen";
-  //   }
-  // }
+  std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
+  std::string fp = dir + "/" + "memory_usage.csv";
 
-  // double start_time = absl::GetCurrentTimeNanos() / 1e9;
-  // std::string curr_mem = std::to_string(used_memory_);
-  // std::string curr_time = std::to_string(start_time);
-  // std::stringstream data;
-  // data << curr_time << ", " << curr_mem;
-  // RAY_LOG(DEBUG) << "DEBUG 1 data: " << data.str();
+  double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  std::string curr_mem = std::to_string(used_memory_);
+  std::string curr_time = std::to_string(start_time);
+  std::stringstream data;
+  data << curr_time << ", " << curr_mem;
+  RAY_LOG(DEBUG) << "DEBUG 1 data: " << data.str();
 
-  // if (file.is_open()) {
-  //   file << data.str() << "\n";
-  //   if (used_memory_ == 0) {
-  //     file.close();
-  //   }
-  // } else {
-  //   RAY_LOG(DEBUG) << "DEBUG 2: File opening is wrong if this message can be seen";
-  // }
+  std::ofstream file(fp, std::ios::app);  // Open the file in append mode
+
+  if (file.is_open()) {
+    if (file.tellp() == 0) {
+      file << "Timestamp, Memory Usage\n";  // Write the header line if the file is empty
+    }
+    file << data.str() << "\n";  // Write the data to the file
+    file.close();  // Close the file
+  } else {
+    RAY_LOG(DEBUG) << "DEBUG 2: File opening failed";
+  }
   /// RSTODO: END
 
   RAY_CHECK(!local_objects_.empty() || used_memory_ == 0);

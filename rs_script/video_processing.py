@@ -500,19 +500,20 @@ def main(args):
                     node_resources.append(r)
 
         print("All nodes joined")
-        i = 0
-        worker_resources = node_resources[:num_worker_nodes]
-        i += num_worker_nodes
-        owner_resources = node_resources[i:i + num_owner_nodes]
-        i += num_owner_nodes
-        sink_resources = node_resources[i:i + num_sink_nodes]
+        # i = 0
+        worker_resources = node_resources
+        # i += num_worker_nodes
+        owner_resources = [head_node_resource]
+        # i += num_owner_nodes
+        sink_resources = [head_node_resource]
+    # worker_resources.append(head_node_resource)
+    # worker_resources.pop(0)
+    # owner_resources = [worker_resources[0]]
+    # sink_resources = [worker_resources[1]]
     print("worker_resources", worker_resources)
     print("owner_resources", owner_resources)
     print("sink_resources", sink_resources)
-    worker_resources.append(owner_resources[0])
-    worker_resources.append(sink_resources[0])
-    worker_resources.append(head_node_resource)
-
+    
     # Start processing at an offset from the current time to give all processes
     # time to start up.
     offset_seconds = 5
