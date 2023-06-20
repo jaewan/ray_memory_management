@@ -568,31 +568,31 @@ void ObjectManager::PickMostAvailableNode(const std::vector<ObjectID> requested_
       RAY_LOG(INFO) << "Node: " << pair.first << " has available memory: " << pair.second;
     }
 
-    NodeID node_id;
-    int64_t max_available_memory = 0;
+    /// Initialize a vector of node ID
+    std::vector<NodeID> candidate_nodes;
     for (const auto &pair : node_to_available_memory_) {
-      if (pair.second > max_available_memory && pair.first != origin_node_id) {
-        node_id = pair.first;
-        max_available_memory = pair.second;
+      if (data_size <= pair.second && pair.first != origin_node_id) {
+        candidate_nodes.push_back(pair.first);
       }
     }
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Max available memory: " << max_available_memory << " for node: " << node_id << " for object size: " << data_size;
+    // RAY_LOG(INFO) << "Max available memory: " << max_available_memory << " for node: " << node_id << " for object size: " << data_size;
 
-    if (data_size > max_available_memory) {
+    if (candidate_nodes.size() == 0) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Data size: " << data_size << " is greater than max available memory: " << max_available_memory 
-        << " for node: " << node_id << " and we will spill to disk instead for object: " << object_id;
+      // RAY_LOG(INFO) << "Data size: " << data_size << " is greater than max available memory: " << max_available_memory << " and we will spill to disk instead for object: " << object_id;
 
       objects_to_spill_to_disk.push_back(object_id);
     } else {
-      node_to_available_memory_[node_id] -= data_size;
+      int node_index = rand() % candidate_nodes.size();
+      NodeID chosen_node = candidate_nodes[node_index];
+      node_to_available_memory_[chosen_node] -= data_size;
 
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Available memory for node: " << node_id << " is now: " << node_to_available_memory_[node_id] << " after subtracting data size: " << data_size;
+      RAY_LOG(INFO) << "Available memory for node: " << chosen_node << " is now: " << node_to_available_memory_[chosen_node] << " after subtracting data size: " << data_size;
 
-      SpillRemote(object_id, node_id, callback, local_disk_spill_callback);
+      SpillRemote(object_id, chosen_node, callback, local_disk_spill_callback);
     }
   }
 
