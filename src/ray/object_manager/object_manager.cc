@@ -921,8 +921,8 @@ void ObjectManager::HandleUpdateOriginNode(const rpc::UpdateOriginNodeRequest &r
 void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id, const std::function<void(ObjectID)> callback, const std::function<void(std::vector<ObjectID>)> local_disk_spill_callback) {
   /// RSCODE: Add code to add object id to node id mapping
   RAY_LOG(INFO) << "Object we are trying to spill: " << object_id;
-  spilled_remote_objects_url_.emplace(object_id, node_id);
-  spilled_remote_objects_to_free_.emplace(object_id, node_id);
+  spilled_remote_objects_url_[object_id] = node_id;
+  spilled_remote_objects_to_free_[object_id] = node_id;
   object_to_cancel_spill_remote_[object_id] = false;
 
   if (pulled_objects_from_remote_.contains(object_id)) {
@@ -1276,6 +1276,8 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
 
             /// RSTODO: Maybe put this back later
             node_to_available_memory_[node_id] = reply.available_memory();
+
+            spilled_remote_objects_url_.erase(object_id);
           } else {
             /// RSTODO: Delete this later
             RAY_LOG(INFO) << "Successfully spilled to remote for object: " << object_id;
