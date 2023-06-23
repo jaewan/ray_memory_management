@@ -1465,19 +1465,19 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
   RAY_LOG(INFO) << "Chunk index: " << chunk_index << " for object: " << object_id;
 
   // First check if node is OOM
-  if (spilling_in_progress_) {
-    RAY_LOG(INFO) << "Spilling is currently in progress";
+  // if (spilling_in_progress_) {
+  //   RAY_LOG(INFO) << "Spilling is currently in progress";
 
-    reply->set_success(false);
-    reply->set_available_memory(0);
+  //   reply->set_success(false);
+  //   reply->set_available_memory(0);
 
-    if (received_remote_objects_origin_.contains(object_id)) {
-      buffer_pool_.AbortCreate(object_id);
-    }
+  //   if (received_remote_objects_origin_.contains(object_id)) {
+  //     buffer_pool_.AbortCreate(object_id);
+  //   }
 
-    send_reply_callback(Status::OK(), nullptr, nullptr);
-    return;
-  }
+  //   send_reply_callback(Status::OK(), nullptr, nullptr);
+  //   return;
+  // }
 
   // Check if data size fits in memory
   uint64_t available_memory = config_.object_store_memory - plasma::plasma_store_runner->GetAllocated();
@@ -1488,9 +1488,7 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
     reply->set_available_memory(available_memory);
 
     /// Probably not necessary here but just in case
-    if (received_remote_objects_origin_.contains(object_id)) {
-      buffer_pool_.AbortCreate(object_id);
-    }
+    buffer_pool_.AbortCreate(object_id);
 
     send_reply_callback(Status::OK(), nullptr, nullptr);
     return;
