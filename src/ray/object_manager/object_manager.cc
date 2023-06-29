@@ -1495,7 +1495,7 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
     reply->set_available_memory(available_memory);
 
     /// Probably not necessary here but just in case
-    buffer_pool_.AbortCreate(object_id);
+    // buffer_pool_.AbortCreate(object_id);
 
     send_reply_callback(Status::OK(), nullptr, nullptr);
     return;
