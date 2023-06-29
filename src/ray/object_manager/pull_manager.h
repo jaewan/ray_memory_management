@@ -274,11 +274,11 @@ class PullManager {
     void AddBundlePullRequest(uint64_t request_id, BundlePullRequest request) {
       requests.emplace(request_id, request);
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "About to emplace in inactive requests";
+      // RAY_LOG(INFO) << "About to emplace in inactive requests";
 
       if (request.IsPullable()) {
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "Emplacing in inactive requests";
+        // RAY_LOG(INFO) << "Emplacing in inactive requests";
 
         inactive_requests.emplace(request_id);
       }
@@ -291,7 +291,7 @@ class PullManager {
 
     void DeactivateBundlePullRequest(uint64_t request_id) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "About to emplace in inactive_requests in DeactivateBundlePullRequest";
+      // RAY_LOG(INFO) << "About to emplace in inactive_requests in DeactivateBundlePullRequest";
       
       RAY_CHECK_EQ(active_requests.erase(request_id), 1u);
       inactive_requests.emplace(request_id);

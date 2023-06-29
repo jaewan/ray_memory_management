@@ -402,6 +402,14 @@ def process_videos(video_pathname, num_videos, output_filename, view,
     print("Mean latency:", np.mean(latencies))
     print("Max latency:", np.max(latencies))
     runtime = perf_counter() - start_time
+
+    import os
+    file_path = '/home/jae/ray_memory_management/rs_script/video_example/husky.mp4'
+    file_size = os.path.getsize(file_path)
+    fs_mb = file_size / (1024 * 1024)
+    throughput = fs_mb / runtime
+    throughput *= num_videos
+    print("Throughput:", throughput)
     print("Runtime:", runtime)
 
 def kill_node(fail_at, kill_script, worker_ip):
@@ -503,10 +511,10 @@ def main(args):
         # i = 0
         worker_resources = node_resources
         # i += num_worker_nodes
-        owner_resources = [head_node_resource]
+        owner_resources = [worker_resources[0]]
         # i += num_owner_nodes
-        sink_resources = [head_node_resource]
-    # worker_resources.append(head_node_resource)
+        sink_resources = [worker_resources[1]]
+    worker_resources.append(head_node_resource)
     # worker_resources.pop(0)
     # owner_resources = [worker_resources[0]]
     # sink_resources = [worker_resources[1]]

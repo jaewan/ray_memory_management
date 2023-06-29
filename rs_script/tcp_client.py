@@ -3,7 +3,7 @@ import numpy as np
 import time
 
 def connect_to_server():
-    host = '10.138.0.2' 
+    host = '10.128.15.197'
     port = 6378
     buffer_size = 4096
 

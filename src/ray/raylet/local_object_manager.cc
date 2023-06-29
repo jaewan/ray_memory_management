@@ -40,7 +40,7 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
     }
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Calling PinObjectsAndWaitForFree on object: " << object_id;
+    // RAY_LOG(INFO) << "Calling PinObjectsAndWaitForFree on object: " << object_id;
 
     const auto inserted =
         local_objects_.emplace(object_id, std::make_pair<>(owner_address, false));
@@ -93,7 +93,7 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
                                                      const Status &) {
       const auto object_id = ObjectID::FromBinary(object_id_binary);
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Owner has died, calling ReleaseFreedObject on object: " << object_id;
+      // RAY_LOG(INFO) << "Owner has died, calling ReleaseFreedObject on object: " << object_id;
       ReleaseFreedObject(object_id);
     };
 
@@ -112,7 +112,7 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
 
 void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
   /// RSTODO: Delete this later
-  RAY_LOG(DEBUG) << "Calling Released Freed Object on: " << object_id;
+  // RAY_LOG(DEBUG) << "Calling Released Freed Object on: " << object_id;
 
   /// RSCODE: Only free object if it's not spilling to remote
   // absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
@@ -160,7 +160,7 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
 
 void LocalObjectManager::FlushFreeObjects() {
     /// RSTODO: Delete this later
-  RAY_LOG(DEBUG) << "Calling FlushFreeObjects";
+  // RAY_LOG(DEBUG) << "Calling FlushFreeObjects";
 
   if (!objects_to_free_.empty()) {
     RAY_LOG(DEBUG) << "Freeing " << objects_to_free_.size() << " out-of-scope objects";
@@ -302,7 +302,7 @@ void LocalObjectManager::SpillObjectsInternal(
   // Filter for the objects that can be spilled.
   for (const auto &id : object_ids) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "We are spilling object: " << id;
+    // RAY_LOG(INFO) << "We are spilling object: " << id;
 
     // We should not spill an object that we are not the primary copy for, or
     // objects that are already being spilled.
@@ -357,7 +357,7 @@ void LocalObjectManager::SpillObjectsInternal(
 
     if (freed_it == local_objects_.end() || freed_it->second.second) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "We are freeing object before calling FindNodeToSpill";
+      // RAY_LOG(INFO) << "We are freeing object before calling FindNodeToSpill";
 
       num_bytes_pending_spill_ -= it->second->GetSize();
       objects_pending_spill_.erase(it);
@@ -685,7 +685,7 @@ void LocalObjectManager::OnObjectRemoteSpilled(const std::vector<ObjectID> objec
     // Mark that the object is spilled and unpin the pending requests.
     // spilled_objects_url_.emplace(object_id, object_url);
     /// RSTODO:
-    RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
+    // RAY_LOG(INFO) << "Spilled Object URL (Remote): " << object_url;
 
     /// RSTODO: Might have to just delete this later because it messes up with bookkeeping but rn we need it to get past the check:
     /// RAY_CHECK((pinned_objects_.count(object_id) > 0) || (spilled_objects_url_.count(object_id) > 0) || (objects_pending_spill_.count(object_id) > 0));
@@ -845,14 +845,14 @@ bool LocalObjectManager::RestoreRemoteSpilledObject(const ObjectID &object_id, i
   /// NVM: keeping this here, but this comment is obsolete.  
   absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
   /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "Object restoration is happening";
-  RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spill_remote_mapping.size();
-  RAY_LOG(INFO) << "Object we are trying to restore: " << object_id;
+  // RAY_LOG(INFO) << "Object restoration is happening";
+  // RAY_LOG(INFO) << "Spill Remote Mapping Info: " << spill_remote_mapping.size();
+  // RAY_LOG(INFO) << "Object we are trying to restore: " << object_id;
 
   if (objects_pending_restore_.count(object_id) > 0) {
     // If the same object is restoring, we dedup here.
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "We are dedupping in RestoreRemoteSpilledObject";
+    // RAY_LOG(INFO) << "We are dedupping in RestoreRemoteSpilledObject";
     return true;
   }
 
@@ -1020,7 +1020,7 @@ void LocalObjectManager::AsyncRestoreSpilledObject(
 void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_size) {
   
   /// RSTODO: Delete later
-  RAY_LOG(DEBUG) << "Starting ProcessSpilledObjectsDeleteQueue";
+  // RAY_LOG(DEBUG) << "Starting ProcessSpilledObjectsDeleteQueue";
 
   /// RSCODE: Fetch remote spill mapping
   absl::flat_hash_map<ObjectID, NodeID> spill_remote_mapping = object_manager_.GetSpillRemoteMapping();
@@ -1049,7 +1049,7 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       // ref count.
 
       /// RSTODO: Delete later
-      RAY_LOG(DEBUG) << "Checking if spilled object can be deleted: " << object_id;
+      // RAY_LOG(DEBUG) << "Checking if spilled object can be deleted: " << object_id;
 
       if (spilled_objects_url_it->second != "remotelyspilled") {
 
@@ -1070,7 +1070,7 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
         // If there's no more refs, delete the object.
         if (url_ref_count_it->second == 0) {
           /// RSTODO: Delete later
-          RAY_LOG(DEBUG) << "There are no more refs and the object can be deleted: " << object_id;
+          // RAY_LOG(DEBUG) << "There are no more refs and the object can be deleted: " << object_id;
 
           url_ref_count_.erase(url_ref_count_it);
           RAY_LOG(DEBUG) << "The URL " << object_url
@@ -1090,7 +1090,7 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
       // If the object was not spilled, it gets pinned again. Unpin here to
       // prevent a memory leak.
       /// RSTODO: Delete later
-      RAY_LOG(DEBUG) << "We are pinning the object again because it apparently wasn't spilled: " << object_id;
+      // RAY_LOG(DEBUG) << "We are pinning the object again because it apparently wasn't spilled: " << object_id;
       pinned_objects_.erase(object_id);
     }
     local_objects_.erase(object_id);
@@ -1098,18 +1098,18 @@ void LocalObjectManager::ProcessSpilledObjectsDeleteQueue(uint32_t max_batch_siz
   }
   if (object_urls_to_delete.size() > 0) {
     /// RSTODO: Delete later
-    RAY_LOG(DEBUG) << "We are now deleting the object from disk";
+    // RAY_LOG(DEBUG) << "We are now deleting the object from disk";
     DeleteSpilledObjects(object_urls_to_delete);
   }
   /// RSCODE: Delete object from remote node
   if (remote_spilled_objects_to_delete.size() > 0) {
     /// RSTODO: Delete later
-    for (const auto &object_id : remote_spilled_objects_to_delete) {
-      RAY_LOG(DEBUG) << "Object we are about to delete from remote: " << object_id;
-    }
+    // for (const auto &object_id : remote_spilled_objects_to_delete) {
+      // RAY_LOG(DEBUG) << "Object we are about to delete from remote: " << object_id;
+    // }
 
     /// RSTODO: Delete later
-    RAY_LOG(DEBUG) << "We are now deleting the object from remote node";
+    // RAY_LOG(DEBUG) << "We are now deleting the object from remote node";
     DeleteRemoteSpilledObjects(remote_spilled_objects_to_delete);
   }
 }

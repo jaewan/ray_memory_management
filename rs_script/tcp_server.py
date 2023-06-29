@@ -1,8 +1,9 @@
 import socket
 import time
+import os
 
 def start_server():
-    host = '10.138.0.2'
+    host = '10.128.15.193'
     port = 6378
     buffer_size = 4096  # Define the buffer size
     filename = 'received_data.npy'

@@ -25,7 +25,7 @@ void PushManager::StartPush(const NodeID &dest_id,
                             int64_t num_chunks,
                             std::function<void(int64_t)> send_chunk_fn) {
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "StartPush test of: " << obj_id;
+  // RAY_LOG(INFO) << "StartPush test of: " << obj_id;
 
   auto push_id = std::make_pair(dest_id, obj_id);
   RAY_CHECK(num_chunks > 0);
@@ -42,7 +42,7 @@ void PushManager::StartPush(const NodeID &dest_id,
 
 void PushManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id) {
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "OnChunkComplete test of: " << obj_id;
+  // RAY_LOG(INFO) << "OnChunkComplete test of: " << obj_id;
 
   auto push_id = std::make_pair(dest_id, obj_id);
   chunks_in_flight_ -= 1;
@@ -58,7 +58,7 @@ void PushManager::OnChunkComplete(const NodeID &dest_id, const ObjectID &obj_id)
 
 void PushManager::ScheduleRemainingPushes() {
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "ScheduleRemainingPushes test";
+  // RAY_LOG(INFO) << "ScheduleRemainingPushes test";
 
   bool keep_looping = true;
   // Loop over all active pushes for approximate round-robin prioritization.

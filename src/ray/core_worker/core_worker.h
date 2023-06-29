@@ -1040,7 +1040,7 @@ class CoreWorker : public rpc::CoreWorkerServiceHandler {
                             rpc::SendReplyCallback send_reply_callback) {
     if (intended_worker_id != worker_context_.GetWorkerID()) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "HandleWrongRecipient test 1";
+      // RAY_LOG(INFO) << "HandleWrongRecipient test 1";
 
       std::ostringstream stream;
       stream << "Mismatched WorkerID: ignoring RPC for previous worker "

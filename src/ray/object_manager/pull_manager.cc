@@ -84,7 +84,7 @@ uint64_t PullManager::Pull(const std::vector<rpc::ObjectReference> &object_ref_b
     } else {
       if (it->second.IsPullable()) {
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "Pull test 0";
+        // RAY_LOG(INFO) << "Pull test 0";
         bundle_pull_request.MarkObjectAsPullable(obj_id);
       }
     }
@@ -93,24 +93,24 @@ uint64_t PullManager::Pull(const std::vector<rpc::ObjectReference> &object_ref_b
 
   if (prio == BundlePriority::GET_REQUEST) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Pull test 1";
+    // RAY_LOG(INFO) << "Pull test 1";
 
     get_request_bundles_.AddBundlePullRequest(req_id, std::move(bundle_pull_request));
   } else if (prio == BundlePriority::WAIT_REQUEST) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Pull test 2";
+    // RAY_LOG(INFO) << "Pull test 2";
 
     wait_request_bundles_.AddBundlePullRequest(req_id, std::move(bundle_pull_request));
   } else {
     // RSTODO: Delete later
-    RAY_LOG(INFO) << "Pull test 3";
+    // RAY_LOG(INFO) << "Pull test 3";
 
     RAY_CHECK(prio == BundlePriority::TASK_ARGS);
     task_argument_bundles_.AddBundlePullRequest(req_id, std::move(bundle_pull_request));
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Pull test 4";
+  // RAY_LOG(INFO) << "Pull test 4";
 
   // We have a new request. Activate the new request, if the
   // current available memory allows it.
@@ -140,7 +140,7 @@ bool PullManager::ActivateNextBundlePullRequest(BundlePullRequestQueue &bundles,
     int64_t bytes_to_pull = 0;
     for (const auto &obj_id : next_request.objects) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 3";
+      // RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 3";
       const bool needs_pull = active_object_pull_requests_.count(obj_id) == 0;
       if (needs_pull) {
         // This is the first bundle request in the queue to require this object.
@@ -148,7 +148,7 @@ bool PullManager::ActivateNextBundlePullRequest(BundlePullRequestQueue &bundles,
         // TODO(ekl) this overestimates bytes needed if it's already available
         // locally.
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 4";
+        // RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 4";
         bytes_to_pull += map_find_or_die(object_pull_requests_, obj_id).object_size;
       }
     }
@@ -156,7 +156,7 @@ bool PullManager::ActivateNextBundlePullRequest(BundlePullRequestQueue &bundles,
     // Quota check.
     if (respect_quota && num_active_bundles_ >= 1 && bytes_to_pull > RemainingQuota()) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 5";
+      // RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 5";
 
       RAY_LOG(DEBUG) << "Bundle would exceed quota: "
                      << "num_bytes_being_pulled(" << num_bytes_being_pulled_
@@ -173,7 +173,7 @@ bool PullManager::ActivateNextBundlePullRequest(BundlePullRequestQueue &bundles,
     }
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 6";
+    // RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 6";
 
     RAY_LOG(DEBUG) << "Activating request " << next_request_id
                    << " num bytes being pulled: " << num_bytes_being_pulled_
@@ -181,12 +181,12 @@ bool PullManager::ActivateNextBundlePullRequest(BundlePullRequestQueue &bundles,
     num_bytes_being_pulled_ += bytes_to_pull;
     for (const auto &obj_id : next_request.objects) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 7";
+      // RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 7";
       const bool needs_pull = active_object_pull_requests_.count(obj_id) == 0;
       active_object_pull_requests_[obj_id].insert(next_request_id);
       if (needs_pull) {
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 8";
+        // RAY_LOG(INFO) << "ActivateNextBundlePullRequest test 8";
 
         RAY_LOG(DEBUG) << "Activating pull for object " << obj_id;
         auto &request = map_find_or_die(object_pull_requests_, obj_id);
@@ -212,23 +212,23 @@ void PullManager::DeactivateBundlePullRequest(
   const auto &request = map_find_or_die(bundles.requests, request_id);
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Calling DeactivateBundlePullRequest";
+  // RAY_LOG(INFO) << "Calling DeactivateBundlePullRequest";
 
   for (const auto &obj_id : request.objects) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "DeactivateBundlePullRequest test 1";
+    // RAY_LOG(INFO) << "DeactivateBundlePullRequest test 1";
 
     absl::MutexLock lock(&active_objects_mu_);
     auto it = active_object_pull_requests_.find(obj_id);
     if (it == active_object_pull_requests_.end() || !it->second.erase(request_id)) {
       // The object is already deactivated, no action is required.
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "DeactivateBundlePullRequest test 2";
+      // RAY_LOG(INFO) << "DeactivateBundlePullRequest test 2";
       continue;
     }
     if (it->second.empty()) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "DeactivateBundlePullRequest test 3";
+      // RAY_LOG(INFO) << "DeactivateBundlePullRequest test 3";
 
       RAY_LOG(DEBUG) << "Deactivating pull for object " << obj_id;
       num_bytes_being_pulled_ -=
@@ -240,7 +240,7 @@ void PullManager::DeactivateBundlePullRequest(
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "DeactivateBundlePullRequest test 4";
+  // RAY_LOG(INFO) << "DeactivateBundlePullRequest test 4";
 
   bundles.DeactivateBundlePullRequest(request_id);
   num_active_bundles_ -= 1;
@@ -253,12 +253,12 @@ void PullManager::DeactivateUntilMarginAvailable(
     int64_t quota_margin,
     std::unordered_set<ObjectID> *object_ids_to_cancel) {
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Calling DeactivateUntilMarginAvailable";  
+  // RAY_LOG(INFO) << "Calling DeactivateUntilMarginAvailable";  
   
   while (RemainingQuota() < quota_margin && !bundles.active_requests.empty()) {
     if (num_active_bundles_ <= retain_min) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "DeactivateUntilMarginAvailable test 1";  
+      // RAY_LOG(INFO) << "DeactivateUntilMarginAvailable test 1";  
       return;
     }
     const uint64_t request_id = *(bundles.active_requests.rbegin());
@@ -267,7 +267,7 @@ void PullManager::DeactivateUntilMarginAvailable(
                    << " num bytes available: " << num_bytes_available_;
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "DeactivateUntilMarginAvailable test 2";  
+    // RAY_LOG(INFO) << "DeactivateUntilMarginAvailable test 2";  
     DeactivateBundlePullRequest(bundles, request_id, object_ids_to_cancel);
   }
 }
@@ -318,7 +318,7 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
   bool wait_requests_remaining = !wait_request_bundles_.inactive_requests.empty();
   while (wait_requests_remaining) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 3";
+    // RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 3";
 
     const int64_t margin_required = NextRequestBundleSize(wait_request_bundles_);
     DeactivateUntilMarginAvailable("task args request",
@@ -355,7 +355,7 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
   // Call the cancellation callbacks outside of the lock.
   for (const auto &obj_id : object_ids_to_cancel) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 4";
+    // RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 4";
 
     RAY_LOG(DEBUG) << "Not enough memory to create requested object " << obj_id
                    << ", aborting.";
@@ -368,7 +368,7 @@ void PullManager::UpdatePullsBasedOnAvailableMemory(int64_t num_bytes_available)
       RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 5";
       if (object_ids_to_cancel.count(obj_id) == 0) {
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 6 for object: " << obj_id;
+        // RAY_LOG(INFO) << "UpdatePullsBasedOnAvailableMemory test 6 for object: " << obj_id;
         
         TryToMakeObjectLocal(obj_id);
       }
@@ -431,12 +431,12 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
   auto it = object_pull_requests_.find(object_id);
   if (it == object_pull_requests_.end()) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Object has been pulled: " << object_id;
+    // RAY_LOG(INFO) << "Object has been pulled: " << object_id;
     return;
   }
 
   /// RSTODO: Delete this
-  RAY_LOG(INFO) << "Testing";
+  // RAY_LOG(INFO) << "Testing";
   
   const bool was_pullable_before = it->second.IsPullable();
   // Reset the list of clients that are now expected to have the object.
@@ -512,7 +512,7 @@ void PullManager::OnLocationChange(const ObjectID &object_id,
 
 void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Try to make object local 0 for object: " << object_id;
+  // RAY_LOG(INFO) << "Try to make object local 0 for object: " << object_id;
 
   // The object is already local; abort.
   if (object_is_local_(object_id)) {
@@ -520,7 +520,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Try to make object local 1";
+  // RAY_LOG(INFO) << "Try to make object local 1";
 
   // The object is no longer needed; abort.
   if (active_object_pull_requests_.count(object_id) == 0) {
@@ -528,26 +528,26 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Try to make object local 2";
+  // RAY_LOG(INFO) << "Try to make object local 2";
 
   // The object waiting for local pull retry; abort.
   auto &request = map_find_or_die(object_pull_requests_, object_id);
   if (request.next_pull_time > get_time_seconds_()) {
     ///RSTODO: Delete later
-    RAY_LOG(INFO) << "Return at map_find_or_die for object: " << object_id;
+    // RAY_LOG(INFO) << "Return at map_find_or_die for object: " << object_id;
     return;
   }
 
   /// RSTODO: Add lambda call here to fetch from remote
   bool success = restore_remote_spilled_object_(object_id, request.object_size);
   if (success) {
-    RAY_LOG(INFO) << "Restored from Remote";
+    // RAY_LOG(INFO) << "Restored from Remote";
     UpdateRetryTimer(request, object_id);
     return;
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Try to make object local 3";
+  // RAY_LOG(INFO) << "Try to make object local 3";
 
   // Try to pull the object from a remote node. If the object is spilled on the local
   // disk of the remote node, it will be restored by PushManager prior to pushing.
@@ -555,7 +555,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   bool did_pull = PullFromRandomLocation(object_id);
   if (did_pull) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Object pulled from random location (remote node)";
+    // RAY_LOG(INFO) << "Object pulled from random location (remote node)";
     UpdateRetryTimer(request, object_id);
     return;
   }
@@ -570,7 +570,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Try to make object local 4";
+  // RAY_LOG(INFO) << "Try to make object local 4";
 
   /// Verify that direct_restore_url is not remotely spilled
   /// RSTODO: Refactor this later
@@ -579,7 +579,7 @@ void PullManager::TryToMakeObjectLocal(const ObjectID &object_id) {
       // Select an url from the object directory update
       UpdateRetryTimer(request, object_id);
       /// RSTODO: Delete this later
-      RAY_LOG(INFO) << "Restoring from disk for object: " << object_id;
+      // RAY_LOG(INFO) << "Restoring from disk for object: " << object_id;
       restore_spilled_object_(object_id,
                               request.object_size,
                               direct_restore_url,
@@ -796,12 +796,12 @@ std::string PullManager::BundleInfo(const BundlePullRequestQueue &bundles) const
 
 int64_t PullManager::NextRequestBundleSize(const BundlePullRequestQueue &bundles) const {
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Calling NextRequestBundleSize";
+  // RAY_LOG(INFO) << "Calling NextRequestBundleSize";
 
   if (bundles.inactive_requests.empty()) {
     // No inactive requests in the queue.
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "NextRequestBundleSize test 1";
+    // RAY_LOG(INFO) << "NextRequestBundleSize test 1";
     return 0L;
   }
   // Get the next pull request in the queue.
@@ -810,7 +810,7 @@ int64_t PullManager::NextRequestBundleSize(const BundlePullRequestQueue &bundles
   RAY_CHECK(next_request.IsPullable());
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "NextRequestBundleSize test 2";
+  // RAY_LOG(INFO) << "NextRequestBundleSize test 2";
 
   absl::MutexLock lock(&active_objects_mu_);
 
@@ -819,10 +819,10 @@ int64_t PullManager::NextRequestBundleSize(const BundlePullRequestQueue &bundles
   for (const auto &obj_id : next_request.objects) {
     bool needs_pull = active_object_pull_requests_.count(obj_id) == 0;
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "NextRequestBundleSize test 3";
+    // RAY_LOG(INFO) << "NextRequestBundleSize test 3";
     if (needs_pull) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "NextRequestBundleSize test 4";
+      // RAY_LOG(INFO) << "NextRequestBundleSize test 4";
       // This is the first bundle request in the queue to require this object.
       // Add the size to the number of bytes being pulled.
       bytes_needed_calculated +=

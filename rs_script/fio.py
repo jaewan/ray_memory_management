@@ -4,7 +4,7 @@ import json
 import os
 
 CHUNK_SIZE_GB = 1  # Size of each chunk in gigabytes
-DATA_SIZE_GB = 20  # Total size of data in gigabytes
+DATA_SIZE_GB = 60  # Total size of data in gigabytes
 
 def create_data():
     # Number of float32 numbers in each chunk
@@ -24,8 +24,8 @@ def create_data():
         data.tofile(filename)
 
 def run_fio():
-    cmd = ["fio", "--name=testfile", "--ioengine=sync", "--rw=readwrite", 
-           "--bs=4k", "--size=20g", "--numjobs=1", "--output-format=json"]
+    cmd = ["fio", "--name=/ray_spill/testfile", "--ioengine=sync", "--rw=write", "--direct=0",
+           "--bs=4k", "--size=60g", "--numjobs=4", "--output-format=json"]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -36,12 +36,12 @@ def run_fio():
 
     fio_output = json.loads(result.stdout)
 
-    read_bw = fio_output['jobs'][0]['read']['bw'] / 1024
+    #read_bw = fio_output['jobs'][0]['read']['bw'] / 1024
     write_bw = fio_output['jobs'][0]['write']['bw'] / 1024
 
-    print("Read bandwidth: {} MB/s".format(read_bw))
+    #print("Read bandwidth: {} MB/s".format(read_bw))
     print("Write bandwidth: {} MB/s".format(write_bw))
 
 if __name__ == "__main__":
-    create_data()
+    #create_data()
     run_fio()
