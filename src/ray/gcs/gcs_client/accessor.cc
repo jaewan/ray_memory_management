@@ -15,6 +15,7 @@
 #include "ray/gcs/gcs_client/accessor.h"
 
 #include <future>
+#include <chrono>
 
 #include "ray/common/asio/instrumented_io_context.h"
 #include "ray/gcs/gcs_client/gcs_client.h"
@@ -399,7 +400,7 @@ bool ActorInfoAccessor::IsActorUnsubscribed(const ActorID &actor_id) {
 NodeInfoAccessor::NodeInfoAccessor(GcsClient *client_impl) : client_impl_(client_impl) {}
 
 Status NodeInfoAccessor::RegisterSelf(const GcsNodeInfo &local_node_info,
-                                      const StatusCallback &callback) {
+                                      const StatusAndTimeCoordinationCallback &callback) {
   auto node_id = NodeID::FromBinary(local_node_info.node_id());
   RAY_LOG(DEBUG) << "Registering node info, node id = " << node_id
                  << ", address is = " << local_node_info.node_manager_address();
@@ -407,6 +408,8 @@ Status NodeInfoAccessor::RegisterSelf(const GcsNodeInfo &local_node_info,
   RAY_CHECK(local_node_info.state() == GcsNodeInfo::ALIVE);
   rpc::RegisterNodeRequest request;
   request.mutable_node_info()->CopyFrom(local_node_info);
+	int64_t local_timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+	request.set_timestamp(local_timestamp );
   client_impl_->GetGcsRpcClient().RegisterNode(
       request,
       [this, node_id, local_node_info, callback](const Status &status,
@@ -416,7 +419,7 @@ Status NodeInfoAccessor::RegisterSelf(const GcsNodeInfo &local_node_info,
           local_node_id_ = NodeID::FromBinary(local_node_info.node_id());
         }
         if (callback) {
-          callback(status);
+          callback(status,reply.timestamp_coordination());
         }
         RAY_LOG(DEBUG) << "Finished registering node info, status = " << status
                        << ", node id = " << node_id;

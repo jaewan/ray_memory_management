@@ -108,7 +108,7 @@ void Raylet::Stop() {
 }
 
 ray::Status Raylet::RegisterGcs() {
-  auto register_callback = [this](const Status &status) {
+  auto register_callback = [this](const Status &status, int64_t timestamp_coordination) {
     RAY_CHECK_OK(status);
     RAY_LOG(INFO) << "Raylet of id, " << self_node_id_
                   << " started. Raylet consists of node_manager and object_manager."
@@ -116,8 +116,10 @@ ray::Status Raylet::RegisterGcs() {
                   << ":" << self_node_info_.node_manager_port()
                   << " object_manager address: " << self_node_info_.node_manager_address()
                   << ":" << self_node_info_.object_manager_port()
-                  << " hostname: " << self_node_info_.node_manager_address();
+                  << " hostname: " << self_node_info_.node_manager_address()
+                  << " coordination: " << timestamp_coordination;
     RAY_CHECK_OK(node_manager_.RegisterGcs());
+		node_manager_.SetObjectManagerCoordination(timestamp_coordination);
   };
 
   RAY_RETURN_NOT_OK(

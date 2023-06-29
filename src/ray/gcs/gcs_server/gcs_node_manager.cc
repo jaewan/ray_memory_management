@@ -15,6 +15,7 @@
 #include "ray/gcs/gcs_server/gcs_node_manager.h"
 
 #include <utility>
+#include <chrono>
 
 #include "ray/common/ray_config.h"
 #include "ray/gcs/pb_util.h"
@@ -50,6 +51,11 @@ void GcsNodeManager::HandleRegisterNode(const rpc::RegisterNodeRequest &request,
                   << ", node name = " << request.node_info().node_name();
     RAY_CHECK_OK(gcs_publisher_->PublishNodeInfo(node_id, request.node_info(), nullptr));
     AddNode(std::make_shared<rpc::GcsNodeInfo>(request.node_info()));
+
+		int64_t node_timestamp = request.timestamp();
+		int64_t timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+		reply->set_timestamp_coordination(node_timestamp - timestamp);
+
     GCS_RPC_SEND_REPLY(send_reply_callback, reply, status);
   };
   RAY_CHECK_OK(

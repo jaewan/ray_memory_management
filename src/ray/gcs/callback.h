@@ -26,6 +26,7 @@ namespace gcs {
 /// This callback is used to notify when a operation completes.
 using EmptyCallback = std::function<void()>;
 
+using StatusAndTimeCoordinationCallback = std::function<void(Status status, int64_t)>;
 /// This callback is used to notify when a write/subscribe to GCS completes.
 /// \param status Status indicates whether the write/subscribe was successful.
 using StatusCallback = std::function<void(Status status)>;

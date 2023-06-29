@@ -302,6 +302,10 @@ class ObjectManager : public ObjectManagerInterface,
     return pull_manager_->PullRequestActiveOrWaitingForMetadata(pull_request_id);
   }
 
+	void SetTimestampCoordination(int64_t coordination){
+		coordination_ = coordination;
+	}
+
  public:
   /// Takes user-defined IObjectDirectory implementation.
   /// When this constructor is used, the ObjectManager assumes ownership of
@@ -627,6 +631,8 @@ class ObjectManager : public ObjectManagerInterface,
   /// \param client_id Remote server client id
   void SendPullRequest(const ObjectID &object_id, const NodeID &client_id, const std::function<void()> callback = [](){}, const bool from_remote = false);
 
+	int64_t GetTimeStamp();
+
   /// Get the rpc client according to the node ID
   ///
   /// \param node_id Remote node id, will send rpc request to it
@@ -637,6 +643,9 @@ class ObjectManager : public ObjectManagerInterface,
   ///
   /// \param node_id Remote node id, will send rpc request to it
   std::shared_ptr<rpc::RemoteSpillClient> GetRemoteSpillRpcClient(const NodeID &node_id);
+
+	// Subtract this value to current timestamp to coordinate with other nodes
+	int64_t coordination_ = 0;
 
   /// Weak reference to main service. We ensure this object is destroyed before
   /// main_service_ is stopped.

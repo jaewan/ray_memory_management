@@ -173,6 +173,9 @@ class NodeManager : public rpc::NodeManagerServiceHandler,
                             int64_t message_type,
                             const uint8_t *message_data);
 
+	// Set Coordination at object manager. This is to coordinate timestamp across nodes
+  void SetObjectManagerCoordination(int64_t coordination);
+
   /// Subscribe to the relevant GCS tables and set up handlers.
   ///
   /// \return Status indicating whether this was done successfully or not.

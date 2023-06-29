@@ -220,7 +220,7 @@ void ObjectManager::StartRpcService() {
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "For counting purposes, RPC service threads number: " << config_.rpc_service_threads_number;
+  // RAY_LOG(INFO) << "For counting purposes, RPC service threads number: " << config_.rpc_service_threads_number;
   object_manager_server_.RegisterService(object_manager_service_);
   /// RSCODE: 
   object_manager_server_.RegisterService(remote_spill_service_);
@@ -244,6 +244,11 @@ void ObjectManager::StopRpcService() {
   // remote_spill_server_.Shutdown();
 }
 
+int64_t ObjectManager::GetTimeStamp(){
+	RAY_CHECK(coordination_ != 0) << "Coordination is not set";
+	return std::chrono::steady_clock::now().time_since_epoch().count() - coordination_;
+}
+
 void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   // Notify the object directory that the object has been added to this node.
   const ObjectID &object_id = object_info.object_id;
@@ -264,7 +269,8 @@ void ObjectManager::HandleObjectAdded(const ObjectInfo &object_info) {
   std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
   std::string fp = dir + "/" + "memory_usage.csv";
 
-  double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  //double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  int64_t start_time = GetTimeStamp();
   std::string curr_mem = std::to_string(used_memory_);
   std::string curr_time = std::to_string(start_time);
   std::stringstream data;
@@ -318,7 +324,8 @@ void ObjectManager::HandleObjectDeleted(const ObjectID &object_id) {
   std::string dir = "/home/jaewonchang/ray_memory_management/rs_script";
   std::string fp = dir + "/" + "memory_usage.csv";
 
-  double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  //double start_time = absl::GetCurrentTimeNanos() / 1e9;
+  int64_t start_time = GetTimeStamp();
   std::string curr_mem = std::to_string(used_memory_);
   std::string curr_time = std::to_string(start_time);
   std::stringstream data;
@@ -374,7 +381,7 @@ uint64_t ObjectManager::Pull(const std::vector<rpc::ObjectReference> &object_ref
     auto object_id = ObjectRefToId(ref);
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "About to call SubscribeObjectLocations on object: " << object_id;
+    // RAY_LOG(INFO) << "About to call SubscribeObjectLocations on object: " << object_id;
 
     RAY_CHECK_OK(object_directory_->SubscribeObjectLocations(
         object_directory_pull_callback_id_, object_id, ref.owner_address(), callback));
@@ -396,7 +403,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
 
   /// RSTODO: Delete this later
   if (from_remote) {
-    RAY_LOG(INFO) << "Sending pull request for: " << object_id;
+    // RAY_LOG(INFO) << "Sending pull request for: " << object_id;
   }
 
   if (rpc_client) {
@@ -430,7 +437,7 @@ void ObjectManager::SendPullRequest(const ObjectID &object_id, const NodeID &cli
     /// RSCODE: Add code to delete object entry from hash map if remote
     if (from_remote) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Erasing from spilled_remote_objects_url_ after pull for object: " << object_id;
+      // RAY_LOG(INFO) << "Erasing from spilled_remote_objects_url_ after pull for object: " << object_id;
       spilled_remote_objects_url_.erase(object_id);
     }
   } else {
@@ -797,11 +804,11 @@ void ObjectManager::HandleDeleteRemoteSpilledObject(const rpc::DeleteRemoteSpill
   ObjectID object_id = ObjectID::FromBinary(request.remote_spilled_object_id());
 
   /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "About to free object in remote node: " << object_id;
+  // RAY_LOG(INFO) << "About to free object in remote node: " << object_id;
 
   /// RSTODO: Delete this later
   for (auto it = local_objects_.begin(); it != local_objects_.end(); it++) {
-    RAY_LOG(INFO) << "Object in local_objects_: " << it->first;
+    // RAY_LOG(INFO) << "Object in local_objects_: " << it->first;
   }
 
   auto it = local_objects_.find(object_id);
@@ -855,7 +862,7 @@ void ObjectManager::HandleIncrementRemoteObjectRefCount(const rpc::IncrementRemo
   ObjectID object_id = ObjectID::FromBinary(request.remote_spilled_object_id());
 
   /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "In remote node, about to increment ref count of object: " << object_id;
+  // RAY_LOG(INFO) << "In remote node, about to increment ref count of object: " << object_id;
 
   RemoteSpillIncrementRefCount(object_id);
 
@@ -930,9 +937,9 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   }
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Spill Remote Mapping Info in SpillRemote: " << spilled_remote_objects_url_.size();
+  // RAY_LOG(INFO) << "Spill Remote Mapping Info in SpillRemote: " << spilled_remote_objects_url_.size();
 
-  RAY_LOG(DEBUG) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
+  RAY_LOG(INFO) << "Spill remotely on " << self_node_id_ << " to " << node_id << " of object "
               << object_id;
 
   const ObjectInfo &object_info = local_objects_[object_id].object_info;
@@ -942,7 +949,7 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
   // uint64_t offset = 0;
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Owner address: " << object_info.owner_ip_address << " for object: " << object_id;
+  // RAY_LOG(INFO) << "Owner address: " << object_info.owner_ip_address << " for object: " << object_id;
 
   rpc::Address owner_address;
   owner_address.set_raylet_id(object_info.owner_raylet_id.Binary());
@@ -981,18 +988,18 @@ void ObjectManager::SpillRemote(const ObjectID &object_id, const NodeID &node_id
 
 /// RSTODO: Delete from_remote arg later
 void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const bool from_remote) {
-  RAY_LOG(DEBUG) << "Push on " << self_node_id_ << " to " << node_id << " of object "
-                 << object_id;
+  // RAY_LOG(DEBUG) << "Push on " << self_node_id_ << " to " << node_id << " of object "
+                //  << object_id;
 
   /// RSTODO: Delete this later
   if (from_remote) {
-    RAY_LOG(INFO) << "Push from remote from " << self_node_id_ << " to " << node_id << " of object "
-                 << object_id;
+    // RAY_LOG(INFO) << "Push from remote from " << self_node_id_ << " to " << node_id << " of object "
+                //  << object_id;
   }
 
   if (local_objects_.count(object_id) != 0) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Pushing from local for object " << object_id;
+    // RAY_LOG(INFO) << "Pushing from local for object " << object_id;
 
     /// RSCODE:
     return PushLocalObject(object_id, node_id, from_remote);
@@ -1002,7 +1009,7 @@ void ObjectManager::Push(const ObjectID &object_id, const NodeID &node_id, const
   auto object_url = get_spilled_object_url_(object_id);
   if (!object_url.empty() && RayConfig::instance().is_external_storage_type_fs()) {
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Try to push from file system";
+    // RAY_LOG(INFO) << "Try to push from file system";
 
     return PushFromFilesystem(object_id, node_id, object_url);
   }
@@ -1132,7 +1139,7 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
     return;
   }
 
-  RAY_LOG(DEBUG) << "Sending object chunks of " << object_id << " to node " << node_id
+  RAY_LOG(INFO) << "Sending object chunks of " << object_id << " to node " << node_id
                  << ", number of chunks: " << chunk_reader->GetNumChunks()
                  << ", total data size: " << chunk_reader->GetObject().GetObjectSize();
 
@@ -1144,7 +1151,7 @@ void ObjectManager::SpillRemoteInternal(const ObjectID &object_id,
   spill_remote_manager_->StartSpillRemote(
       node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for spill for object: " << object_id;
+        // RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for spill for object: " << object_id;
         remote_spill_rpc_service_.post(
             [=]() {
               // Post to the multithreaded RPC event loop so that data is copied
@@ -1192,7 +1199,7 @@ void ObjectManager::PushObjectInternal(const ObjectID &object_id,
   push_manager_->StartPush(
       node_id, object_id, chunk_reader->GetNumChunks(), [=](int64_t chunk_id) {
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for push for object: " << object_id;
+        // RAY_LOG(INFO) << "For counting purposes: We are about to call rpc_service_ for push for object: " << object_id;
         rpc_service_.post(
             [=]() {
               // Post to the multithreaded RPC event loop so that data is copied
@@ -1258,7 +1265,7 @@ void ObjectManager::SpillObjectChunk(const UniqueID &spill_id,
   num_bytes_pushed_from_plasma_ += spill_remote_request.data().length();
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_ << " for current object: " << object_id;
+  // RAY_LOG(INFO) << "Number of bytes pushed from head node: " << num_bytes_pushed_from_plasma_ << " for current object: " << object_id;
 
   rpc::ClientCallback<rpc::SpillRemoteReply> spill_remote_callback =
       [this, start_time, object_id, node_id, chunk_index, on_complete, callback] (const Status &status, const rpc::SpillRemoteReply &reply) {
@@ -1325,7 +1332,7 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
   push_request.set_from_remote(from_remote);
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "For counting purposes: We are about to calling SendObjectChunk for object: " << object_id;
+  // RAY_LOG(INFO) << "For counting purposes: We are about to calling SendObjectChunk for object: " << object_id;
 
   // read a chunk into push_request and handle errors.
   auto optional_chunk = chunk_reader->GetChunk(chunk_index);
@@ -1347,9 +1354,9 @@ void ObjectManager::SendObjectChunk(const UniqueID &push_id,
   // "num_bytes_pushed_from_plasma" also decreases when this happens
   // "num_bytes_pushed_from_plasma" is the "total bytes pushed from head" in head node logs
   // "num_bytes_pushed_from_plasma" is the 
-  RAY_LOG(INFO) << "Push from " << self_node_id_ << " to " << node_id << " of object "
-                 << object_id;
-  RAY_LOG(INFO) << "Total bytes pulled from remote: " << num_bytes_pushed_from_plasma_;
+  // RAY_LOG(INFO) << "Push from " << self_node_id_ << " to " << node_id << " of object "
+  //                << object_id;
+  // RAY_LOG(INFO) << "Total bytes pulled from remote: " << num_bytes_pushed_from_plasma_;
 
   // record the time cost between send chunk and receive reply
   rpc::ClientCallback<rpc::PushReply> callback =
@@ -1377,7 +1384,7 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
   NodeID node_id = NodeID::FromBinary(request.node_id());
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "For counting purposes: We are calling HandlePush for pull for object: " << object_id;
+  // RAY_LOG(INFO) << "For counting purposes: We are calling HandlePush for pull for object: " << object_id;
 
   // Serialize.
   uint64_t chunk_index = request.chunk_index();
@@ -1390,7 +1397,7 @@ void ObjectManager::HandlePush(const rpc::PushRequest &request,
   bool from_remote = request.from_remote();
 
   /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "Number bytes pulled from remote in push handler: " << request.data().length();
+  // RAY_LOG(INFO) << "Number bytes pulled from remote in push handler: " << request.data().length();
 
   bool success = ReceiveObjectChunk(
       node_id, object_id, owner_address, data_size, metadata_size, chunk_index, data, from_remote);
@@ -1451,7 +1458,7 @@ void RemoteSpill::HandleSpillRemote(const rpc::SpillRemoteRequest &request,
                                     rpc::SpillRemoteReply *reply,
                                     rpc::SendReplyCallback send_reply_callback) {
   /// RSTODO: Delete this later
-  RAY_LOG(INFO) << "About to write data into remote node memory";
+  // RAY_LOG(INFO) << "About to write data into remote node memory";
   
   ObjectID object_id = ObjectID::FromBinary(request.object_id());
   NodeID node_id = NodeID::FromBinary(request.node_id());
@@ -1606,8 +1613,8 @@ bool ObjectManager::ReceiveObjectChunk(const NodeID &node_id,
                  << ", object size: " << data_size;
   
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "ReceiveObjectChunk on " << node_id
-                << " of object " << object_id;
+  // RAY_LOG(INFO) << "ReceiveObjectChunk on " << node_id
+  //               << " of object " << object_id;
   /// RSCODE: current solution: add default from_remote param so that
   /// pull manager checking is not invoked. 
   // if (!from_remote && !pull_manager_->IsObjectActive(object_id)) {
@@ -1669,8 +1676,8 @@ void ObjectManager::HandlePull(const rpc::PullRequest &request,
   
   /// RSTODO: Delete this later
   if (from_remote) {
-    RAY_LOG(INFO) << "Received remote pull request from node " << node_id << " for object ["
-                 << object_id << "].";
+    // RAY_LOG(INFO) << "Received remote pull request from node " << node_id << " for object ["
+    //              << object_id << "].";
   }
 
   main_service_->post([this, object_id, node_id, from_remote]() { Push(object_id, node_id, from_remote); },
@@ -1704,7 +1711,7 @@ void ObjectManager::HandleFreeObjects(const rpc::FreeObjectsRequest &request,
 void ObjectManager::FreeObjects(const std::vector<ObjectID> &object_ids,
                                 bool local_only) {
   /// RSTODO: Delete this later
-  RAY_LOG(DEBUG) << "We are freeing objects in memory";
+  // RAY_LOG(DEBUG) << "We are freeing objects in memory";
   buffer_pool_.FreeObjects(object_ids);
   if (!local_only) {
     const auto remote_connections = object_directory_->LookupAllRemoteConnections();
@@ -1748,7 +1755,7 @@ std::shared_ptr<rpc::ObjectManagerClient> ObjectManager::GetRpcClient(
     const NodeID &node_id) {
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Node id in GetRpcClient: " << node_id;
+  // RAY_LOG(INFO) << "Node id in GetRpcClient: " << node_id;
 
   auto it = remote_object_manager_clients_.find(node_id);
   if (it == remote_object_manager_clients_.end()) {
@@ -1775,7 +1782,7 @@ std::shared_ptr<rpc::RemoteSpillClient> ObjectManager::GetRemoteSpillRpcClient(
     const NodeID &node_id) {
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Node id in GetRemoteSpillRpcClient: " << node_id;
+  // RAY_LOG(INFO) << "Node id in GetRemoteSpillRpcClient: " << node_id;
 
   auto it = remote_spill_clients_.find(node_id);
   if (it == remote_spill_clients_.end()) {

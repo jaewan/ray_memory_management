@@ -238,7 +238,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
                  const std::string &object_url,
                  std::function<void(const ray::Status &)> callback) {
             /// RSTODO: Delete later
-            RAY_LOG(INFO) << "AsyncRestoreSpilledObject is being called!";
+            // RAY_LOG(INFO) << "AsyncRestoreSpilledObject is being called!";
             /// RSTODO: entering phase for spill restoration.
             GetLocalObjectManager().AsyncRestoreSpilledObject(
                 object_id, object_size, object_url, callback);
@@ -463,6 +463,10 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
             new rpc::RuntimeEnvAgentClient(ip_address, port, client_call_manager_));
       });
   worker_pool_.SetAgentManager(agent_manager_);
+}
+
+void NodeManager::SetObjectManagerCoordination(int64_t coordination) {
+	object_manager_.SetTimestampCoordination(coordination); 
 }
 
 ray::Status NodeManager::RegisterGcs() {
@@ -693,10 +697,10 @@ void NodeManager::HandleRequestObjectSpillage(
   local_object_manager_.SpillObjects(
       {object_id}, [object_id, reply, send_reply_callback](const ray::Status &status) {
         /// RSTODO: Delete later
-        RAY_LOG(INFO) << "Node manager callback test";
+        // RAY_LOG(INFO) << "Node manager callback test";
         if (status.ok()) {
           /// RSTODO: Delete later
-          RAY_LOG(INFO) << "Node manager status ok test";
+          // RAY_LOG(INFO) << "Node manager status ok test";
 
           RAY_LOG(DEBUG) << "Object " << object_id
                          << " has been spilled, replying to owner";
@@ -1461,14 +1465,14 @@ void NodeManager::DisconnectClient(const std::shared_ptr<ClientConnection> &clie
   if (worker) {
     // The client is a worker.
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "Client is a worker";
+    // RAY_LOG(INFO) << "Client is a worker";
     is_worker = true;
   } else {
     worker = worker_pool_.GetRegisteredDriver(client);
     if (worker) {
       // The client is a driver.
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "Client is a driver";
+      // RAY_LOG(INFO) << "Client is a driver";
       is_driver = true;
     } else {
       RAY_LOG(INFO) << "Ignoring client disconnect because the client has already "
@@ -1606,7 +1610,7 @@ void NodeManager::ProcessFetchOrReconstructMessage(
     const std::shared_ptr<ClientConnection> &client, const uint8_t *message_data) {
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Calling ProcessFetchOrReconstructMessage";
+  // RAY_LOG(INFO) << "Calling ProcessFetchOrReconstructMessage";
 
   auto message = flatbuffers::GetRoot<protocol::FetchOrReconstruct>(message_data);
   const auto refs =
@@ -1616,12 +1620,12 @@ void NodeManager::ProcessFetchOrReconstructMessage(
   if (message->fetch_only()) {
 
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 1";
+    // RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 1";
 
     std::shared_ptr<WorkerInterface> worker = worker_pool_.GetRegisteredWorker(client);
     if (!worker) {
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 2";
+      // RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 2";
       worker = worker_pool_.GetRegisteredDriver(client);
     }
     // Fetch requests can get re-ordered after the worker finishes, so make sure to
@@ -1631,7 +1635,7 @@ void NodeManager::ProcessFetchOrReconstructMessage(
       // objects are local, or if the worker dies.
       
       /// RSTODO: Delete later
-      RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 3";
+      // RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 3";
       dependency_manager_.StartOrUpdateGetRequest(worker->WorkerId(), refs);
     }
   } else {
@@ -1641,7 +1645,7 @@ void NodeManager::ProcessFetchOrReconstructMessage(
     // will be stored as the object's value.
     
     /// RSTODO: Delete later
-    RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 4";
+    // RAY_LOG(INFO) << "ProcessFetchOrReconstructMessage test 4";
     const TaskID task_id = from_flatbuf<TaskID>(*message->task_id());
     AsyncResolveObjects(client,
                         refs,
@@ -2186,7 +2190,7 @@ void NodeManager::AsyncResolveObjects(
   std::shared_ptr<WorkerInterface> worker = worker_pool_.GetRegisteredWorker(client);
 
   /// RSTODO: Delete later
-  RAY_LOG(INFO) << "Calling AsyncResolveObjects";
+  // RAY_LOG(INFO) << "Calling AsyncResolveObjects";
 
   if (!worker) {
     // The client is a driver. Drivers do not hold resources, so we simply mark

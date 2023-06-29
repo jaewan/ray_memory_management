@@ -277,7 +277,7 @@ class NodeInfoAccessor {
   /// \param callback Callback that will be called when registration is complete.
   /// \return Status
   virtual Status RegisterSelf(const rpc::GcsNodeInfo &local_node_info,
-                              const StatusCallback &callback);
+                              const StatusAndTimeCoordinationCallback &callback);
 
   /// Drain (remove the information of the node from the cluster) the local node from GCS
   /// synchronously.
