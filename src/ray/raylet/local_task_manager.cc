@@ -693,6 +693,7 @@ void LocalTaskManager::PinTaskArgs(const TaskSpecification &spec,
   // TODO(swang): This should really be an assertion, but we can sometimes
   // receive a duplicate task request if there is a failure and the original
   // version of the task has not yet been canceled.
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] PinTaskArgs of priority:" << spec.GetPriority() << " taskId:" << spec.TaskId();
   auto inserted = executing_task_args_.emplace(spec.TaskId(), deps).second;
   if (inserted) {
     for (size_t i = 0; i < deps.size(); i++) {
@@ -713,6 +714,8 @@ void LocalTaskManager::PinTaskArgs(const TaskSpecification &spec,
 
 void LocalTaskManager::ReleaseTaskArgs(const TaskID &task_id) {
   auto it = executing_task_args_.find(task_id);
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] ReleaseTaskArgs taskId: " << task_id <<" before release:" << pinned_task_arguments_bytes_
+		<< " count:" << pinned_task_arguments_.size();
   // TODO(swang): This should really be an assertion, but we can sometimes
   // receive a duplicate task request if there is a failure and the original
   // version of the task has not yet been canceled.
@@ -730,6 +733,8 @@ void LocalTaskManager::ReleaseTaskArgs(const TaskID &task_id) {
     }
     executing_task_args_.erase(it);
   }
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] ReleaseTaskArgs after release:" << pinned_task_arguments_bytes_
+		<< " count:" << pinned_task_arguments_.size();
 }
 
 namespace {

@@ -498,9 +498,10 @@ void CoreWorkerDirectTaskSubmitter::OnWorkerIdle(
 
 void CoreWorkerDirectTaskSubmitter::CancelWorkerLeaseIfNeeded(
     const SchedulingKey &scheduling_key) {
+	// This is not needed as Boa do not follow scheduling_key lease.
+	return;
   auto &scheduling_key_entry = scheduling_key_entries_[scheduling_key];
-  auto &task_priority_queue = scheduling_key_entry.task_priority_queue;
-  if (!task_priority_queue.empty()) {
+  if (!priority_task_queues_.empty()) {
     // There are still pending tasks, or there are tasks that can be stolen by a new
     // worker, so let the worker lease request succeed.
     return;
@@ -649,7 +650,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 		pri.Set(request_priority->score);
 	}
 	if (resource_spec.JobId().IsNil()){
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] ERROR Jae redirect request should be handled. Local raylet already calculated the remote resource";
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] ERROR Jae redirect request should be handled. Local raylet already calculated the remote resource pri:"<< pri;
 		if(is_spillback)
 			RAY_CHECK(is_spillback) << "Jae redirect request should be handled. Local raylet already calculated the remote resource";
 		return;
@@ -826,10 +827,11 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
 									auto &lease_entry = worker_to_lease_entry_[addr];
 									if (lease_entry.lease_client && !lease_entry.is_busy){
 										RAY_LOG(DEBUG) << "[JAE_DEBUG] call from 3" << pri;
-										ReturnWorker(addr, false, true);
+										// When should a worker be exiting?
+										ReturnWorker(addr, false, false);
 									}
 								}else{
-										RAY_LOG(DEBUG) << "[JAE_DEBUG] call from 4" << pri;
+									RAY_LOG(DEBUG) << "[JAE_DEBUG] call from 4" << pri;
 									priority_task_queues_.emplace(pri);
 									OnWorkerIdle(addr,
 															 scheduling_key,

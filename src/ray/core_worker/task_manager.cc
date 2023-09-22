@@ -37,6 +37,7 @@ void TaskManager::CoordinateTimeStamp(const Status &status,
 }
 
 //TODO(Jae) Delete object priority when a task is finished
+/*
 Priority TaskManager::GenerateTaskPriority(
 		TaskSpecification &spec, std::vector<ObjectID> &task_deps) {
   // Priority id to assign when a new task is invoked.
@@ -68,6 +69,42 @@ Priority TaskManager::GenerateTaskPriority(
   }else{
     pri.SetFromParentPriority(max_priority, new_pri);
     //pri.SetFromParentPriority(max_priority, new_priority_s++);
+  }
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] priority of the task is:" << pri;
+	RAY_CHECK(pri != Priority()) << "??";
+  spec.SetPriority(pri);
+  return pri;
+}
+*/
+
+//Debug Version
+Priority TaskManager::GenerateTaskPriority(
+		TaskSpecification &spec, std::vector<ObjectID> &task_deps) {
+  // Priority id to assign when a new task is invoked.
+  // Sequentially increase new_priority_s after assign this to a new priority
+  static int new_priority_s = 0;
+
+	RAY_CHECK(timestamp_coordinator_ != 0) << "Jae handle when coordination rpc is slow";
+  static const bool ensemble_serving = RayConfig::instance().ENSEMBLE_SERVE();
+  RAY_LOG(DEBUG) << "Generating priority of task " << spec.TaskId() 
+								 << " with num_dependencies:" << task_deps.size();
+
+  Priority dummy_pri = Priority();
+  Priority &max_priority = dummy_pri;
+  for (const ObjectID &argument_id : task_deps) {
+    Priority &p = reference_counter_->GetObjectPriority(argument_id);
+    if(max_priority > p){
+      max_priority = p;
+		}
+  }
+
+  Priority pri;
+  //This is an ensemble serve patch for multi driver
+  if(ensemble_serving && max_priority == pri && task_deps.size() &&
+			reference_counter_->GetCurrentTaskPriority() != pri){
+    pri.SetFromParentPriority(reference_counter_->GetCurrentTaskPriority(), new_priority_s++);
+  }else{
+    pri.SetFromParentPriority(max_priority, new_priority_s++);
   }
 	RAY_LOG(DEBUG) << "[JAE_DEBUG] priority of the task is:" << pri;
 	RAY_CHECK(pri != Priority()) << "??";
