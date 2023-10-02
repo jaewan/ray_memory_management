@@ -247,6 +247,9 @@ message GcsNodeInfo {
 
   // The user-provided identifier or name for this node.
   string node_name = 12;
+
+  // Num of workers at init(worker_soft_limit). This will not change if Ray is init() with #cpus.
+  int64 num_workers = 13;
 }
 
 message HeartbeatTableData {

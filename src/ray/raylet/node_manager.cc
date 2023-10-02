@@ -273,7 +273,7 @@ NodeManager::NodeManager(instrumented_io_context &io_service,
 			if(RayConfig::instance().enable_BlockTasksSpill()){
 			  // Deadlock#1 when all workers are spinning
 			  if(num_spinning_workers && num_spinning_workers == worker_pool_.GetAllRegisteredWorkersNum()){
-					RAY_LOG(DEBUG) << "[" << __func__ << "] all workers are spinning: " << num_spinning_workers;
+					RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] all workers are spinning: " << num_spinning_workers;
 					if(evict_tasks){
 						if(cluster_task_manager_->EvictTasks(base_priority)){
 							if(delete_eager_spilled_objects){

@@ -40,12 +40,12 @@ message ReportWorkerBacklogReply {}
 
 message TimeStampCoordinationRequest {
   // Timestamp of core_worker
-	int64 worker_timestamp = 1;
+  int64 worker_timestamp = 1;
 }
 
 message TimeStampCoordinationReply {
   // Timestamp Coordination value. Add this value in core_worker to priority
-	int64 coordination = 1;
+  int64 coordination = 1;
 }
 
 // Request a worker from the raylet with the specified resources.

@@ -133,6 +133,8 @@ class CoreWorkerDirectTaskSubmitter {
   /// we avoid double counting backlogs in autoscaler.
   void ReportWorkerBacklog();
 
+	void UpdateNumWorkersPerRaylet(const std::vector<rpc::GcsNodeInfo> &node_info_list);
+
  private:
 	std::pair<Priority*, bool> GetNextTaskToPush(const ray::NodeID *node_id, const Priority &base_priority);
   /// Schedule more work onto an idle worker or return it back to the raylet if
@@ -372,6 +374,17 @@ class CoreWorkerDirectTaskSubmitter {
   // All tasks are managed in this single queue
   absl::btree_set<Priority> priority_task_queues_;
   absl::btree_set<Priority> priority_task_queues_not_pushed_;
+	struct worker_stats{
+		worker_stats() : num_workers(0), num_active_workers(0), num_lease_on_flight(0) {}
+    worker_stats(int64_t numworkers, int numactiveworkers, int numleaseonflight)
+         : num_workers(numworkers), num_active_workers(numactiveworkers), num_lease_on_flight(numleaseonflight) {}
+		int64_t num_workers;
+		int num_active_workers;
+		int num_lease_on_flight;
+	};
+	// Number of workers per raylet and active workers
+	absl::flat_hash_map<const std::string, worker_stats> num_workers_per_raylet_;
+	absl::flat_hash_map<const std::string, int> num_active_workers_per_raylet_;
   // priority_task_queues_ are used to decide the sequence of worker lease and this is used to
   // find the task spec of the priority
   absl::flat_hash_map<Priority, TaskSpecification> priority_to_task_spec_;

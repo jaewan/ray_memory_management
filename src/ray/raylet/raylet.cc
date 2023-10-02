@@ -90,6 +90,7 @@ Raylet::Raylet(instrumented_io_context &main_service,
   auto resource_map = node_manager_config.resource_config.ToResourceMap();
   self_node_info_.mutable_resources_total()->insert(resource_map.begin(),
                                                     resource_map.end());
+	self_node_info_.set_num_workers(node_manager_config.num_workers_soft_limit);
 }
 
 Raylet::~Raylet() {}

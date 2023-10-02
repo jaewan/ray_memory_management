@@ -399,6 +399,11 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
       worker_context_.GetCurrentJobID(),
       boost::asio::steady_timer(io_service_),
       RayConfig::instance().max_pending_lease_requests_per_scheduling_category());
+
+	auto update_num_worker = [this](const Status &status, const std::vector<rpc::GcsNodeInfo> &node_info_list){
+		direct_task_submitter_->UpdateNumWorkersPerRaylet(node_info_list);
+	};
+  gcs_client_->Nodes().AsyncGetAll(update_num_worker);
   auto report_locality_data_callback = [this](
                                            const ObjectID &object_id,
                                            const absl::flat_hash_set<NodeID> &locations,
