@@ -96,19 +96,18 @@ inline void LeaseGrant(const std::string &fnc_name, const Priority &pri, int req
 }
 
 inline void LogTaskSeq(const Priority &pri){
-	static auto soft_limit = RayConfig::instance().num_workers_soft_limit();
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
-  stream << "Task " << pri << " submitted " << " soft_limit:" << soft_limit << "\n" ;
+  stream << "Task " << pri << " submitted " << "\n" ;
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
 }
 
-inline void LogLeaseSeq(const Priority &pri, size_t num_leases_on_flight){
+inline void LogLeaseSeq(const Priority &pri, ray::NodeID nodeid, size_t num_leases_on_flight){
   std::ofstream log_stream("/tmp/ray/core_worker_log", std::ios_base::app);
   std::ostringstream stream;
-  stream << "\tReq lease " << pri << " num_leases_on_flight:" << num_leases_on_flight << "\n";
+  stream << "\tReq lease " << pri << " to node:" << nodeid <<" num_leases_on_flight:" << num_leases_on_flight << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
@@ -151,7 +150,7 @@ void CoreWorkerDirectTaskSubmitter::LogObjectCount(const Priority &pri, const ra
 	log_path << "/tmp/ray/" << *raylet_id;
   std::ofstream log_stream(log_path.str(), std::ios_base::app);
   std::ostringstream stream;
-  stream << it->second <<" num_producer:" <<
+  stream << it->second << pri <<" num_producer:" <<
 	num_producers_ << " num_consumers:" << num_consumers_ << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
@@ -170,10 +169,9 @@ inline void LogMisPlacedTask(const TaskID &task_id, const Priority &pri, ray::No
   log_stream.close();
 }
 
-void CoreWorkerDirectTaskSubmitter::UpdateNumWorkersPerRaylet(const std::vector<rpc::GcsNodeInfo> &node_info_list){
-	for (auto &node_info : node_info_list) {
-		num_workers_per_raylet_.emplace(node_info.node_id(), worker_stats(node_info.num_workers(),0,0));
-	}
+void CoreWorkerDirectTaskSubmitter::UpdateNumWorkersPerRaylet(const std::string node_id, int64_t num_workers){
+	num_workers_per_raylet_.emplace(node_id, worker_stats(num_workers,0,0));
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] raylet:" << NodeID::FromBinary(node_id) << " has worker:" << num_workers;
 }
 
 Status CoreWorkerDirectTaskSubmitter::SubmitTask(TaskSpecification task_spec) {
@@ -707,7 +705,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
   num_leases_on_flight_++;
 	stat.num_lease_on_flight++;
   num_leases_requested_++;
-	LogLeaseSeq(pri,stat.num_lease_on_flight);
+	LogLeaseSeq(pri, NodeID::FromBinary(raylet_address->raylet_id()), stat.num_lease_on_flight);
 
 	//LeaseGrant("\t Lease req:" , pri, priority_task_queues_.size(), is_spillback);
 
@@ -894,7 +892,7 @@ void CoreWorkerDirectTaskSubmitter::RequestNewWorkerIfNeeded(
                              << NodeID::FromBinary(reply.retry_at_raylet_address().raylet_id())
 			  										 << " is_spillback:" << (&reply.retry_at_raylet_address() != nullptr);
 							if(priority_task_queues_not_pushed_.contains(pri)){
-								LeaseGrant("\t\tRedirect Request" , pri, priority_task_queues_.size(), raylet_id);
+								LeaseGrant("\t\tRedirect Request" , pri, priority_task_queues_.size(), NodeID::FromBinary(reply.retry_at_raylet_address().raylet_id()));
 								priority_task_queues_.emplace(pri);
 								RequestNewWorkerIfNeeded(scheduling_key, &pri, &reply.retry_at_raylet_address());
 							}else{

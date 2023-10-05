@@ -193,11 +193,18 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
   RAY_CHECK_OK(gcs_client_->Connect(io_service_));
   RegisterToGcs();
 
+	std::vector<std::pair<const std::string, int64_t>> node_updates;
   // Register a callback to monitor removed nodes.
-  auto on_node_change = [this](const NodeID &node_id, const rpc::GcsNodeInfo &data) {
+  auto on_node_change = [this,&node_updates](const NodeID &node_id, const rpc::GcsNodeInfo &data) {
     if (data.state() == rpc::GcsNodeInfo::DEAD) {
       OnNodeRemoved(node_id);
-    }
+    }else{
+			if(direct_task_submitter_ != nullptr)
+				direct_task_submitter_->UpdateNumWorkersPerRaylet(data.node_id(), data.num_workers());
+			else{
+				node_updates.push_back({data.node_id(), data.num_workers()});
+			}
+		}
   };
   RAY_CHECK_OK(gcs_client_->Nodes().AsyncSubscribeToNodeChange(on_node_change, nullptr));
 
@@ -400,10 +407,9 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
       boost::asio::steady_timer(io_service_),
       RayConfig::instance().max_pending_lease_requests_per_scheduling_category());
 
-	auto update_num_worker = [this](const Status &status, const std::vector<rpc::GcsNodeInfo> &node_info_list){
-		direct_task_submitter_->UpdateNumWorkersPerRaylet(node_info_list);
-	};
-  gcs_client_->Nodes().AsyncGetAll(update_num_worker);
+	for (auto &p : node_updates){
+		direct_task_submitter_->UpdateNumWorkersPerRaylet(p.first, p.second);
+	}
   auto report_locality_data_callback = [this](
                                            const ObjectID &object_id,
                                            const absl::flat_hash_set<NodeID> &locations,

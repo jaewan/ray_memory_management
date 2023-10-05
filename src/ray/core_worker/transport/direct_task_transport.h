@@ -133,7 +133,7 @@ class CoreWorkerDirectTaskSubmitter {
   /// we avoid double counting backlogs in autoscaler.
   void ReportWorkerBacklog();
 
-	void UpdateNumWorkersPerRaylet(const std::vector<rpc::GcsNodeInfo> &node_info_list);
+	void UpdateNumWorkersPerRaylet(const std::string, int64_t num_workers);
 
  private:
 	std::pair<Priority*, bool> GetNextTaskToPush(const ray::NodeID *node_id, const Priority &base_priority);
