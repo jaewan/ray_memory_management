@@ -13,6 +13,7 @@ from ray.train.train_loop_utils import (
     world_size,
 )
 from ray.train.trainer import Trainer, TrainingIterator
+from ray.air.config import RunConfig
 
 
 usage_lib.record_library_usage("train")
@@ -29,6 +30,9 @@ __all__ = [
     "Trainer",
     "world_rank",
     "world_size",
+    "RunConfig",
     "TRAIN_DATASET_KEY",
     "CheckpointStrategy",
 ]
+
+RunConfig.__module__ = "ray.train"
