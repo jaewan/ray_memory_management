@@ -16,6 +16,8 @@
 
 #include <vector>
 
+#include "absl/random/bit_gen_ref.h"
+#include "absl/random/random.h"
 #include "ray/raylet/scheduling/policy/scheduling_policy.h"
 
 namespace ray {
@@ -52,7 +54,9 @@ class HybridSchedulingPolicy : public ISchedulingPolicy {
                          std::function<bool(scheduling::NodeID)> is_node_available)
       : local_node_id_(local_node_id),
         nodes_(nodes),
-        is_node_available_(is_node_available) {}
+        is_node_available_(is_node_available),
+        bitgen_(),
+        bitgenref_(bitgen_) {}
 
   scheduling::NodeID Schedule(const ResourceRequest &resource_request,
                               SchedulingOptions options) override;
@@ -67,6 +71,11 @@ class HybridSchedulingPolicy : public ISchedulingPolicy {
   /// Function Checks if node is alive.
   std::function<bool(scheduling::NodeID)> is_node_available_;
 
+  /// Random number generator to choose a random node out of the top K.
+  mutable absl::BitGen bitgen_;
+  /// Using BitGenRef to simplify testing.
+  mutable absl::BitGenRef bitgenref_;
+
   enum class NodeFilter {
     /// Default scheduling.
     kAny,
@@ -77,6 +86,23 @@ class HybridSchedulingPolicy : public ISchedulingPolicy {
     /// special handling for this.
     kNonGpu
   };
+
+	bool IsNodeFeasible(
+    const scheduling::NodeID &node_id,
+    const NodeFilter &node_filter,
+    const NodeResources &node_resources,
+    const ResourceRequest &resource_request) const;
+
+  /// helper function compute a score between 0-1 indicates
+  /// the preference of the node (the lower score,
+  /// the more preferable.
+  float ComputeNodeScore(const scheduling::NodeID &node_id, float spread_threshold) const;
+
+  scheduling::NodeID GetBestNode(
+      std::vector<std::pair<scheduling::NodeID, float>> &node_scores,
+      size_t num_candidate_nodes,
+      std::optional<scheduling::NodeID> preferred_node_id,
+      float preferred_node_score) const;
 
   /// \param resource_request: The resource request we're attempting to schedule.
   /// \param node_filter: defines the subset of nodes were are allowed to schedule on.
