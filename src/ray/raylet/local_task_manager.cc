@@ -62,7 +62,6 @@ void LocalTaskManager::QueueAndScheduleTask(std::shared_ptr<internal::Work> work
 bool LocalTaskManager::WaitForTaskArgsRequests(std::shared_ptr<internal::Work> work) {
   const auto &task = work->task;
   const auto &task_id = task.GetTaskSpecification().TaskId();
-  const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
   auto object_ids = task.GetTaskSpecification().GetDependencies();
   bool can_dispatch = true;
   if (object_ids.size() > 0) {
@@ -70,7 +69,7 @@ bool LocalTaskManager::WaitForTaskArgsRequests(std::shared_ptr<internal::Work> w
         task_dependency_manager_.RequestTaskDependencies(task_id, task.GetDependencies());
     if (args_ready) {
       RAY_LOG(DEBUG) << "Args already ready, task can be dispatched " << task_id;
-      tasks_to_dispatch_[scheduling_key].push_back(work);
+      dfs_tasks_to_dispatch_[work->PrioritizeLocalNode()].emplace(work->task.GetTaskSpecification().GetPriority(),work);
     } else {
 			waited_for_task_args_.emplace(task.GetTaskSpecification().TaskId());
       RAY_LOG(DEBUG) << "Waiting for args for task: "
@@ -82,13 +81,13 @@ bool LocalTaskManager::WaitForTaskArgsRequests(std::shared_ptr<internal::Work> w
   } else {
     RAY_LOG(DEBUG) << "No args, task can be dispatched "
                    << task.GetTaskSpecification().TaskId();
-    tasks_to_dispatch_[scheduling_key].push_back(work);
+		dfs_tasks_to_dispatch_[work->PrioritizeLocalNode()].emplace(work->task.GetTaskSpecification().GetPriority(),work);
   }
   return can_dispatch;
 }
 
-void LocalTaskManager::ScheduleAndDispatchTasks() {
-  DispatchScheduledTasksToWorkers();
+void LocalTaskManager::ScheduleAndDispatchTasks(bool remote_node_updated) {
+  DispatchScheduledTasksToWorkers(remote_node_updated);
   // TODO(swang): Spill from waiting queue first? Otherwise, we may end up
   // spilling a task whose args are already local.
   // TODO(swang): Invoke ScheduleAndDispatchTasks() when we run out of memory
@@ -97,27 +96,22 @@ void LocalTaskManager::ScheduleAndDispatchTasks() {
   SpillWaitingTasks();
 }
 
-void LocalTaskManager::DispatchScheduledTasksToWorkers() {
+#define LOCALITY_NUM 2
+void LocalTaskManager::DispatchScheduledTasksToWorkers(bool remote_worker_available) {
   // Check every task in task_to_dispatch queue to see
   // whether it can be dispatched and ran. This avoids head-of-line
   // blocking where a task which cannot be dispatched because
   // there are not enough available resources blocks other
   // tasks from being dispatched.
-  for (auto shapes_it = tasks_to_dispatch_.begin();
-       shapes_it != tasks_to_dispatch_.end();) {
-    auto &scheduling_class = shapes_it->first;
-    auto &dispatch_queue = shapes_it->second;
-    //auto work_it = dispatch_queue.begin();
-    //const std::shared_ptr<internal::Work> &work = *work_it;
-    //auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
-
-    if (info_by_sched_cls_.find(scheduling_class) == info_by_sched_cls_.end()) {
-      // Initialize the class info.
-      info_by_sched_cls_.emplace(
-          scheduling_class,
-          SchedulingClassInfo(MaxRunningTasksPerSchedulingClass(scheduling_class)));
-    }
-    auto &sched_cls_info = info_by_sched_cls_.at(scheduling_class);
+	// If the available worker is from remote node, the flag is turned on
+	// In that case shoud iterate from backward where task is not seleceted based on locality
+	int iterate_seq[LOCALITY_NUM] = {1,0};
+	if(remote_worker_available){
+		iterate_seq[0] = 0;
+		iterate_seq[1] = 1;
+	}
+  for (int i = 0; i < LOCALITY_NUM; i++){
+    auto &dispatch_queue = dfs_tasks_to_dispatch_[iterate_seq[i]];
 
     /// We cap the maximum running tasks of a scheduling class to avoid
     /// scheduling too many tasks of a single type/depth, when there are
@@ -126,8 +120,9 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
     /// with nested tasks.
     bool is_infeasible = false;
     for (auto work_it = dispatch_queue.begin(); work_it != dispatch_queue.end();) {
-    //for (; work_it != dispatch_queue.end();) {
-      auto &work = *work_it;
+      auto &work = work_it->second;
+			auto scheduling_class = work->task.GetTaskSpecification().GetSchedulingClass();
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] scheduling class is:" << scheduling_class;
       const auto &task = work->task;
       const auto spec = task.GetTaskSpecification();
       TaskID task_id = spec.TaskId();
@@ -135,6 +130,14 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
         work_it++;
         continue;
       }
+
+			if (info_by_sched_cls_.find(scheduling_class) == info_by_sched_cls_.end()) {
+				// Initialize the class info.
+				info_by_sched_cls_.emplace(
+						scheduling_class,
+						SchedulingClassInfo(MaxRunningTasksPerSchedulingClass(scheduling_class)));
+			}
+			auto &sched_cls_info = info_by_sched_cls_.at(scheduling_class);
 
       // Check if the scheduling class is at capacity now.
       if (sched_cls_cap_enabled_ &&
@@ -145,7 +148,7 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
                        << " scheduling_class:" << scheduling_class 
 											 << " capacity:" << sched_cls_info.capacity  << " running_tasks:" <<  sched_cls_info.running_tasks.size();
         if (get_time_ms_() < sched_cls_info.next_update_time) {
-          // We're over capacity and it's not time to admit a new task yetoooojjjji.
+          // We're over capacity and it's not time to admit a new task yet.
           // Calculate the next time we should admit a new task.
           int64_t current_capacity = sched_cls_info.running_tasks.size();
           int64_t allowed_capacity = sched_cls_info.capacity;
@@ -175,7 +178,7 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
           // prioritize spilling from the end of the queue.
           // TODO(scv119): where does pulling happen?
           auto it = waiting_task_queue_.insert(waiting_task_queue_.begin(),
-                                               std::move(*work_it));
+                                               std::move(work_it->second));
           RAY_CHECK(waiting_tasks_index_.emplace(task_id, it).second);
           work_it = dispatch_queue.erase(work_it);
         } else {
@@ -227,6 +230,8 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
         // The local node currently does not have the resources to run the task, so we
         // should try spilling to another node.
         bool did_spill = TrySpillback(work, is_infeasible);
+        RAY_LOG(DEBUG) << "[JAE_DEBUG] RayTask: " << task.GetTaskSpecification().TaskId() << " is non schedulable "
+					<< "spill to other nodes:" << did_spill;
         if (!did_spill) {
           // There must not be any other available nodes in the cluster, so the task
           // should stay on this node. We can skip the rest of the shape because the
@@ -278,23 +283,14 @@ void LocalTaskManager::DispatchScheduledTasksToWorkers() {
             allocated_instances_serialized_json);
         work_it++;
       }
-    }
-    // In the beginning of the loop, we add scheduling_class
-    // to the `info_by_sched_cls_` map.
-    // In cases like dead owners, we may not add any tasks
-    // to `running_tasks` so we can remove the map entry
-    // for that scheduling_class to prevent memory leaks.
-    if (sched_cls_info.running_tasks.size() == 0) {
-      info_by_sched_cls_.erase(scheduling_class);
-    }
-    if (is_infeasible) {
-      // TODO(scv119): fail the request.
-      // Call CancelTask
-      tasks_to_dispatch_.erase(shapes_it++);
-    } else if (dispatch_queue.empty()) {
-      tasks_to_dispatch_.erase(shapes_it++);
-    } else {
-      shapes_it++;
+			// In the beginning of the loop, we add scheduling_class
+			// to the `info_by_sched_cls_` map.
+			// In cases like dead owners, we may not add any tasks
+			// to `running_tasks` so we can remove the map entry
+			// for that scheduling_class to prevent memory leaks.
+			if (sched_cls_info.running_tasks.size() == 0) {
+				info_by_sched_cls_.erase(scheduling_class);
+			}
     }
   }
 }
@@ -382,6 +378,8 @@ bool LocalTaskManager::TrySpillback(const std::shared_ptr<internal::Work> &work,
       /*requires_object_store_memory*/ false,
       &is_infeasible);
 
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] is_infeasible: " << is_infeasible << " node is nill: " << scheduling_node_id.IsNil()
+		<< " self_node:" <<(scheduling_node_id.Binary()==self_node_id_.Binary());
   if (is_infeasible || scheduling_node_id.IsNil() ||
       scheduling_node_id.Binary() == self_node_id_.Binary()) {
     return false;
@@ -436,21 +434,20 @@ bool LocalTaskManager::PoppedWorkerHandler(
 
   auto erase_from_dispatch_queue_fn = [this](const std::shared_ptr<internal::Work> &work,
                                              const SchedulingClass &scheduling_class) {
-    auto shapes_it = tasks_to_dispatch_.find(scheduling_class);
-    //auto shapes_it = tasks_to_dispatch_.find(sched_cls_for_dfs);
-    RAY_CHECK(shapes_it != tasks_to_dispatch_.end()) << scheduling_class;
+    auto shapes_it = dfs_tasks_to_dispatch_.find(work->PrioritizeLocalNode());
+    RAY_CHECK(shapes_it != dfs_tasks_to_dispatch_.end());
     auto &dispatch_queue = shapes_it->second;
     bool erased = false;
     for (auto work_it = dispatch_queue.begin(); work_it != dispatch_queue.end();
          work_it++) {
-      if (*work_it == work) {
+      if (work_it->second == work) {
         dispatch_queue.erase(work_it);
         erased = true;
         break;
       }
     }
     if (dispatch_queue.empty()) {
-      tasks_to_dispatch_.erase(shapes_it);
+      dfs_tasks_to_dispatch_.erase(work->PrioritizeLocalNode());
     }
     RAY_CHECK(erased);
   };
@@ -596,8 +593,8 @@ void LocalTaskManager::TasksUnblocked(const std::vector<TaskID> &ready_ids) {
       const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
       //const auto scheduling_key = 0;
       RAY_LOG(DEBUG) << "Args ready, task can be dispatched "
-                     << task.GetTaskSpecification().TaskId();
-      tasks_to_dispatch_[scheduling_key].push_back(work);
+                     << task.GetTaskSpecification().TaskId() << " scheduling_key:" << scheduling_key;
+			dfs_tasks_to_dispatch_[work->PrioritizeLocalNode()].emplace(work->task.GetTaskSpecification().GetPriority(),work);
       waiting_task_queue_.erase(it->second);
       waiting_tasks_index_.erase(it);
     }
@@ -754,18 +751,17 @@ bool LocalTaskManager::CancelTask(
     const TaskID &task_id,
     rpc::RequestWorkerLeaseReply::SchedulingFailureType failure_type,
     const std::string &scheduling_failure_message) {
-  for (auto shapes_it = tasks_to_dispatch_.begin(); shapes_it != tasks_to_dispatch_.end();
-       shapes_it++) {
-    auto &work_queue = shapes_it->second;
+	for (int i = 0; i < LOCALITY_NUM; i++){
+    auto &work_queue = dfs_tasks_to_dispatch_[i];
     for (auto work_it = work_queue.begin(); work_it != work_queue.end(); work_it++) {
-      const auto &task = (*work_it)->task;
+      const auto &task = work_it->second->task;
       if (task.GetTaskSpecification().TaskId() == task_id) {
         RAY_LOG(DEBUG) << "Canceling task " << task_id << " from dispatch queue.";
-        ReplyCancelled(*work_it, failure_type, scheduling_failure_message);
-        if ((*work_it)->GetState() == internal::WorkStatus::WAITING_FOR_WORKER) {
+        ReplyCancelled(work_it->second, failure_type, scheduling_failure_message);
+        if (work_it->second->GetState() == internal::WorkStatus::WAITING_FOR_WORKER) {
           // We've already acquired resources so we need to release them.
           cluster_resource_scheduler_->GetLocalResourceManager().ReleaseWorkerResources(
-              (*work_it)->allocated_instances);
+              work_it->second->allocated_instances);
           // Release pinned task args.
           ReleaseTaskArgs(task_id);
         }
@@ -774,10 +770,10 @@ bool LocalTaskManager::CancelTask(
               task.GetTaskSpecification().TaskId());
         }
         RemoveFromRunningTasksIfExists(task);
-        (*work_it)->SetStateCancelled();
+        work_it->second->SetStateCancelled();
         work_queue.erase(work_it);
         if (work_queue.empty()) {
-          tasks_to_dispatch_.erase(shapes_it);
+          dfs_tasks_to_dispatch_.erase(i);
         }
         return true;
       }
@@ -809,11 +805,11 @@ bool LocalTaskManager::AnyPendingTasksForResourceAcquisition(
   // We are guaranteed that these tasks are blocked waiting for resources after a
   // call to ScheduleAndDispatchTasks(). They may be waiting for workers as well, but
   // this should be a transient condition only.
-  for (const auto &shapes_it : tasks_to_dispatch_) {
-    auto &work_queue = shapes_it.second;
+  for (const auto &local_it : dfs_tasks_to_dispatch_) {
+    auto &work_queue = local_it.second;
     for (const auto &work_it : work_queue) {
-      const auto &work = *work_it;
-      const auto &task = work_it->task;
+      const auto &work = *work_it.second;
+      const auto &task = work_it.second->task;
 
       // If the work is not in the waiting state, it will be scheduled soon or won't be
       // scheduled. Consider as non-pending.

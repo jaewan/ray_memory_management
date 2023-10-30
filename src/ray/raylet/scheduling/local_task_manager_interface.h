@@ -35,7 +35,7 @@ class ILocalTaskManager {
   virtual void QueueAndScheduleTask(std::shared_ptr<internal::Work> work) = 0;
 
   // Schedule and dispatch tasks.
-  virtual void ScheduleAndDispatchTasks() = 0;
+  virtual void ScheduleAndDispatchTasks(bool remote_node_updated = false) = 0;
 
   virtual void SetBlockTaskPriority(Priority base_priority) = 0;
 
@@ -88,7 +88,7 @@ class NoopLocalTaskManager : public ILocalTaskManager {
   }
 
   // Schedule and dispatch tasks.
-  void ScheduleAndDispatchTasks() override {}
+  void ScheduleAndDispatchTasks(bool remote_node_updated = false) override {}
 
   void SetBlockTaskPriority(Priority base_priority) override {
     RAY_CHECK(false)

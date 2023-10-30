@@ -95,7 +95,7 @@ class LocalTaskManager : public ILocalTaskManager {
   void QueueAndScheduleTask(std::shared_ptr<internal::Work> work) override;
 
   // Schedule and dispatch tasks.
-  void ScheduleAndDispatchTasks() override;
+  void ScheduleAndDispatchTasks(bool remote_node_updated = false) override;
 
   /// Move tasks from waiting to ready for dispatch. Called when a task's
   /// dependencies are resolved.
@@ -212,7 +212,7 @@ class LocalTaskManager : public ILocalTaskManager {
   /// If there are not enough resources locally, up to one task per resource
   /// shape (the task at the head of the queue) will get spilled back to a
   /// different node.
-  void DispatchScheduledTasksToWorkers();
+  void DispatchScheduledTasksToWorkers(bool remote_worker_available = false);
 
   /// Helper method when the current node does not have the available resources to run a
   /// task.
@@ -314,6 +314,9 @@ class LocalTaskManager : public ILocalTaskManager {
   /// is still queued.
   absl::flat_hash_map<SchedulingClass, std::deque<std::shared_ptr<internal::Work>>>
       tasks_to_dispatch_;
+
+	absl::btree_map<int, absl::btree_map<ray::Priority, std::shared_ptr<internal::Work>>> 
+			dfs_tasks_to_dispatch_;
 
   ray::Priority block_requested_priority_;
 

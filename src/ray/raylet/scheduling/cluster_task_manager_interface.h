@@ -25,7 +25,7 @@ class ClusterTaskManagerInterface {
   virtual ~ClusterTaskManagerInterface() = default;
 
   // Schedule and dispatch tasks.
-  virtual void ScheduleAndDispatchTasks() = 0;
+  virtual void ScheduleAndDispatchTasks(bool remote_node_updated = false) = 0;
   ;
   /// Populate the relevant parts of the heartbeat table. This is intended for
   /// sending raylet <-> gcs heartbeats. In particular, this should fill in

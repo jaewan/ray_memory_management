@@ -1262,7 +1262,8 @@ void NodeManager::UpdateResourceUsage(const NodeID &node_id,
 
   // If light resource usage report enabled, we update remote resources only when related
   // resources map in heartbeat is not empty.
-  cluster_task_manager_->ScheduleAndDispatchTasks();
+	bool remote_node_updated = node_id != self_node_id_;
+  cluster_task_manager_->ScheduleAndDispatchTasks(remote_node_updated);
 }
 
 void NodeManager::ResourceUsageBatchReceived(
@@ -2080,7 +2081,6 @@ void NodeManager::HandleReturnWorker(const rpc::ReturnWorkerRequest &request,
 	RAY_LOG(DEBUG) << "[JAE_DEBUG] " << __func__ << " worker:" << worker_id;
   if (worker) {
     if (request.disconnect_worker()) {
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] " << __func__ << " disconnect_worker";
       // The worker should be destroyed.
       DisconnectClient(worker->Connection(),
                        rpc::WorkerExitType::SYSTEM_ERROR,
@@ -2088,12 +2088,10 @@ void NodeManager::HandleReturnWorker(const rpc::ReturnWorkerRequest &request,
                        "to be destroyed when it is returned.");
     } else {
       if (worker->IsBlocked()) {
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] " << __func__ << " worker is blocked";
         // Handle the edge case where the worker was returned before we got the
         // unblock RPC by unblocking it immediately (unblock is idempotent).
         HandleDirectCallTaskUnblocked(worker);
       }
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] " << __func__ << " releaseworkerResources";
       local_task_manager_->ReleaseWorkerResources(worker);
       // If the worker is exiting, don't add it to our pool. The worker will cleanup
       // and terminate itself.

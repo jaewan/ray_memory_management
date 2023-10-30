@@ -132,7 +132,7 @@ class ClusterTaskManager : public ClusterTaskManagerInterface {
                                              int *num_pending_tasks) const override;
 
   // Schedule and dispatch tasks.
-  void ScheduleAndDispatchTasks() override;
+  void ScheduleAndDispatchTasks(bool remote_node_updated = false) override;
 
   /// Record the internal metrics.
   void RecordMetrics() const override;

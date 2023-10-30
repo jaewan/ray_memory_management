@@ -50,15 +50,13 @@ ClusterTaskManager::ClusterTaskManager(
       leased_workers_size_(leased_workers_size),
       get_time_ms_(get_time_ms){}
 
-inline void LogLeaseSeq(const std::string &fnc_name, const Priority &pri){
-	/*
+inline void LogLeaseSeq(const std::string &fnc_name, const Priority &pri, NodeID &node_id){
   std::ofstream log_stream("/tmp/ray/raylet_log", std::ios_base::app);
   std::ostringstream stream;
-  stream << fnc_name << " " << pri << "\n";
+  stream << fnc_name << " " << pri << " to node:" << node_id << "\n";
   std::string log_str = stream.str();
   log_stream << log_str;
   log_stream.close();
-	*/
 }
 
 void ClusterTaskManager::QueueAndScheduleTask(
@@ -85,7 +83,6 @@ void ClusterTaskManager::QueueAndScheduleTask(
     tasks_to_schedule_[scheduling_class].push_back(work);
     dfs_tasks_to_schedule_.emplace(pri, work);
   }
-	LogLeaseSeq("Lease Req", task.GetTaskSpecification().GetPriority());
   ScheduleAndDispatchTasks();
 }
 
@@ -102,7 +99,7 @@ void ReplyCancelled(const internal::Work &work,
 }
 }  // namespace
 
-void ClusterTaskManager::ScheduleAndDispatchTasks() {
+void ClusterTaskManager::ScheduleAndDispatchTasks(bool remote_node_updated) {
   // Always try to schedule infeasible tasks in case they are now feasible.
   TryScheduleInfeasibleTask();
   for (auto que_it = dfs_tasks_to_schedule_.begin();
@@ -190,8 +187,8 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 
 			continue;
 		}
-		LogLeaseSeq("\t\t Granted to ", task.GetTaskSpecification().GetPriority());
 		NodeID node_id = NodeID::FromBinary(scheduling_node_id.Binary());
+		LogLeaseSeq("\t\t Granted to ", task.GetTaskSpecification().GetPriority(), node_id);
 		ScheduleOnNode(node_id, work);
 		for(auto it = tasks_to_schedule_[scheduling_class].begin(); it != tasks_to_schedule_[scheduling_class].end(); it++){
 			if ( *it == que_it->second){
@@ -200,11 +197,10 @@ void ClusterTaskManager::ScheduleAndDispatchTasks() {
 			}
 		}
 		que_it = dfs_tasks_to_schedule_.erase(que_it);
-    }
+	}
 
-  local_task_manager_->ScheduleAndDispatchTasks();
+  local_task_manager_->ScheduleAndDispatchTasks(remote_node_updated);
 }
-
 
 // No DFS for infeasibleTasks
 void ClusterTaskManager::TryScheduleInfeasibleTask() {
@@ -362,6 +358,8 @@ void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
                                         const std::shared_ptr<internal::Work> &work) {
   static const bool enable_blockTasks = RayConfig::instance().enable_BlockTasks();
   if (spillback_to == self_node_id_ && local_task_manager_) {
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] ScheduleOnNode calling local_task_manager QueueAndScheduleTask on task:"
+									 << work->task.GetTaskSpecification().TaskId();
     local_task_manager_->QueueAndScheduleTask(work);
     return;
   }
@@ -396,6 +394,7 @@ void ClusterTaskManager::ScheduleOnNode(const NodeID &spillback_to,
       node_info_ptr->node_manager_address());
   reply->mutable_retry_at_raylet_address()->set_port(node_info_ptr->node_manager_port());
   reply->mutable_retry_at_raylet_address()->set_raylet_id(spillback_to.Binary());
+  RAY_LOG(DEBUG) << "[JAE_DEBUG] confirming Spilling task " << task_spec.TaskId() << " to node " << spillback_to;
   if (enable_blockTasks){
     auto p = reply->mutable_priority();
     p->Clear();
