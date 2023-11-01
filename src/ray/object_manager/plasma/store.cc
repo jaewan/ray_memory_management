@@ -211,6 +211,13 @@ PlasmaError PlasmaStore::HandleCreateObjectRequest(
     }
   }
 
+	if (allocated_percentage > 0.8) {
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] pre-evicting when the object store is at 80%" 
+			<< " footprint_limit:" << footprint_limit
+			<< " allocated_percentage:" << allocated_percentage
+			<< " Requesting to evict:" << (footprint_limit*(allocated_percentage-0.8));
+		object_lifecycle_mgr_.RequireSpace(footprint_limit*(allocated_percentage-0.8));
+	}
   // Trigger object spilling if current usage is above the specified threshold.
   if (spilling_required != nullptr) {
     if (footprint_limit != 0) {
@@ -495,19 +502,16 @@ Status PlasmaStore::ProcessMessage(const std::shared_ptr<Client> &client,
     error_codes.reserve(object_ids.size());
     for (auto &object_id : object_ids) {
       error_codes.push_back(object_lifecycle_mgr_.DeleteObject(object_id));
-	  //Unset block_task if the object store has less object than threshold
-	  //if(block_task_flag_.load(std::memory_order_relaxed)){
-	  const int64_t footprint_limit = allocator_.GetFootprintLimit();
+			const int64_t footprint_limit = allocator_.GetFootprintLimit();
       float allocated_percentage = 0;
-	  if (footprint_limit != 0) {
-		allocated_percentage = static_cast<float>(allocator_.Allocated()) / footprint_limit;
-	  }
-	  if(allocated_percentage < block_tasks_threshold_){
-		RAY_LOG(DEBUG) << "[JAE_DEBUG] on_object_creation_blocked_callback unsetting block task allocated allocated_percentage is " << allocated_percentage;
-	    on_object_creation_blocked_callback_(ray::Priority(), ObjectID(), false, true, false, false, 0, 0);
-	    block_task_flag_ = false;
-	  }
-      //}
+			if (footprint_limit != 0) {
+				allocated_percentage = static_cast<float>(allocator_.Allocated()) / footprint_limit;
+			}
+			if(allocated_percentage < block_tasks_threshold_){
+			RAY_LOG(DEBUG) << "[JAE_DEBUG] on_object_creation_blocked_callback unsetting block task allocated allocated_percentage is " << allocated_percentage;
+				on_object_creation_blocked_callback_(ray::Priority(), ObjectID(), false, true, false, false, 0, 0);
+				block_task_flag_ = false;
+			}
     }
     RAY_RETURN_NOT_OK(SendDeleteReply(client, object_ids, error_codes));
   } break;

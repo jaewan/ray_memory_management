@@ -26,7 +26,6 @@ void LocalObjectManager::PinObjectsAndWaitForFree(
     const std::vector<ObjectID> &object_ids,
     std::vector<std::unique_ptr<RayObject>> &&objects,
     const rpc::Address &owner_address) {
-  RAY_LOG(DEBUG) << "[JAE_DEBUG] [" << __func__ << "] Called :" << object_ids.size();
   static const bool enable_eagerSpill = RayConfig::instance().enable_EagerSpill();
   for (size_t i = 0; i < object_ids.size(); i++) {
     const auto &object_id = object_ids[i];
@@ -219,7 +218,7 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
 			(objects_pending_eager_spill_.count(object_id)) > 0 ||
 			(eager_spilled_objects_.count(object_id)));
   if (pinned_objects_.count(object_id)) {
-	RemovePinnedObjects(object_id, pinned_objects_[object_id]->GetSize());
+		RemovePinnedObjects(object_id, pinned_objects_[object_id]->GetSize());
     local_objects_.erase(it);
   } else {
     // If the object is being spilled or is already spilled, then we will clean
@@ -229,20 +228,20 @@ void LocalObjectManager::ReleaseFreedObject(const ObjectID &object_id) {
   }
 
   if(eager_spilled_objects_.count(object_id)) {
-	auto entry = spilled_objects_url_.find(object_id);
+		auto entry = spilled_objects_url_.find(object_id);
     RAY_CHECK(entry != spilled_objects_url_.end());
-	auto object_url = entry->second;
+		auto object_url = entry->second;
     RAY_LOG(DEBUG) << "[JAE_DEBUG] delete eager spilled object " << object_id;
     std::vector<std::string> object_url_to_delete;
     object_url_to_delete.emplace_back(object_url);
-	DeleteEagerSpilledObject(object_id, 0);
+		DeleteEagerSpilledObject(object_id, 0);
     eager_spilled_objects_.erase(object_id);
 
     //DeleteSpilledObjects(object_url_to_delete);
 
   }else if(objects_pending_eager_spill_.contains(object_id)){
     RAY_LOG(DEBUG) << "[JAE_DEBUG] object " << object_id << " was freed during eager spill";
-	freed_during_eager_spill_.emplace(object_id);
+		freed_during_eager_spill_.emplace(object_id);
   }
 
   // Try to evict all copies of the object from the cluster.
@@ -602,7 +601,7 @@ void LocalObjectManager::EagerSpillObjectsInternal(
                 const auto &object_id = requested_objects_to_spill[i];
                 auto it = objects_pending_eager_spill_.find(object_id);
                 RAY_CHECK(it != objects_pending_eager_spill_.end());
-				RAY_LOG(DEBUG) << "[JAE_DEBUG] eager spilling error for obj: " << object_id;
+								RAY_LOG(DEBUG) << "[JAE_DEBUG] eager spilling error for obj: " << object_id;
                 pinned_objects_size_ += it->second->GetSize();
                 pinned_objects_.emplace(object_id, std::move(it->second));
                 pinned_objects_prioity_[objectID_to_priority_[object_id]].insert(object_id);

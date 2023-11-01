@@ -316,12 +316,6 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
       push_error_callback,
       RayConfig::instance().max_lineage_bytes()));
 
-	// Timestamp coordiation with raylet for priority DFS
-	local_raylet_client_->TimeStampCoordination([this](const Status &status, 
-													   const rpc::TimeStampCoordinationReply &reply){
-			task_manager_->CoordinateTimeStamp(status, reply);
-      });
-
   // Create an entry for the driver task in the task table. This task is
   // added immediately with status RUNNING. This allows us to push errors
   // related to this driver task back to the driver. For example, if the
@@ -407,9 +401,6 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
       boost::asio::steady_timer(io_service_),
       RayConfig::instance().max_pending_lease_requests_per_scheduling_category());
 
-	for (auto &p : node_updates){
-		direct_task_submitter_->UpdateNumWorkersPerRaylet(p.first, p.second);
-	}
   auto report_locality_data_callback = [this](
                                            const ObjectID &object_id,
                                            const absl::flat_hash_set<NodeID> &locations,
@@ -533,6 +524,18 @@ CoreWorker::CoreWorker(const CoreWorkerOptions &options, const WorkerID &worker_
       [this] { InternalHeartbeat(); },
       RayConfig::instance().core_worker_internal_heartbeat_ms());
 
+
+	RAY_LOG(DEBUG) << "[JAE_DEBUG] updating num_nodes::" << node_updates.size();
+	for (auto &p : node_updates){
+		RAY_LOG(DEBUG) << "[JAE_DEBUG] raylet:" << NodeID::FromBinary(p.first) << " has worker:" << p.second;
+		direct_task_submitter_->UpdateNumWorkersPerRaylet(p.first, p.second);
+	}
+
+	// Timestamp coordiation with raylet for priority DFS
+	local_raylet_client_->TimeStampCoordination([this](const Status &status, 
+													   const rpc::TimeStampCoordinationReply &reply){
+			task_manager_->CoordinateTimeStamp(status, reply);
+	});
 #ifndef _WIN32
   // Doing this last during CoreWorker initialization, so initialization logic like
   // registering with Raylet can finish with higher priority.
